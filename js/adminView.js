@@ -282,6 +282,7 @@ const adminView = {
                 <th>UIN</th>
                 <th>Full Name</th>
                 <th>Institutional Email</th>
+                <th>Academic Year</th>
                 <th>Engineering Branch</th>
                 <th>Division</th>
                 <th>Lab Batch</th>
@@ -299,13 +300,14 @@ const adminView = {
 
   buildStudentRows(studentsList) {
     if (studentsList.length === 0) {
-      return `<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-secondary);">No student records found matching filters.</td></tr>`;
+      return `<tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-secondary);">No student records found matching filters.</td></tr>`;
     }
     return studentsList.map(s => `
       <tr>
         <td style="font-family:var(--font-mono); font-weight:600;">${s.uin}</td>
         <td style="font-weight:500;">${s.name}</td>
         <td style="font-size:12px; color:var(--accent-blue);">${s.email || `${s.uin}@eng.rizvi.edu.in`}</td>
+        <td><span class="tag tag-co" style="font-size:11px; background:var(--bg-subtle); color:var(--text-secondary);">${s.academicYear || '2026-27'}</span></td>
         <td><span class="tag tag-co" style="font-size:11px;">${s.branch || 'Mechanical Engineering'}</span></td>
         <td><span class="tag tag-bt">Div ${s.division}</span></td>
         <td><span class="tag tag-bt">Batch ${s.batch}</span></td>
@@ -352,11 +354,22 @@ const adminView = {
   },
 
   openAddStudentModal() {
+    const ayOptions = (app.data.academicYears || []).map(ay => `<option value="${ay.label}" ${ay.active ? 'selected' : ''}>Academic Year ${ay.label} ${ay.active ? '(Active)' : ''}</option>`).join('');
+    const divOptions = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(d => `<option value="${d}">Division ${d}</option>`).join('');
+
     app.showModal('Enroll New Student for Google Auth', `
       <form onsubmit="adminView.saveNewStudent(event)">
-        <div class="form-group">
-          <label class="form-label">UIN Number</label>
-          <input type="text" id="new-uin" class="form-input code-font" placeholder="24051009" required>
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">UIN Number</label>
+            <input type="text" id="new-uin" class="form-input code-font" placeholder="24051009" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Academic Year</label>
+            <select id="new-ay" class="form-select">
+              ${ayOptions}
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Full Name</label>
@@ -376,15 +389,12 @@ const adminView = {
           <div class="form-group" style="flex:1;">
             <label class="form-label">Division</label>
             <select id="new-div" class="form-select">
-              <option value="A">Division A</option>
-              <option value="B">Division B</option>
-              <option value="C">Division C</option>
-              <option value="D">Division D</option>
+              ${divOptions}
             </select>
           </div>
           <div class="form-group" style="flex:1;">
             <label class="form-label">Batch</label>
-            <input type="text" id="new-batch" class="form-input code-font" value="A1" required>
+            <input type="text" id="new-batch" class="form-input code-font" value="A1" placeholder="e.g. A1, B2" required>
           </div>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
@@ -402,6 +412,7 @@ const adminView = {
       uin: document.getElementById('new-uin').value,
       name: document.getElementById('new-name').value,
       email: document.getElementById('new-email').value,
+      academicYear: document.getElementById('new-ay').value,
       branch: document.getElementById('new-branch').value,
       division: document.getElementById('new-div').value,
       batch: document.getElementById('new-batch').value
@@ -409,7 +420,7 @@ const adminView = {
     app.data.students.push(newSt);
     app.saveState();
     app.closeModal();
-    app.showToast(`Enrolled student ${newSt.name} (${newSt.uin})`, 'success');
+    app.showToast(`Enrolled student ${newSt.name} (${newSt.uin}) for AY ${newSt.academicYear}`, 'success');
     this.renderStudentsMaster(document.getElementById('main-content'));
   },
 
