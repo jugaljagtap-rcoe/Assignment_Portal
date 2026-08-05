@@ -1,6 +1,18 @@
 /* ==========================================================================
-   Google OAuth Configuration & Helper Functions
+   Supabase Cloud & Google OAuth Configuration
    ========================================================================== */
+const SUPABASE_URL = 'https://xnwfnheyrivufthstdff.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhud2ZuaGV5cml2dWZ0aHN0ZGZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5MzY3NDYsImV4cCI6MjEwMTUxMjc0Nn0.1uym3rtdMJmOM6LvOHdfyl3LdVJvueherHkkBf1Wulk';
+
+let supabaseClient = null;
+if (window.supabase && typeof window.supabase.createClient === 'function') {
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (e) {
+    console.warn('Supabase client initialization notice:', e);
+  }
+}
+
 const GOOGLE_CLIENT_ID = window.GOOGLE_CLIENT_ID || '46812612247-sm9usgtn5e55a5mtk4o8lap3jqhr1vu1.apps.googleusercontent.com';
 
 function parseJwtToken(token) {
@@ -29,6 +41,7 @@ class AppEngine {
 
   init() {
     this.setupEventListeners();
+    this.syncWithSupabase();
     if (!this.currentUser) {
       // Prompt Google Auth Sign-In Modal on startup if not logged in
       this.showLoginModal(false);
@@ -36,6 +49,62 @@ class AppEngine {
     this.renderRoleSwitcher();
     this.renderSidebar();
     this.renderCurrentView();
+  }
+
+  async syncWithSupabase() {
+    if (!supabaseClient) return;
+    try {
+      // Fetch students from Supabase
+      const { data: stData, error: stErr } = await supabaseClient.from('students').select('*');
+      if (!stErr && stData && Array.isArray(stData) && stData.length > 0) {
+        stData.forEach(st => {
+          const existingIdx = this.data.students.findIndex(s => s.id === st.id || s.email === st.email || s.uin === st.uin);
+          const formattedSt = {
+            id: st.id,
+            uin: st.uin,
+            name: st.name,
+            email: st.email,
+            academicYear: st.academic_year || st.academicYear || '2026-27',
+            branch: st.branch,
+            division: st.division,
+            batch: st.batch
+          };
+          if (existingIdx >= 0) {
+            this.data.students[existingIdx] = formattedSt;
+          } else {
+            this.data.students.push(formattedSt);
+          }
+        });
+        this.saveState();
+        this.renderCurrentView();
+      }
+
+      // Fetch faculty from Supabase
+      const { data: facData, error: facErr } = await supabaseClient.from('faculty').select('*');
+      if (!facErr && facData && Array.isArray(facData) && facData.length > 0) {
+        facData.forEach(f => {
+          const existingIdx = this.data.faculty.findIndex(fac => fac.id === f.id || fac.email === f.email);
+          const formattedFac = {
+            id: f.id,
+            name: f.name,
+            email: f.email,
+            departmentId: f.department_id || f.departmentId,
+            role: f.role,
+            assignedSubjects: f.assigned_subjects || f.assignedSubjects || [],
+            isDualRole: f.is_dual_role || f.isDualRole || false
+          };
+          if (existingIdx >= 0) {
+            this.data.faculty[existingIdx] = formattedFac;
+          } else {
+            this.data.faculty.push(formattedFac);
+          }
+        });
+        this.saveState();
+        this.renderCurrentView();
+      }
+    } catch (e) {
+      console.warn('Supabase cloud sync background notice:', e);
+    }
   }
 
   loadUserSession() {

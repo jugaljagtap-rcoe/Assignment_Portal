@@ -419,6 +419,23 @@ const adminView = {
     };
     app.data.students.push(newSt);
     app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('students').upsert({
+        id: newSt.id,
+        uin: newSt.uin,
+        name: newSt.name,
+        email: newSt.email,
+        academic_year: newSt.academicYear,
+        branch: newSt.branch,
+        division: newSt.division,
+        batch: newSt.batch
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase cloud sync notice:', error);
+        else console.log('Student synced to Supabase Cloud:', newSt.name);
+      });
+    }
+
     app.closeModal();
     app.showToast(`Enrolled student ${newSt.name} (${newSt.uin}) for AY ${newSt.academicYear}`, 'success');
     this.renderStudentsMaster(document.getElementById('main-content'));
