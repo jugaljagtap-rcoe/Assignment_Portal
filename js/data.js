@@ -155,21 +155,10 @@ const INITIAL_DATA = {
     }
   ],
 
-  students: [
-    { id: "st-101", uin: "24051001", name: "Aarav Sharma", email: "24051001@eng.rizvi.edu.in", branch: "Mechanical Engineering", division: "A", batch: "A1" },
-    { id: "st-102", uin: "24051002", name: "Ananya Patel", email: "24051002@eng.rizvi.edu.in", branch: "Computer Engineering", division: "A", batch: "A1" },
-    { id: "st-103", uin: "24051003", name: "Devansh Mehta", email: "24051003@eng.rizvi.edu.in", branch: "Artificial Intelligence & Data Science", division: "A", batch: "A2" },
-    { id: "st-104", uin: "24051004", name: "Isha Gupta", email: "24051004@eng.rizvi.edu.in", branch: "Electronics & Computer Science", division: "A", batch: "A2" },
-    { id: "st-105", uin: "24051005", name: "Kabir Khan", email: "24051005@eng.rizvi.edu.in", branch: "Civil Engineering", division: "B", batch: "B1" },
-    { id: "st-106", uin: "24051006", name: "Riya Verma", email: "24051006@eng.rizvi.edu.in", branch: "Mechanical Engineering", division: "B", batch: "B2" },
-    { id: "st-107", uin: "24051007", name: "Siddharth Rao", email: "24051007@eng.rizvi.edu.in", branch: "Computer Engineering", division: "C", batch: "C1" },
-    { id: "st-108", uin: "24051008", name: "Zoya Shaikh", email: "24051008@eng.rizvi.edu.in", branch: "Artificial Intelligence & Data Science", division: "D", batch: "D3" }
-  ],
+  students: [],
 
   faculty: [
-    { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: ["sub-phy", "sub-mech", "sub-vmdl"], isDualRole: true },
-    { id: "fac-1", name: "Dr. Ramesh Iyer", email: "ramesh.iyer@eng.rizvi.edu.in", departmentId: "dept-fe", role: "faculty", assignedSubjects: ["sub-phy"] },
-    { id: "fac-2", name: "Prof. Priya Nair", email: "priya.nair@eng.rizvi.edu.in", departmentId: "dept-mech", role: "faculty", assignedSubjects: ["sub-mech"] }
+    { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: ["sub-phy", "sub-mech", "sub-vmdl"], isDualRole: true }
   ],
 
   subjects: [
@@ -185,157 +174,13 @@ const INITIAL_DATA = {
     { id: "co-phy-2", subjectId: "sub-phy", code: "FEL101.CO2", description: "Analyze damping parameters in oscillatory systems.", poId: "PO2" }
   ],
 
-  assignments: [
-    {
-      id: "asg-001",
-      code: "RCOE/TE-Mech/2026-27/24051181VMDL_A001",
-      subjectId: "sub-vmdl",
-      facultyId: "fac-admin-jugal",
-      number: 1,
-      title: "A001: Assignment on Mechanical Vibration Fundamentals and Free Undamped Systems",
-      description: "Perform experimental measurements on mass-spring setup. Calculate natural frequency, static deflection, and damping ratio.",
-      className: "TE Mech",
-      semester: "Semester V",
-      assessmentType: "Direct",
-      modulesCovered: "Module 01: Natural Frequency Measurement of Dynamic Systems",
-      outcomeCovered: "24051181.CO1: To familiarize with mechanical vibration fundamentals and free undamped systems",
-      publishDate: "2026-08-01T09:00",
-      deadline: "2026-08-10T23:59",
-      rubricPresetId: "rub-001",
-      createdAt: "2026-08-04",
-      schedules: [
-        {
-          id: "sch-1",
-          scopeType: "batch",
-          scopeValue: "A1",
-          publishDate: "2026-08-01T09:00",
-          deadline: "2026-08-10T23:59",
-          submissionsOpen: true,
-          gradesReleased: true,
-          attemptDeductions: [
-            { attempt: 1, deductionPct: 0 },
-            { attempt: 2, deductionPct: 10 },
-            { attempt: 3, deductionPct: 20 }
-          ],
-          latePenaltyType: "per_day",
-          latePenaltyValue: 10,
-          lateMaxCap: 30
-        }
-      ],
-      questions: [
-        {
-          id: "q-1",
-          order: 1,
-          sectionLabel: "Q1",
-          text: "A mass-spring system consists of a mass m = {{var_m_kg}} kg attached to a helical spring with stiffness k = {{var_k_Nmm}} N/mm. Determine the natural frequency ω_n and static deflection δ_st.",
-          imageUrl: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&auto=format&fit=crop&q=60",
-          coId: "24051181.CO1",
-          btLevel: "BT3",
-          parameters: [
-            { id: "param-q1-p1", code: "Q001_P01", order: 1, label: "Q1: Natural Frequency (ω_n)", acceptedUnits: ["rad/s", "Hz"], unitRequired: true, valueMarks: 4, unitMarks: 1, tolerancePct: 2 },
-            { id: "param-q1-p2", code: "Q001_P02", order: 2, label: "Q1: Static Deflection (δ_st)", acceptedUnits: ["mm", "m"], unitRequired: true, valueMarks: 4, unitMarks: 1, tolerancePct: 2 }
-          ]
-        },
-        {
-          id: "q-2",
-          order: 2,
-          sectionLabel: "Q2",
-          text: "If the damping coefficient c = {{var_c_Nsm}} N·s/m is added to the above setup, calculate the critical damping coefficient c_c and damping ratio ζ.",
-          imageUrl: "",
-          coId: "24051181.CO1",
-          btLevel: "BT4",
-          parameters: [
-            { id: "param-q2-p1", code: "Q002_P01", order: 1, label: "Q2: Damping Ratio (ζ)", acceptedUnits: ["ratio", "none"], unitRequired: false, valueMarks: 5, unitMarks: 0, tolerancePct: 3 }
-          ]
-        }
-      ]
-    }
-  ],
+  assignments: [],
 
-  studentVariables: [
-    { assignmentId: "asg-001", studentId: "st-101", uin: "24051001", key: "var_m_kg", value: "12.5" },
-    { assignmentId: "asg-001", studentId: "st-101", uin: "24051001", key: "var_k_Nmm", value: "450.0" },
-    { assignmentId: "asg-001", studentId: "st-101", uin: "24051001", key: "var_c_Nsm", value: "8.2" },
-    
-    { assignmentId: "asg-001", studentId: "st-102", uin: "24051002", key: "var_m_kg", value: "14.0" },
-    { assignmentId: "asg-001", studentId: "st-102", uin: "24051002", key: "var_k_Nmm", value: "380.0" },
-    { assignmentId: "asg-001", studentId: "st-102", uin: "24051002", key: "var_c_Nsm", value: "6.5" },
+  studentVariables: [],
 
-    { assignmentId: "asg-001", studentId: "st-103", uin: "24051003", key: "var_m_kg", value: "10.0" },
-    { assignmentId: "asg-001", studentId: "st-103", uin: "24051003", key: "var_k_Nmm", value: "400.0" },
-    { assignmentId: "asg-001", studentId: "st-103", uin: "24051003", key: "var_c_Nsm", value: "7.0" },
+  studentAnswers: [],
 
-    { assignmentId: "asg-001", studentId: "st-104", uin: "24051004", key: "var_m_kg", value: "15.5" },
-    { assignmentId: "asg-001", studentId: "st-104", uin: "24051004", key: "var_k_Nmm", value: "520.0" },
-    { assignmentId: "asg-001", studentId: "st-104", uin: "24051004", key: "var_c_Nsm", value: "9.1" },
-
-    { assignmentId: "asg-001", studentId: "st-105", uin: "24051005", key: "var_m_kg", value: "11.2" },
-    { assignmentId: "asg-001", studentId: "st-105", uin: "24051005", key: "var_k_Nmm", value: "360.0" },
-    { assignmentId: "asg-001", studentId: "st-105", uin: "24051005", key: "var_c_Nsm", value: "5.8" },
-
-    { assignmentId: "asg-001", studentId: "st-106", uin: "24051006", key: "var_m_kg", value: "13.8" },
-    { assignmentId: "asg-001", studentId: "st-106", uin: "24051006", key: "var_k_Nmm", value: "490.0" },
-    { assignmentId: "asg-001", studentId: "st-106", uin: "24051006", key: "var_c_Nsm", value: "8.0" },
-
-    { assignmentId: "asg-001", studentId: "st-107", uin: "24051007", key: "var_m_kg", value: "16.0" },
-    { assignmentId: "asg-001", studentId: "st-107", uin: "24051007", key: "var_k_Nmm", value: "410.0" },
-    { assignmentId: "asg-001", studentId: "st-107", uin: "24051007", key: "var_c_Nsm", value: "7.5" },
-
-    { assignmentId: "asg-001", studentId: "st-108", uin: "24051008", key: "var_m_kg", value: "12.0" },
-    { assignmentId: "asg-001", studentId: "st-108", uin: "24051008", key: "var_k_Nmm", value: "430.0" },
-    { assignmentId: "asg-001", studentId: "st-108", uin: "24051008", key: "var_c_Nsm", value: "6.9" }
-  ],
-
-  studentAnswers: [
-    { assignmentId: "asg-001", studentId: "st-101", parameterId: "param-q1-p1", correctValue: "189.74", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-101", parameterId: "param-q1-p2", correctValue: "0.272", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-101", parameterId: "param-q2-p1", correctValue: "0.0017", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-102", parameterId: "param-q1-p1", correctValue: "164.75", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-102", parameterId: "param-q1-p2", correctValue: "0.361", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-102", parameterId: "param-q2-p1", correctValue: "0.0014", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-103", parameterId: "param-q1-p1", correctValue: "200.00", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-103", parameterId: "param-q1-p2", correctValue: "0.245", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-103", parameterId: "param-q2-p1", correctValue: "0.0018", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-104", parameterId: "param-q1-p1", correctValue: "183.17", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-104", parameterId: "param-q1-p2", correctValue: "0.292", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-104", parameterId: "param-q2-p1", correctValue: "0.0016", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-105", parameterId: "param-q1-p1", correctValue: "179.28", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-105", parameterId: "param-q1-p2", correctValue: "0.305", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-105", parameterId: "param-q2-p1", correctValue: "0.0014", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-106", parameterId: "param-q1-p1", correctValue: "188.44", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-106", parameterId: "param-q1-p2", correctValue: "0.276", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-106", parameterId: "param-q2-p1", correctValue: "0.0015", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-107", parameterId: "param-q1-p1", correctValue: "160.08", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-107", parameterId: "param-q1-p2", correctValue: "0.383", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-107", parameterId: "param-q2-p1", correctValue: "0.0015", correctUnit: "ratio" },
-
-    { assignmentId: "asg-001", studentId: "st-108", parameterId: "param-q1-p1", correctValue: "189.30", correctUnit: "rad/s" },
-    { assignmentId: "asg-001", studentId: "st-108", parameterId: "param-q1-p2", correctValue: "0.274", correctUnit: "mm" },
-    { assignmentId: "asg-001", studentId: "st-108", parameterId: "param-q2-p1", correctValue: "0.0015", correctUnit: "ratio" }
-  ],
-
-  submissions: [
-    {
-      id: "subm-001",
-      assignmentId: "asg-001",
-      studentId: "st-101",
-      parameterId: "param-q1-p1",
-      attemptNumber: 1,
-      submittedValue: "189.74",
-      submittedUnit: "rad/s",
-      isCorrectValue: true,
-      isCorrectUnit: true,
-      marksAwarded: 4,
-      deductionPct: 0,
-      submittedAt: "2026-08-04T14:30"
-    }
-  ],
+  submissions: [],
 
   attainmentSettings: {
     studentThresholdPct: 60,

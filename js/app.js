@@ -310,10 +310,19 @@ class AppEngine {
 
   loadState() {
     let state = null;
-    const saved = localStorage.getItem('rizvi_fe_portal_data');
-    if (saved) {
-      try { state = JSON.parse(saved); } catch(e) { console.error('Failed to parse state:', e); }
+    const SEED_VERSION = 'v2_clean';
+    const currentVer = localStorage.getItem('rizvi_fe_portal_data_ver');
+
+    if (currentVer !== SEED_VERSION) {
+      localStorage.removeItem('rizvi_fe_portal_data');
+      localStorage.setItem('rizvi_fe_portal_data_ver', SEED_VERSION);
+    } else {
+      const saved = localStorage.getItem('rizvi_fe_portal_data');
+      if (saved) {
+        try { state = JSON.parse(saved); } catch(e) { console.error('Failed to parse state:', e); }
+      }
     }
+
     if (!state) {
       state = JSON.parse(JSON.stringify(INITIAL_DATA));
     }
