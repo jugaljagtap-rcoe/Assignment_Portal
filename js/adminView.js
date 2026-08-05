@@ -311,11 +311,31 @@ const adminView = {
         <td><span class="tag tag-co" style="font-size:11px;">${s.branch || 'Mechanical Engineering'}</span></td>
         <td><span class="tag tag-bt">Div ${s.division}</span></td>
         <td><span class="tag tag-bt">Batch ${s.batch}</span></td>
-        <td>
+        <td style="display:flex; gap:6px;">
           <button class="btn btn-ghost btn-sm" onclick="app.setActiveStudent('${s.id}'); app.switchRole('student');">Preview Canvas</button>
+          <button class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:11px; color:var(--danger);" onclick="adminView.deleteStudent('${s.id}')">🗑️ Delete</button>
         </td>
       </tr>
     `).join('');
+  },
+
+  deleteStudent(id) {
+    const st = app.data.students.find(s => s.id === id);
+    const nameStr = st ? `${st.name} (${st.uin})` : 'Student';
+    if (confirm(`Are you sure you want to delete ${nameStr}?`)) {
+      app.data.students = app.data.students.filter(s => s.id !== id);
+      app.saveState();
+
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+        supabaseClient.from('students').delete().eq('id', id).then(({ error }) => {
+          if (error) console.warn('Supabase delete student notice:', error);
+          else console.log('Deleted student from Supabase Cloud:', id);
+        });
+      }
+
+      app.showToast(`Deleted ${nameStr}`, 'info');
+      this.renderStudentsMaster(document.getElementById('main-content'));
+    }
   },
 
   filterStudents() {
