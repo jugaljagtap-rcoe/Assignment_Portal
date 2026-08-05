@@ -409,13 +409,13 @@ const adminView = {
     e.preventDefault();
     const newSt = {
       id: 'st-' + Date.now(),
-      uin: document.getElementById('new-uin').value,
-      name: document.getElementById('new-name').value,
-      email: document.getElementById('new-email').value,
+      uin: (document.getElementById('new-uin').value || '').trim(),
+      name: (document.getElementById('new-name').value || '').trim(),
+      email: (document.getElementById('new-email').value || '').trim().toLowerCase(),
       academicYear: document.getElementById('new-ay').value,
       branch: document.getElementById('new-branch').value,
       division: document.getElementById('new-div').value,
-      batch: document.getElementById('new-batch').value
+      batch: (document.getElementById('new-batch').value || '').trim()
     };
     app.data.students.push(newSt);
     app.saveState();

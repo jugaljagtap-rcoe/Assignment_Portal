@@ -63,17 +63,21 @@ class AppEngine {
     let role = null;
     let studentId = null;
 
-    if (HARDCODED_ADMIN_EMAILS.includes(email)) {
-      const foundFac = this.data.faculty.find(f => f.email.toLowerCase() === email);
+    if (HARDCODED_ADMIN_EMAILS.some(e => e.trim().toLowerCase() === email)) {
+      const foundFac = (this.data.faculty || []).find(f => (f.email || '').trim().toLowerCase() === email);
       role = 'admin';
       matchedUser = foundFac || { name: googlePayload ? googlePayload.name : 'Prof. Jugal Jagtap', email: email, department: 'First Year Engineering' };
     } else {
-      const fac = this.data.faculty.find(f => (f.email || '').toLowerCase() === email);
+      const fac = (this.data.faculty || []).find(f => (f.email || '').trim().toLowerCase() === email);
       if (fac) {
         role = fac.role || 'faculty';
         matchedUser = fac;
       } else {
-        const st = this.data.students.find(s => (s.email || '').toLowerCase() === email || (s.uin && email.startsWith(s.uin.toLowerCase())));
+        const st = (this.data.students || []).find(s => {
+          const sEmail = (s.email || '').trim().toLowerCase();
+          const sUin = (s.uin || '').trim().toLowerCase();
+          return (sEmail && sEmail === email) || (sEmail && email.startsWith(sEmail)) || (sUin && (email === sUin || email.startsWith(sUin)));
+        });
         if (st) {
           role = 'student';
           matchedUser = st;
@@ -310,22 +314,20 @@ class AppEngine {
 
   loadState() {
     let state = null;
-    const SEED_VERSION = 'v4_clean_subjects';
-    const currentVer = localStorage.getItem('rizvi_fe_portal_data_ver');
-
-    if (currentVer !== SEED_VERSION) {
-      localStorage.removeItem('rizvi_fe_portal_data');
-      localStorage.setItem('rizvi_fe_portal_data_ver', SEED_VERSION);
-    } else {
-      const saved = localStorage.getItem('rizvi_fe_portal_data');
-      if (saved) {
-        try { state = JSON.parse(saved); } catch(e) { console.error('Failed to parse state:', e); }
-      }
+    const saved = localStorage.getItem('rizvi_fe_portal_data');
+    if (saved) {
+      try { state = JSON.parse(saved); } catch(e) { console.error('Failed to parse state:', e); }
     }
 
     if (!state) {
       state = JSON.parse(JSON.stringify(INITIAL_DATA));
     }
+
+    if (!state.students) state.students = [];
+    if (!state.faculty) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
+    if (!state.subjects) state.subjects = [];
+    if (!state.assignments) state.assignments = [];
+    if (!state.submissions) state.submissions = [];
 
     // Force strict 6 Hardcoded Departments
     state.departments = JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS));
