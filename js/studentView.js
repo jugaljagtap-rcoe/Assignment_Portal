@@ -19,39 +19,62 @@ const studentView = {
   },
 
   renderDashboard(container) {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || app.data.students[0];
-    const assignments = app.data.assignments;
-    const schedule = app.getAssignmentSchedule('asg-001', student.batch);
+    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const assignments = app.data.assignments || [];
+    
+    let activeAsg = assignments.length > 0 ? (assignments.find(a => a.id === app.activeAssignmentId) || assignments[0]) : null;
+    let schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
+
+    let totalEarnedMarks = student ? this.calculateStudentTotalMarks(student.id) : 0;
+    let totalPossibleMarks = 0;
+
+    if (assignments.length > 0) {
+      assignments.forEach(a => {
+        (a.questions || []).forEach(q => {
+          (q.parameters || []).forEach(p => {
+            totalPossibleMarks += ((p.valueMarks || 0) + (p.unitMarks || 0));
+          });
+        });
+      });
+    }
+
+    const studentHeader = student 
+      ? `Welcome, <strong>${student.name}</strong> (<code class="code-font">${student.uin}</code>) | Branch: ${student.branch} | Div ${student.division} / Batch ${student.batch}`
+      : `Welcome to Student Lab Portal | No Student Profile Selected`;
 
     container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Student Lab Portal</h1>
-          <p class="page-subtitle">Welcome, <strong>${student.name}</strong> (<code class="code-font">${student.uin}</code>) | Branch: ${student.branch} | Div ${student.division} / Batch ${student.batch}</p>
+          <p class="page-subtitle">${studentHeader}</p>
         </div>
-        <button class="btn btn-primary" onclick="app.switchNav('solver')">✏️ Open Active Canvas Sheet</button>
+        ${activeAsg ? `<button class="btn btn-primary" onclick="app.switchNav('solver')">✏️ Open Active Canvas Sheet</button>` : ''}
       </div>
 
       <div class="kpi-grid">
         <div class="kpi-card">
           <span class="kpi-label">My Class & Division</span>
-          <span class="kpi-value">${student.division} / ${student.batch}</span>
-          <span class="kpi-trend positive">${student.branch}</span>
+          <span class="kpi-value">${student ? `${student.division} / ${student.batch}` : '--'}</span>
+          <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Active Assignment</span>
-          <span class="kpi-value">Exp 03</span>
-          <span class="kpi-trend neutral">Damped Vibration</span>
+          <span class="kpi-value">${activeAsg ? `Exp ${String(activeAsg.number).padStart(2, '0')}` : '--'}</span>
+          <span class="kpi-trend neutral">${activeAsg ? activeAsg.title.split(':')[0] : 'No Experiments'}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Batch Deadline</span>
-          <span class="kpi-value" style="font-size:16px;">${new Date(schedule.deadline).toLocaleDateString()}</span>
-          <span class="kpi-trend negative">${schedule.submissionsOpen ? 'Submissions Open' : 'Closed'}</span>
+          <span class="kpi-value" style="font-size:16px;">${schedule ? new Date(schedule.deadline).toLocaleDateString() : '--'}</span>
+          <span class="kpi-trend ${schedule && schedule.submissionsOpen ? 'negative' : 'neutral'}">
+            ${schedule ? (schedule.submissionsOpen ? 'Submissions Open' : 'Closed') : 'No Active Deadlines'}
+          </span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">My Marks Earned</span>
-          <span class="kpi-value">${this.calculateStudentTotalMarks(student.id)} / 10</span>
-          <span class="kpi-trend positive">${schedule.gradesReleased ? 'Grades Released' : 'Pending Evaluation'}</span>
+          <span class="kpi-value">${totalEarnedMarks} / ${totalPossibleMarks}</span>
+          <span class="kpi-trend positive">
+            ${schedule ? (schedule.gradesReleased ? 'Grades Released' : 'Pending Evaluation') : 'No Grades'}
+          </span>
         </div>
       </div>
 
@@ -70,16 +93,22 @@ const studentView = {
               </tr>
             </thead>
             <tbody>
-              ${assignments.map(asg => {
+              ${assignments.length === 0 ? `
+                <tr>
+                  <td colspan="6" style="text-align:center; padding:24px; color:var(--text-secondary);">
+                    ℹ️ No lab experiments currently assigned. Contact your subject faculty.
+                  </td>
+                </tr>
+              ` : assignments.map(asg => {
                 const sub = app.data.subjects.find(s => s.id === asg.subjectId);
-                const sch = app.getAssignmentSchedule(asg.id, student.batch);
+                const sch = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1');
                 return `
                   <tr>
                     <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${asg.code}</td>
                     <td style="font-weight:600;">${asg.title}</td>
                     <td><span class="tag tag-co">${sub ? sub.code : ''}</span></td>
                     <td style="font-size:12px; font-weight:600;">${new Date(sch.deadline).toLocaleString()}</td>
-                    <td><span class="tag tag-success">Open</span></td>
+                    <td><span class="tag ${sch.submissionsOpen ? 'tag-success' : 'tag-danger'}">${sch.submissionsOpen ? 'Open' : 'Closed'}</span></td>
                     <td>
                       <button class="btn btn-primary btn-sm" onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('solver');">Solve Canvas Sheet</button>
                     </td>
@@ -102,8 +131,20 @@ const studentView = {
   },
 
   renderSolverCanvas(container) {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || app.data.students[0];
-    const asg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0];
+    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const asg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || (app.data.assignments.length > 0 ? app.data.assignments[0] : null);
+
+    if (!asg || !student) {
+      container.innerHTML = `
+        <div class="card" style="padding:40px; text-align:center;">
+          <h2 style="font-size:18px; margin-bottom:8px;">No Active Canvas Sheet</h2>
+          <p style="color:var(--text-secondary); margin-bottom:16px;">There are currently no lab assignments published to solve.</p>
+          <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
+        </div>
+      `;
+      return;
+    }
+
     const subject = app.data.subjects.find(s => s.id === asg.subjectId);
     const department = subject ? app.data.departments.find(d => d.id === subject.departmentId) : null;
     const schedule = app.getAssignmentSchedule(asg.id, student.batch);
@@ -371,23 +412,26 @@ const studentView = {
   },
 
   renderStudentGrades(container) {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || app.data.students[0];
-    const mySubmissions = app.data.submissions.filter(s => s.studentId === student.id);
-    const schedule = app.getAssignmentSchedule('asg-001', student.batch);
+    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const mySubmissions = student ? app.data.submissions.filter(s => s.studentId === student.id) : [];
+    const activeAsg = app.data.assignments.length > 0 ? (app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0]) : null;
+    const schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
+
+    const studentTitle = student ? `${student.name} (${student.uin})` : 'No Student Profile Selected';
 
     container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">My Grades & Rubric Evaluation</h1>
-          <p class="page-subtitle">Personalized Evaluation Report for ${student.name} (${student.uin})</p>
+          <p class="page-subtitle">Personalized Evaluation Report for ${studentTitle}</p>
         </div>
       </div>
 
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <h3 class="card-title">Attempt History & Evaluation Log</h3>
-          <span class="tag ${schedule.gradesReleased ? 'tag-success' : 'tag-warning'}">
-            ${schedule.gradesReleased ? '🟢 Grades Released by Faculty' : '⏳ Grades Hidden Pending Release'}
+          <span class="tag ${schedule && schedule.gradesReleased ? 'tag-success' : 'tag-warning'}">
+            ${schedule ? (schedule.gradesReleased ? '🟢 Grades Released by Faculty' : '⏳ Grades Hidden Pending Release') : 'ℹ️ No Evaluation Logs'}
           </span>
         </div>
 
