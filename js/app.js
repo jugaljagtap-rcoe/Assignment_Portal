@@ -222,7 +222,7 @@ class AppEngine {
                 </div>
 
                 <div>
-                  <label style="display:block; font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">🎓 Student Master (360):</label>
+                  <label style="display:block; font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">🎓 Student Master (${this.data.students.length}):</label>
                   <select id="quick-student-select" class="form-control" style="font-size:12px;" onchange="if(this.value) app.login(this.value)">
                     <option value="">-- Select Student --</option>
                     ${studentOptions}
@@ -449,7 +449,7 @@ class AppEngine {
     if (this.currentRole === 'admin') {
       items = [
         { id: 'dashboard', label: 'Admin Dashboard', icon: '⚡' },
-        { id: 'students', label: 'Student Master (360)', icon: '🎓' },
+        { id: 'students', label: `Student Master (${this.data.students.length})`, icon: '🎓' },
         { id: 'faculty', label: 'Faculty Roster', icon: '👨‍🏫' },
         { id: 'departments', label: 'Departments & Vision/Mission', icon: '🏛️' },
         { id: 'google-auth', label: 'Google Auth & Roles', icon: '🔑' },

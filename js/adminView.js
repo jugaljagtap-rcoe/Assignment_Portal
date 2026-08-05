@@ -107,7 +107,7 @@ const adminView = {
       <div class="card" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
         <h3 class="card-title" style="color:var(--accent-blue);">🔒 Whitelist Enforcement Policy (Strict Access Control)</h3>
         <p style="font-size:13px; color:var(--text-primary); margin-top:4px;">
-          Even if an email address belongs to <code>@eng.rizvi.edu.in</code>, <strong>login is strictly denied</strong> if the email is not explicitly listed in the Admin Roster, Faculty Roster, or 360 Student Master CSV Roster. No unlisted accounts can log in!
+          Even if an email address belongs to <code>@eng.rizvi.edu.in</code>, <strong>login is strictly denied</strong> if the email is not explicitly listed in the Admin Roster, Faculty Roster, or Student Master CSV Roster. No unlisted accounts can log in!
         </p>
       </div>
 
@@ -167,7 +167,7 @@ const adminView = {
 
         <div class="card">
           <span class="tag tag-bt" style="margin-bottom:8px;">3. STUDENT MASTER</span>
-          <h4 style="font-size:15px; margin-bottom:6px;">360 Student Master CSV</h4>
+          <h4 style="font-size:15px; margin-bottom:6px;">Student Master CSV Roster</h4>
           <p style="font-size:12px; color:var(--text-secondary);">
             Students pre-imported via CSV (matching <code>uin@eng.rizvi.edu.in</code>) get access to their personalized Canvas Sheets.
           </p>
@@ -236,7 +236,7 @@ const adminView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Student Master Roster (360 Students)</h1>
+          <h1 class="page-title">Student Master Roster (${app.data.students.length} Enrolled)</h1>
           <p class="page-subtitle">Central Student Roster with Branch, Division, & Batch allocations for @eng.rizvi.edu.in</p>
         </div>
         <div style="display:flex; gap:10px;">
