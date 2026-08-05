@@ -102,12 +102,7 @@ const INITIAL_DATA = {
     { id: "PO12", code: "PO12", description: "Life-long Learning: Engage in independent and life-long learning." }
   ],
 
-  modules: [
-    { id: "mod-vmdl-1", subjectId: "sub-vmdl", code: "Module 01", title: "Module 01: Natural Frequency Measurement of Dynamic Systems" },
-    { id: "mod-vmdl-2", subjectId: "sub-vmdl", code: "Module 02", title: "Module 02: Damped Free Vibration Systems & Logarithmic Decrement" },
-    { id: "mod-phy-1", subjectId: "sub-phy", code: "Module 01", title: "Module 01: Measurements, Error Analysis & Oscillations" },
-    { id: "mod-phy-2", subjectId: "sub-phy", code: "Module 02", title: "Module 02: Wave Optics & Interference in Thin Films" }
-  ],
+  modules: [],
 
   rubricPresets: [
     {
@@ -158,21 +153,12 @@ const INITIAL_DATA = {
   students: [],
 
   faculty: [
-    { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: ["sub-phy", "sub-mech", "sub-vmdl"], isDualRole: true }
+    { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: [], isDualRole: true }
   ],
 
-  subjects: [
-    { id: "sub-phy", code: "FEL101", shortName: "PhysicsLab", fullName: "Applied Physics Laboratory I", departmentId: "dept-fe" },
-    { id: "sub-mech", code: "FEL102", shortName: "MechanicsLab", fullName: "Engineering Mechanics Laboratory", departmentId: "dept-mech" },
-    { id: "sub-vmdl", code: "24051181", shortName: "VMDL", fullName: "Vibration and Machinery Diagnostics Laboratory", departmentId: "dept-mech" }
-  ],
+  subjects: [],
 
-  courseOutcomes: [
-    { id: "co-vmdl-1", subjectId: "sub-vmdl", code: "24051181.CO1", description: "To familiarize with mechanical vibration fundamentals and free undamped systems.", poId: "PO1" },
-    { id: "co-vmdl-2", subjectId: "sub-vmdl", code: "24051181.CO2", description: "Analyze damping parameters and logarithmic decrement in dynamic systems.", poId: "PO2" },
-    { id: "co-phy-1", subjectId: "sub-phy", code: "FEL101.CO1", description: "Determine natural frequency of mechanical systems.", poId: "PO1" },
-    { id: "co-phy-2", subjectId: "sub-phy", code: "FEL101.CO2", description: "Analyze damping parameters in oscillatory systems.", poId: "PO2" }
-  ],
+  courseOutcomes: [],
 
   assignments: [],
 

@@ -310,7 +310,7 @@ class AppEngine {
 
   loadState() {
     let state = null;
-    const SEED_VERSION = 'v2_clean';
+    const SEED_VERSION = 'v4_clean_subjects';
     const currentVer = localStorage.getItem('rizvi_fe_portal_data_ver');
 
     if (currentVer !== SEED_VERSION) {
