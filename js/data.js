@@ -102,6 +102,11 @@ const INITIAL_DATA = {
     { id: "PO12", code: "PO12", description: "Life-long Learning: Engage in independent and life-long learning." }
   ],
 
+  programSpecificOutcomes: [
+    { id: "PSO1", code: "PSO1", description: "Domain Modeling & Simulation: Apply modern engineering software tools to solve domain-specific problems." },
+    { id: "PSO2", code: "PSO2", description: "Practical & Laboratory Competency: Design, execute, and analyze real-world laboratory experiments." }
+  ],
+
   modules: [],
 
   rubricPresets: [

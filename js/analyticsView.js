@@ -49,9 +49,9 @@ const analyticsView = {
 
       <div class="kpi-grid">
         <div class="kpi-card">
-          <span class="kpi-label">Course Outcomes Defined</span>
+          <span class="kpi-label">Outcomes (CO/LO) Defined</span>
           <span class="kpi-value">${courseOutcomes.length}</span>
-          <span class="kpi-trend positive">${courseOutcomes.length > 0 ? 'Mapped to POs' : 'No COs Defined'}</span>
+          <span class="kpi-trend positive">${courseOutcomes.length > 0 ? 'Mapped in Net Matrix' : 'No Outcomes Defined'}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Class Target Attainment</span>
@@ -60,9 +60,9 @@ const analyticsView = {
         </div>
         ${coStats.length === 0 ? `
           <div class="kpi-card">
-            <span class="kpi-label">CO Attainment Status</span>
-            <span class="kpi-value" style="font-size:18px; color:var(--text-secondary);">No CO Data</span>
-            <span class="kpi-trend neutral">Add COs in Faculty Portal</span>
+            <span class="kpi-label">Outcome Attainment Status</span>
+            <span class="kpi-value" style="font-size:18px; color:var(--text-secondary);">No Outcome Data</span>
+            <span class="kpi-trend neutral">Add Outcomes in Faculty Portal</span>
           </div>
           <div class="kpi-card">
             <span class="kpi-label">Enrolled Students</span>
@@ -79,16 +79,17 @@ const analyticsView = {
       </div>
 
       <div class="card" style="margin-top:24px;">
-        <h3 class="card-title">Direct Course Outcome (CO) Attainment Report</h3>
+        <h3 class="card-title">Direct Course & Lab Outcome (CO/LO) Attainment Report</h3>
         <p class="card-subtitle" style="margin-bottom:16px;">Derived dynamically from student submission performance logs</p>
 
         <div class="table-container">
           <table class="custom-table">
             <thead>
               <tr>
-                <th>CO Code</th>
+                <th>Type</th>
+                <th>Outcome Code</th>
                 <th>Outcome Description</th>
-                <th>Mapped PO</th>
+                <th>Mapped POs</th>
                 <th>Students Attaining (≥${app.data.attainmentSettings.studentThresholdPct}%)</th>
                 <th>Class Attainment %</th>
                 <th>Target Met Status</th>
@@ -97,25 +98,33 @@ const analyticsView = {
             <tbody>
               ${coStats.length === 0 ? `
                 <tr>
-                  <td colspan="6" style="text-align:center; padding:24px; color:var(--text-secondary);">
-                    ℹ️ No Course Outcomes (COs) defined yet. Add Course Outcomes under <strong>"Course Outcomes & Modules"</strong> in Faculty Portal.
+                  <td colspan="7" style="text-align:center; padding:24px; color:var(--text-secondary);">
+                    ℹ️ No Outcomes (COs/LOs) defined yet. Add Outcomes under <strong>"Course Outcomes & Modules"</strong> in Faculty Portal.
                   </td>
                 </tr>
               ` : 
-                coStats.map(cs => `
-                  <tr>
-                    <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">${cs.co.code}</td>
-                    <td>${cs.co.description}</td>
-                    <td><span class="tag tag-bt">${cs.co.poId || 'PO1'}</span></td>
-                    <td><strong>${cs.passingStudents} / ${totalStudents}</strong></td>
-                    <td style="font-weight:700; font-size:16px;">${cs.attainmentPct}%</td>
-                    <td>
-                      <span class="tag ${cs.targetMet ? 'tag-success' : 'tag-danger'}">
-                        ${cs.targetMet ? '✓ Target Met (Level 3)' : '✕ Target Pending (Level 1)'}
-                      </span>
-                    </td>
-                  </tr>
-                `).join('')
+                coStats.map(cs => {
+                  const type = cs.co.type || (cs.co.code && cs.co.code.includes('.LO') ? 'LO' : 'CO');
+                  const poList = cs.co.poIds || (cs.co.poId ? [cs.co.poId] : []);
+                  return `
+                    <tr>
+                      <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type}</span></td>
+                      <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">${cs.co.code}</td>
+                      <td>${cs.co.description}</td>
+                      <td>
+                        ${poList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                          poList.map(po => `<span class="tag tag-bt" style="margin-right:4px;">${po}</span>`).join('')}
+                      </td>
+                      <td><strong>${cs.passingStudents} / ${totalStudents}</strong></td>
+                      <td style="font-weight:700; font-size:16px;">${cs.attainmentPct}%</td>
+                      <td>
+                        <span class="tag ${cs.targetMet ? 'tag-success' : 'tag-danger'}">
+                          ${cs.targetMet ? '✓ Target Met (Level 3)' : '✕ Target Pending (Level 1)'}
+                        </span>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')
               }
             </tbody>
           </table>

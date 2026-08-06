@@ -277,19 +277,46 @@ const facultyView = {
     `);
   },
 
+  activeOutcomesSubTab: 'list',
+  activeMatrixSubjectId: 'all',
+
+  switchOutcomesSubTab(tabName) {
+    this.activeOutcomesSubTab = tabName;
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
+  },
+
   renderCOAndModulesManager(container) {
+    const isList = this.activeOutcomesSubTab === 'list';
+    const isMatrix = this.activeOutcomesSubTab === 'matrix';
+
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Course Outcomes & Subject Modules</h1>
-          <p class="page-subtitle">Manage Syllabus Modules & Course Outcomes (COs) for your assigned subjects</p>
+          <h1 class="page-title">Course & Lab Outcomes (CO / LO) & Curricular Mapping</h1>
+          <p class="page-subtitle">Manage Syllabus Modules, COs/LOs, and comprehensive Net Mapping Matrix across POs, PSOs, Modules & Labs</p>
         </div>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-secondary" onclick="facultyView.openAddModuleModal()">+ Add Subject Module</button>
-          <button class="btn btn-primary" onclick="facultyView.openAddCOModal()">+ Add Course Outcome (CO)</button>
+          <button class="btn btn-primary" onclick="facultyView.openAddCOModal()">+ Add Outcome (CO / LO)</button>
         </div>
       </div>
 
+      <!-- Sub-Tabs Navigation Bar -->
+      <div class="sub-tabs-container">
+        <button class="sub-tab-btn ${isList ? 'active' : ''}" onclick="facultyView.switchOutcomesSubTab('list')">
+          📚 Outcomes & Syllabus Modules
+        </button>
+        <button class="sub-tab-btn ${isMatrix ? 'active' : ''}" onclick="facultyView.switchOutcomesSubTab('matrix')">
+          🕸️ Net Mapping Matrix (CO/LO ↔ PO ↔ PSO ↔ Modules ↔ Experiments)
+        </button>
+      </div>
+
+      ${isList ? this.renderOutcomesListHTML() : this.renderNetMappingMatrixHTML()}
+    `;
+  },
+
+  renderOutcomesListHTML() {
+    return `
       <div class="card" style="margin-bottom:24px;">
         <h3 class="card-title" style="margin-bottom:12px;">Syllabus Modules</h3>
         <div class="table-container">
@@ -324,35 +351,162 @@ const facultyView = {
       </div>
 
       <div class="card">
-        <h3 class="card-title" style="margin-bottom:12px;">Course Outcomes (COs)</h3>
+        <h3 class="card-title" style="margin-bottom:12px;">Course Outcomes (COs) & Lab Outcomes (LOs)</h3>
         <div class="table-container">
           <table class="custom-table">
             <thead>
               <tr>
-                <th>CO Code</th>
-                <th>Course Outcome Description</th>
-                <th>Mapped PO</th>
+                <th>Type</th>
+                <th>Outcome Code</th>
+                <th>Description</th>
+                <th>Mapped POs</th>
+                <th>Mapped PSOs</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${app.data.courseOutcomes.length === 0 ? `<tr><td colspan="4" style="text-align:center; padding:16px;">No course outcomes defined yet. Click "+ Add Course Outcome (CO)" above.</td></tr>` :
-                app.data.courseOutcomes.map(co => `
-                  <tr>
-                    <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
-                    <td style="font-weight:500;">${co.description}</td>
-                    <td><span class="tag tag-bt">${co.poId || 'PO1'}</span></td>
-                    <td>
-                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
-                    </td>
-                  </tr>
-                `).join('')
+              ${(app.data.courseOutcomes || []).length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:16px;">No outcomes defined yet. Click "+ Add Outcome (CO / LO)" above.</td></tr>` :
+                app.data.courseOutcomes.map(co => {
+                  const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+                  const poList = (co.poIds && co.poIds.length > 0) ? co.poIds : (co.poId ? [co.poId] : []);
+                  const psoList = co.psoIds || [];
+                  return `
+                    <tr>
+                      <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type === 'LO' ? '🧪 Lab (LO)' : '📖 Course (CO)'}</span></td>
+                      <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
+                      <td style="font-weight:500;">${co.description}</td>
+                      <td>
+                        ${poList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                          poList.map(po => `<span class="tag tag-bt" style="margin-right:4px;">${po}</span>`).join('')}
+                      </td>
+                      <td>
+                        ${psoList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                          psoList.map(pso => `<span class="tag tag-success" style="margin-right:4px;">${pso}</span>`).join('')}
+                      </td>
+                      <td>
+                        <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')
               }
             </tbody>
           </table>
         </div>
       </div>
     `;
+  },
+
+  renderNetMappingMatrixHTML() {
+    const subjects = app.data.subjects || [];
+    const outcomes = (app.data.courseOutcomes || []).filter(co => {
+      if (this.activeMatrixSubjectId === 'all') return true;
+      return co.subjectId === this.activeMatrixSubjectId;
+    });
+
+    const pos = app.data.programOutcomes || [];
+    const psos = app.data.programSpecificOutcomes || [];
+
+    return `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h3 class="card-title" style="margin-bottom:4px;">Outcome Net Mapping Matrix</h3>
+            <p style="font-size:13px; color:var(--text-secondary);">Click on any PO or PSO chip in the grid to instantly toggle mapping for that outcome.</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="font-size:13px; font-weight:600;">Filter Subject:</label>
+            <select class="form-select" style="width:auto; padding:6px 12px;" onchange="facultyView.activeMatrixSubjectId = this.value; facultyView.renderCOAndModulesManager(document.getElementById('main-content'));">
+              <option value="all" ${this.activeMatrixSubjectId === 'all' ? 'selected' : ''}>All Subjects</option>
+              ${subjects.map(s => `<option value="${s.id}" ${this.activeMatrixSubjectId === s.id ? 'selected' : ''}>${s.code} - ${s.shortName || s.fullName}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container" style="overflow-x:auto;">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th style="text-align:left; min-width:140px;">Outcome Code</th>
+                <th style="min-width:70px;">Type</th>
+                <th style="text-align:left; min-width:220px;">Outcome Description</th>
+                <th colspan="${pos.length}">Program Outcomes (POs)</th>
+                <th colspan="${psos.length}">Program Specific Outcomes (PSOs)</th>
+              </tr>
+              <tr>
+                <th></th>
+                <th></th>
+                <th></th>
+                ${pos.map(p => `<th title="${p.description}" style="font-family:var(--font-mono); font-size:11px;">${p.code}</th>`).join('')}
+                ${psos.map(pso => `<th title="${pso.description}" style="font-family:var(--font-mono); font-size:11px;">${pso.code}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${outcomes.length === 0 ? `
+                <tr>
+                  <td colspan="${3 + pos.length + psos.length}" style="text-align:center; padding:24px; color:var(--text-muted);">
+                    No outcomes defined for this selection. Click "+ Add Outcome (CO / LO)" to create outcomes.
+                  </td>
+                </tr>
+              ` : outcomes.map(co => {
+                const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+                const poList = co.poIds || (co.poId ? [co.poId] : []);
+                const psoList = co.psoIds || [];
+
+                return `
+                  <tr>
+                    <td style="text-align:left; font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
+                    <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type}</span></td>
+                    <td style="text-align:left; font-size:12px; max-width:280px; white-space:normal;">${co.description}</td>
+                    ${pos.map(po => {
+                      const isMapped = poList.includes(po.code);
+                      return `
+                        <td class="matrix-cell-toggle" onclick="facultyView.toggleOutcomeMapping('${co.id}', '${po.code}', 'PO')">
+                          <span class="matrix-toggle-chip ${isMapped ? (type === 'LO' ? 'active-lo' : 'active') : ''}">${po.code}</span>
+                        </td>
+                      `;
+                    }).join('')}
+                    ${psos.map(pso => {
+                      const isMapped = psoList.includes(pso.code);
+                      return `
+                        <td class="matrix-cell-toggle" onclick="facultyView.toggleOutcomeMapping('${co.id}', '${pso.code}', 'PSO')">
+                          <span class="matrix-toggle-chip ${isMapped ? (type === 'LO' ? 'active-lo' : 'active') : ''}">${pso.code}</span>
+                        </td>
+                      `;
+                    }).join('')}
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
+  toggleOutcomeMapping(coId, code, type) {
+    const co = app.data.courseOutcomes.find(c => c.id === coId);
+    if (!co) return;
+
+    if (type === 'PO') {
+      if (!co.poIds) co.poIds = co.poId ? [co.poId] : [];
+      if (co.poIds.includes(code)) {
+        co.poIds = co.poIds.filter(p => p !== code);
+      } else {
+        co.poIds.push(code);
+      }
+      co.poId = co.poIds[0] || '';
+    } else if (type === 'PSO') {
+      if (!co.psoIds) co.psoIds = [];
+      if (co.psoIds.includes(code)) {
+        co.psoIds = co.psoIds.filter(p => p !== code);
+      } else {
+        co.psoIds.push(code);
+      }
+    }
+
+    app.saveState();
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
   },
 
   deleteModule(moduleId) {
@@ -369,11 +523,11 @@ const facultyView = {
   deleteCO(coId) {
     const co = app.data.courseOutcomes.find(c => c.id === coId);
     if (!co) return;
-    if (!confirm(`Are you sure you want to delete Course Outcome "${co.code}"?`)) return;
+    if (!confirm(`Are you sure you want to delete Outcome "${co.code}"?`)) return;
 
     app.data.courseOutcomes = app.data.courseOutcomes.filter(c => c.id !== coId);
     app.saveState();
-    app.showToast(`Deleted Course Outcome ${co.code}`, 'info');
+    app.showToast(`Deleted Outcome ${co.code}`, 'info');
     this.renderCOAndModulesManager(document.getElementById('main-content'));
   },
 
@@ -418,51 +572,113 @@ const facultyView = {
     this.renderCOAndModulesManager(document.getElementById('main-content'));
   },
 
+  autoGenerateOutcomeCode(subjectId, type) {
+    const sub = app.data.subjects.find(s => s.id === subjectId);
+    const subPrefix = sub ? (sub.code || 'CO') : 'CO';
+    const existing = (app.data.courseOutcomes || []).filter(c => c.subjectId === subjectId && (c.type === type || (c.code && c.code.includes('.' + type))));
+    const count = existing.length + 1;
+    return `${subPrefix}.${type}${count}`;
+  },
+
+  updateOutcomeCodePreview() {
+    const subId = document.getElementById('co-sub').value;
+    const type = document.querySelector('input[name="co-type-radio"]:checked').value;
+    const autoCode = this.autoGenerateOutcomeCode(subId, type);
+    const codeInput = document.getElementById('co-code');
+    if (codeInput) codeInput.value = autoCode;
+  },
+
   openAddCOModal() {
-    app.showModal('Add Course Outcome (CO)', `
-      <form onsubmit="facultyView.saveCO(event)">
+    const firstSubId = app.data.subjects.length > 0 ? app.data.subjects[0].id : '';
+    const initialCode = firstSubId ? this.autoGenerateOutcomeCode(firstSubId, 'CO') : '24051181.CO1';
+
+    app.showModal('Add Course / Lab Outcome (CO / LO)', `
+      <form id="co-form" onsubmit="facultyView.saveCO(event, false)">
+        <div class="form-group">
+          <label class="form-label">Outcome Category Type</label>
+          <div style="display:flex; gap:16px; margin-top:6px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:14px;">
+              <input type="radio" name="co-type-radio" value="CO" checked onchange="facultyView.updateOutcomeCodePreview()"> 📖 Course Outcome (CO)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:14px;">
+              <input type="radio" name="co-type-radio" value="LO" onchange="facultyView.updateOutcomeCodePreview()"> 🧪 Lab Outcome (LO)
+            </label>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Subject</label>
-          <select id="co-sub" class="form-select">
+          <select id="co-sub" class="form-select" onchange="facultyView.updateOutcomeCodePreview()">
             ${app.data.subjects.map(s => `<option value="${s.id}">${s.code} - ${s.fullName}</option>`).join('')}
           </select>
         </div>
+
         <div class="form-group">
-          <label class="form-label">CO Code</label>
-          <input type="text" id="co-code" class="form-input code-font" placeholder="24051181.CO3" required>
+          <label class="form-label">Auto-Generated Outcome Code (Subject-Prefixed)</label>
+          <input type="text" id="co-code" class="form-input code-font" value="${initialCode}" required style="font-weight:700; color:var(--accent-blue);">
         </div>
+
         <div class="form-group">
-          <label class="form-label">Description</label>
-          <textarea id="co-desc" class="form-textarea" rows="2" placeholder="Analyze forced vibration systems and calculate transmissibility..." required></textarea>
+          <label class="form-label">Outcome Description</label>
+          <textarea id="co-desc" class="form-textarea" rows="3" placeholder="Enter clear, measurable outcome description..." required autofocus></textarea>
         </div>
-        <div class="form-group">
-          <label class="form-label">Map to Program Outcome (PO)</label>
-          <select id="co-po" class="form-select">
-            ${app.data.programOutcomes.map(po => `<option value="${po.code}">${po.code}: ${po.description.substring(0, 50)}...</option>`).join('')}
-          </select>
-        </div>
-        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
-          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Course Outcome</button>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:12px; border-top:1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Close / Done</button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-primary" onclick="facultyView.saveCO(event, true)">+ Save & Add Next</button>
+            <button type="submit" class="btn btn-secondary">Save & Close</button>
+          </div>
         </div>
       </form>
     `);
   },
 
-  saveCO(e) {
-    e.preventDefault();
+  saveCO(e, keepOpen = false) {
+    if (e) e.preventDefault();
+
+    const descInput = document.getElementById('co-desc');
+    const codeInput = document.getElementById('co-code');
+    const subSelect = document.getElementById('co-sub');
+    const typeRadio = document.querySelector('input[name="co-type-radio"]:checked');
+
+    if (!descInput || !descInput.value.trim()) {
+      app.showToast('Please enter an outcome description', 'warning');
+      if (descInput) descInput.focus();
+      return;
+    }
+
+    const type = typeRadio ? typeRadio.value : 'CO';
+    const subjectId = subSelect ? subSelect.value : '';
+    const code = codeInput ? codeInput.value.trim() : 'CO1';
+    const description = descInput.value.trim();
+
     const newCO = {
-      id: 'co-' + Date.now(),
-      subjectId: document.getElementById('co-sub').value,
-      code: document.getElementById('co-code').value,
-      description: document.getElementById('co-desc').value,
-      poId: document.getElementById('co-po').value
+      id: (type === 'LO' ? 'lo-' : 'co-') + Date.now(),
+      type: type,
+      subjectId: subjectId,
+      code: code,
+      description: description,
+      poIds: [],
+      psoIds: [],
+      moduleIds: [],
+      experimentIds: []
     };
+
     app.data.courseOutcomes.push(newCO);
     app.saveState();
-    app.closeModal();
-    app.showToast(`Added Course Outcome ${newCO.code}`, 'success');
-    this.renderCOAndModulesManager(document.getElementById('main-content'));
+
+    app.showToast(`Added ${type} outcome ${newCO.code}`, 'success');
+
+    if (keepOpen) {
+      descInput.value = '';
+      this.updateOutcomeCodePreview();
+      descInput.focus();
+      this.renderCOAndModulesManager(document.getElementById('main-content'));
+    } else {
+      app.closeModal();
+      this.renderCOAndModulesManager(document.getElementById('main-content'));
+    }
   },
 
   renderAssignmentBuilder(container) {

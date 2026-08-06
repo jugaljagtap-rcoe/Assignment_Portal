@@ -396,11 +396,21 @@ class AppEngine {
     if (!state.faculty) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
     if (!state.subjects) state.subjects = [];
     if (!state.courseOutcomes) state.courseOutcomes = [];
+    if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
 
     // Force strict 6 Hardcoded Departments
     state.departments = JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS));
+
+    // Ensure backwards compatibility for COs/LOs
+    state.courseOutcomes.forEach(co => {
+      if (!co.type) co.type = (co.code && co.code.includes('.LO')) ? 'LO' : 'CO';
+      if (!co.poIds) co.poIds = co.poId ? [co.poId] : ['PO1'];
+      if (!co.psoIds) co.psoIds = [];
+      if (!co.moduleIds) co.moduleIds = [];
+      if (!co.experimentIds) co.experimentIds = [];
+    });
 
     return state;
   }
