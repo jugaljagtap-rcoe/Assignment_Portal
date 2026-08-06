@@ -257,7 +257,7 @@ class AppEngine {
               <div style="font-size:12px; color:var(--text-secondary);">Restricted to <code style="color:var(--accent-blue); font-weight:600;">@eng.rizvi.edu.in</code></div>
             </div>
           </div>
-          ${canClose ? '<button class="close-btn" onclick="app.closeModal()">✕</button>' : ''}
+          ${canClose ? '<button class="close-btn" aria-label="Close modal" onclick="app.closeModal()">✕</button>' : ''}
         </div>
         <div class="modal-body" style="padding:20px;">
           <div style="background:var(--accent-blue-subtle); border:1px solid rgba(0,102,204,0.2); padding:12px 14px; border-radius:var(--radius-md); font-size:12px; color:var(--accent-blue); margin-bottom:18px;">
@@ -600,7 +600,7 @@ class AppEngine {
       <div class="modal-card">
         <div class="modal-header">
           <h3 class="modal-title">${title}</h3>
-          <button class="close-btn" onclick="app.closeModal()">✕</button>
+          <button class="close-btn" aria-label="Close modal" onclick="app.closeModal()">✕</button>
         </div>
         <div class="modal-body">${contentHtml}</div>
       </div>

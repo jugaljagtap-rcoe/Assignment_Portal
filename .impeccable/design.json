@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-06T23:08:00.000Z",
+  "title": "Design System: Rizvi FE Assignment Portal",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Rizvi Royal Blue",
+        "canonical": "#0066CC",
+        "tonalRamp": ["#001C3D", "#003366", "#004D99", "#0066CC", "#0080FF", "#3399FF", "#80BFFF", "#E8F0FB"]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Apple Canvas Gray",
+        "canonical": "#F5F5F7",
+        "tonalRamp": ["#1D1D1F", "#3A3A3C", "#6E6E73", "#AEAEB2", "#C7C7CC", "#E5E5E7", "#F2F2F2", "#F5F5F7"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Page Title Display",
+        "purpose": "Main top-level view titles (28px Inter Bold)."
+      },
+      "mono": {
+        "displayName": "Numerical Code Mono",
+        "purpose": "Student UINs, mathematical formulas, solution key parameters, and dynamic variable chips."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-level-1",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)",
+        "purpose": "Resting cards, header bar, and static container elements."
+      },
+      {
+        "name": "shadow-level-2",
+        "value": "0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)",
+        "purpose": "Card hover state and active focal elements."
+      },
+      {
+        "name": "shadow-level-3",
+        "value": "0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06)",
+        "purpose": "Digital assignment paper canvas and floating toast notifications."
+      },
+      {
+        "name": "shadow-level-4",
+        "value": "0 24px 64px rgba(0, 0, 0, 0.16), 0 8px 16px rgba(0, 0, 0, 0.08)",
+        "purpose": "High-priority modal overlay dialogs."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-fast",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Fast transitions for button hovers, tab switches, and role toggle buttons."
+      },
+      {
+        "name": "transition-normal",
+        "value": "250ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Normal transitions for modal overlay fades and card elevation shifts."
+      }
+    ],
+    "breakpoints": [
+      { "name": "max-width", "value": "1280px" },
+      { "name": "sidebar", "value": "240px" },
+      { "name": "canvas", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action button for form submissions and primary CTAs.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">SUBMIT ASSIGNMENT</button>",
+      "css": ".ds-btn { height: 40px; padding: 0 16px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: Inter, sans-serif; transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary { background: #0066CC; color: #FFFFFF; } .ds-btn-primary:hover { background: #0077ED; box-shadow: 0 2px 6px rgba(0, 102, 204, 0.25); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary outlined action button.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Export Gradebook</button>",
+      "css": ".ds-btn { height: 40px; padding: 0 16px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-family: Inter, sans-serif; transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary { background: #FFFFFF; border: 1px solid #E5E5E7; color: #1D1D1F; } .ds-btn-secondary:hover { background: #F2F2F2; border-color: #C7C7CC; }"
+    },
+    {
+      "name": "Form Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Standard text input field with halo focus ring.",
+      "html": "<input type=\"text\" class=\"ds-form-input\" placeholder=\"Enter parameter value...\" />",
+      "css": ".ds-form-input { height: 42px; padding: 0 12px; background: #F5F5F7; border: 1px solid #E5E5E7; border-radius: 8px; font-size: 14px; font-family: Inter, sans-serif; color: #1D1D1F; outline: none; transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-form-input:focus { border-color: #0066CC; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15); background: #FFFFFF; }"
+    },
+    {
+      "name": "Variable Substitution Chip",
+      "kind": "chip",
+      "refersTo": "chip-var",
+      "description": "Monospaced inline chip highlighting dynamic student-unique variable parameters.",
+      "html": "<span class=\"ds-var-chip\">P = 189.74 rad/s</span>",
+      "css": ".ds-var-chip { display: inline-flex; align-items: center; padding: 2px 6px; background: #E8F0FB; color: #0066CC; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; border-radius: 4px; border: 1px solid rgba(0, 102, 204, 0.2); }"
+    },
+    {
+      "name": "KPI Summary Card",
+      "kind": "card",
+      "refersTo": "card-kpi",
+      "description": "Dashboard metric summary card.",
+      "html": "<div class=\"ds-kpi-card\"><div class=\"ds-kpi-label\">Total Enrolled Students</div><div class=\"ds-kpi-value\">360</div><div class=\"ds-kpi-trend ds-positive\"><span>↑</span> 100% Whitelisted</div></div>",
+      "css": ".ds-kpi-card { background: #FFFFFF; border: 1px solid #E5E5E7; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); display: flex; flex-direction: column; gap: 6px; font-family: Inter, sans-serif; } .ds-kpi-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: #6E6E73; } .ds-kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: #1D1D1F; } .ds-kpi-trend { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; } .ds-positive { color: #34C759; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Institutional Precision Desk",
+    "overview": "A light-mode design system built on Apple & Linear aesthetic principles. It pairs crisp typography (Inter for UI layout, JetBrains Mono for dynamic formulas) with clean light surfaces (#F5F5F7 background, #FFFFFF cards), subtle 1px structural borders (#E5E5E7), a 4-tier elevation shadow system, and a restrained institutional Royal Blue accent (#0066CC).",
+    "keyCharacteristics": [
+      "Prism-Clean Light Mode Palette (#F5F5F7 background with crisp #FFFFFF surface cards)",
+      "Dual-Font System (Inter for UI layout, JetBrains Mono for dynamic formulas and UINs)",
+      "Structured 4-Tier Elevation System (from flat border rest states to 64px modal blurs)",
+      "Apple-Inspired Segmented Control & Role Switcher",
+      "900px High-Fidelity Paper Canvas format for student sheet rendering and printing"
+    ],
+    "rules": [
+      {
+        "name": "The Rarity of Blue Rule",
+        "body": "Primary accent blue (#0066CC) is reserved strictly for interactive focus points and active navigation. It covers ≤10% of any screen surface to preserve its visual weight.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dual-Font Protocol Rule",
+        "body": "Never mix sans-serif and mono fonts inside numerical inputs or formulas. All variable numbers, calculations, and solution parameters must render in JetBrains Mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The Progressive Elevation Rule",
+        "body": "Surfaces never jump more than one elevation shadow level during interaction. Resting level-1 cards transition strictly to level-2 on hover.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use #F5F5F7 for application body background and #FFFFFF for elevated content cards",
+      "Do wrap all student-unique numerical values in .var-chip elements using JetBrains Mono",
+      "Do apply strict 1px #E5E5E7 border lines to demarcate structured sections",
+      "Do preserve the centered 900px canvas max-width for student assignment sheet views"
+    ],
+    "donts": [
+      "Don't introduce saturated dark mode backgrounds or heavy dark drop shadows",
+      "Don't mix sans-serif and monospaced typography within the same numerical entry field",
+      "Don't bypass the 4-level shadow scale with arbitrary custom CSS drop-shadows",
+      "Don't alter the hardcoded 5 engineering branch or 6 department taxonomy tags"
+    ]
+  }
+}

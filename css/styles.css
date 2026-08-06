@@ -14,7 +14,7 @@
 
   --text-primary: #1D1D1F;
   --text-secondary: #6E6E73;
-  --text-tertiary: #AEAEB2;
+  --text-tertiary: #76767C;
 
   --accent-blue: #0066CC;
   --accent-blue-hover: #0077ED;
@@ -59,6 +59,53 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Skip Link for Screen Readers */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 16px;
+  background: var(--accent-blue);
+  color: #FFF;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+  z-index: 1000;
+  transition: top var(--transition-fast);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+/* Text Overflow & Wrap Utilities */
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-wrap-break {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Motion Sensitivity Opt-Out */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {
@@ -813,3 +860,267 @@ h1.page-title {
     background: transparent !important;
   }
 }
+
+/* ==========================================================================
+   Responsive Adaptation & Touch Optimization (Mobile & Tablet)
+   ========================================================================== */
+
+/* Touch Target Optimization & Safe Area Insets */
+@media (pointer: coarse) {
+  .btn, .btn-sm {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+  .role-btn {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+  .close-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-item {
+    min-height: 44px;
+  }
+}
+
+/* Tablet Viewports (< 992px) */
+@media (max-width: 992px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .assignment-meta-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile Viewports (< 768px) */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .app-header {
+    height: auto;
+    padding: 12px 16px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .brand-container {
+    gap: 8px;
+  }
+
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .brand-title {
+    font-size: 14px;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .header-controls {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .role-switcher {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .role-btn {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .active-user-badge {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .app-container {
+    flex-direction: column;
+    padding: 16px 12px;
+    gap: 16px;
+  }
+
+  .sidebar-nav {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-default);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-item {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .nav-item.active::before {
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    height: 3px;
+  }
+
+  .page-header-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  h1.page-title {
+    font-size: 22px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+  }
+
+  .assignment-canvas {
+    padding: 24px 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .college-name {
+    font-size: 18px;
+  }
+
+  .college-sub {
+    font-size: 12px;
+  }
+
+  .question-block {
+    padding: 14px;
+  }
+
+  .parameter-input-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .param-label {
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .param-inputs {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .param-input-val {
+    flex: 1;
+    width: 100%;
+    min-width: 120px;
+  }
+
+  .param-unit-select {
+    width: 100%;
+  }
+
+  .modal-card {
+    max-width: 95%;
+    padding: 16px;
+    margin: 0 10px;
+    max-height: 85vh;
+  }
+
+  .toast-container {
+    left: 16px;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .toast {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+/* Extra Small Viewports (< 480px) */
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-meta-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   Semantic Spatial Rhythm & Density System Utilities
+   ========================================================================== */
+
+:root {
+  --p-density: 1;
+}
+
+.u-mt-0 { margin-top: 0 !important; }
+.u-mt-8 { margin-top: calc(8px * var(--p-density)) !important; }
+.u-mt-12 { margin-top: calc(12px * var(--p-density)) !important; }
+.u-mt-16 { margin-top: calc(16px * var(--p-density)) !important; }
+.u-mt-24 { margin-top: calc(24px * var(--p-density)) !important; }
+
+.u-mb-0 { margin-bottom: 0 !important; }
+.u-mb-8 { margin-bottom: calc(8px * var(--p-density)) !important; }
+.u-mb-12 { margin-bottom: calc(12px * var(--p-density)) !important; }
+.u-mb-16 { margin-bottom: calc(16px * var(--p-density)) !important; }
+.u-mb-24 { margin-bottom: calc(24px * var(--p-density)) !important; }
+
+.u-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.u-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.u-gap-8 { gap: calc(8px * var(--p-density)) !important; }
+.u-gap-12 { gap: calc(12px * var(--p-density)) !important; }
+.u-gap-16 { gap: calc(16px * var(--p-density)) !important; }
+
+/* Table Text Cell Alignment & Hierarchy Helpers */
+.td-code-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+
+.td-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+

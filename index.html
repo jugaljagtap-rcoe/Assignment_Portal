@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Rizvi College of Engineering — First Year Engineering Assignment Portal</title>
   
   <!-- Fonts -->
@@ -18,11 +18,13 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+  <!-- Skip to main content for screen readers -->
+  <a href="#main-content" class="skip-link print-hide">Skip to main content</a>
 
   <!-- Top Navigation Header -->
-  <header class="app-header">
+  <header class="app-header" role="banner">
     <div class="brand-container">
-      <div class="brand-logo">R</div>
+      <div class="brand-logo" aria-hidden="true">R</div>
       <div>
         <div class="brand-title">Rizvi College of Engineering</div>
         <div class="brand-subtitle">First Year Engineering (FE) Assignment & Lab Portal</div>
@@ -38,10 +40,10 @@
   <!-- App Main Content Container -->
   <div class="app-container">
     <!-- Left Navigation Sidebar -->
-    <nav id="sidebar-nav" class="sidebar-nav print-hide"></nav>
+    <nav id="sidebar-nav" class="sidebar-nav print-hide" aria-label="Portal Navigation"></nav>
 
     <!-- Main View Container -->
-    <main id="main-content" class="main-content"></main>
+    <main id="main-content" class="main-content" tabIndex="-1"></main>
   </div>
 
   <!-- Scripts -->
