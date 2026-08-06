@@ -419,19 +419,91 @@ const studentView = {
 
     const studentTitle = student ? `${student.name} (${student.uin})` : 'No Student Profile Selected';
 
+    // Calculate Summary Metrics
+    let totalMarks = 0;
+    let maxPossibleMarks = mySubmissions.length * 4 || 10;
+    mySubmissions.forEach(s => {
+      totalMarks += (s.marksAwarded || 0);
+    });
+    const percentage = maxPossibleMarks > 0 ? Math.min(100, Math.round((totalMarks / maxPossibleMarks) * 100)) : 0;
+    const isGradesReleased = schedule && schedule.gradesReleased;
+
     container.innerHTML = `
-      <div class="page-header-container">
+      <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
           <h1 class="page-title">My Grades & Rubric Evaluation</h1>
-          <p class="page-subtitle">Personalized Evaluation Report for ${studentTitle}</p>
+          <p class="page-subtitle">Personalized Gradesheet & Assessment Report for <strong>${studentTitle}</strong></p>
+        </div>
+        <div class="print-hide" style="display:flex; gap:10px;">
+          <button class="btn btn-secondary" onclick="studentView.exportStudentGradesCSV()">
+            📥 Export CSV Gradesheet
+          </button>
+          <button class="btn btn-primary" onclick="studentView.printStudentGradesheet()">
+            🖨️ Print / Save PDF Gradesheet
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Header (Visible during Print only) -->
+      <div class="printable-header" style="display:none; padding:20px; border-bottom:2px solid #000; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 style="margin:0; font-size:20px; font-weight:800; text-transform:uppercase;">Rizvi College of Engineering</h2>
+            <div style="font-size:13px; font-weight:600; color:#444;">Department of First Year Engineering | Academic Year 2026-27</div>
+            <div style="font-size:12px; color:#666; margin-top:2px;">Automated Canvas Assignment Gradesheet & Rubric Performance Log</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:14px; font-weight:700; color:var(--accent-blue);">OFFICIAL EVALUATION SHEET</div>
+            <div style="font-size:11px; color:#666;">Generated: ${new Date().toLocaleString()}</div>
+          </div>
+        </div>
+        <hr style="margin:12px 0; border:0; border-top:1px solid #ccc;">
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; font-size:12px;">
+          <div><strong>Student Name:</strong> ${student ? student.name : 'N/A'}</div>
+          <div><strong>UIN:</strong> ${student ? student.uin : 'N/A'}</div>
+          <div><strong>Branch:</strong> ${student ? student.branch : 'N/A'}</div>
+          <div><strong>Division / Batch:</strong> ${student ? (student.division + ' - ' + student.batch) : 'N/A'}</div>
+        </div>
+      </div>
+
+      <!-- Summary KPI Scorecards -->
+      <div class="kpi-grid" style="margin-bottom:24px;">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Marks Awarded</span>
+          <div class="kpi-value" style="color:var(--accent-blue);">${isGradesReleased ? `${totalMarks} / ${maxPossibleMarks}` : '🔒 Hidden'}</div>
+          <span class="kpi-trend positive">${isGradesReleased ? `${percentage}% Score` : 'Pending Release'}</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Total Submissions Logged</span>
+          <div class="kpi-value">${mySubmissions.length}</div>
+          <span class="kpi-trend neutral">Canvas Parameter Attempts</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Performance Level</span>
+          <div class="kpi-value" style="font-size:20px;">
+            ${isGradesReleased ? (percentage >= 80 ? '🌟 Exemplary' : percentage >= 50 ? '👍 Satisfactory' : '⚠️ Needs Work') : '⏳ Pending'}
+          </div>
+          <span class="kpi-trend neutral">Auto-Graded Rubric</span>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Evaluation Status</span>
+          <div class="kpi-value" style="font-size:18px;">
+            <span class="tag ${isGradesReleased ? 'tag-success' : 'tag-warning'}">
+              ${isGradesReleased ? '🟢 Grades Released' : '⏳ Hidden Pending Release'}
+            </span>
+          </div>
+          <span class="kpi-trend neutral">Faculty Schedule Policy</span>
         </div>
       </div>
 
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <h3 class="card-title">Attempt History & Evaluation Log</h3>
-          <span class="tag ${schedule && schedule.gradesReleased ? 'tag-success' : 'tag-warning'}">
-            ${schedule ? (schedule.gradesReleased ? '🟢 Grades Released by Faculty' : '⏳ Grades Hidden Pending Release') : 'ℹ️ No Evaluation Logs'}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h3 class="card-title">Attempt History & Parameter Evaluation Log</h3>
+          <span class="tag ${isGradesReleased ? 'tag-success' : 'tag-warning'}">
+            ${isGradesReleased ? '✅ Ground Truth Verified' : '⏳ Pending Faculty Approval'}
           </span>
         </div>
 
@@ -450,25 +522,25 @@ const studentView = {
               </tr>
             </thead>
             <tbody>
-              ${mySubmissions.length === 0 ? `<tr><td colspan="8" style="text-align:center; padding:16px;">No submissions submitted yet. Click "Active Canvas Sheet" to solve questions.</td></tr>` : 
+              ${mySubmissions.length === 0 ? `<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-secondary);">No submissions recorded yet. Click "Active Canvas Sheet" to solve questions.</td></tr>` : 
                 mySubmissions.map(s => `
                   <tr>
                     <td><span class="tag tag-bt">Attempt ${s.attemptNumber}/3</span></td>
                     <td style="font-family:var(--font-mono); font-weight:700;">${s.parameterId}</td>
                     <td style="font-weight:600;">${s.submittedValue}</td>
                     <td style="font-family:var(--font-mono);">${s.submittedUnit || '-'}</td>
-                    <td>-${s.deductionPct || 0}%</td>
+                    <td><span style="color:var(--danger); font-weight:600;">-${s.deductionPct || 0}%</span></td>
                     <td>
-                      ${schedule.gradesReleased ? `
+                      ${isGradesReleased ? `
                         <span class="tag ${s.isCorrectValue ? 'tag-success' : 'tag-danger'}">
-                          ${s.isCorrectValue ? '✓ Correct' : '✕ Incorrect'}
+                          ${s.isCorrectValue ? '✓ Correct (Within ±5%)' : '✕ Out of Range'}
                         </span>
                       ` : `<span class="tag tag-bt">Pending Evaluation</span>`}
                     </td>
                     <td style="font-weight:700; color:var(--accent-blue);">
-                      ${schedule.gradesReleased ? `${s.marksAwarded} Marks` : `Hidden`}
+                      ${isGradesReleased ? `${s.marksAwarded} Marks` : `Hidden`}
                     </td>
-                    <td style="font-size:11px;">${new Date(s.submittedAt).toLocaleString()}</td>
+                    <td style="font-size:11px; color:var(--text-secondary);">${new Date(s.submittedAt).toLocaleString()}</td>
                   </tr>
                 `).join('')
               }
@@ -476,6 +548,82 @@ const studentView = {
           </table>
         </div>
       </div>
+
+      <!-- Printable Footer Signature Block -->
+      <div class="printable-footer" style="display:none; margin-top:40px; padding-top:20px; border-top:1px dashed #aaa; justify-content:space-between; font-size:12px;">
+        <div style="text-align:center; width:200px;">
+          <div style="border-bottom:1px solid #000; height:40px; margin-bottom:4px;"></div>
+          <strong>Student Signature</strong>
+        </div>
+        <div style="text-align:center; width:200px;">
+          <div style="border-bottom:1px solid #000; height:40px; margin-bottom:4px;"></div>
+          <strong>Course Instructor Signature</strong>
+        </div>
+        <div style="text-align:center; width:200px;">
+          <div style="border-bottom:1px solid #000; height:40px; margin-bottom:4px;"></div>
+          <strong>Head of Department (FE)</strong>
+        </div>
+      </div>
     `;
+  },
+
+  exportStudentGradesCSV() {
+    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    if (!student) {
+      app.showToast('No active student profile found to export', 'danger');
+      return;
+    }
+
+    const mySubmissions = app.data.submissions.filter(s => s.studentId === student.id);
+    if (mySubmissions.length === 0) {
+      app.showToast('No submission history found for student to export', 'warning');
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Student UIN,Student Name,Branch,Division,Batch,Attempt Number,Parameter ID,Submitted Value,Submitted Unit,Penalty Deduction %,Evaluation Status,Marks Awarded,Submission Timestamp\n";
+
+    mySubmissions.forEach(s => {
+      const uin = `"${student.uin || ''}"`;
+      const name = `"${student.name || ''}"`;
+      const branch = `"${student.branch || ''}"`;
+      const div = `"${student.division || ''}"`;
+      const batch = `"${student.batch || ''}"`;
+      const attempt = s.attemptNumber;
+      const paramId = `"${s.parameterId || ''}"`;
+      const val = `"${s.submittedValue || ''}"`;
+      const unit = `"${s.submittedUnit || ''}"`;
+      const penalty = s.deductionPct || 0;
+      const evalStatus = s.isCorrectValue ? "Correct" : "Incorrect";
+      const marks = s.marksAwarded || 0;
+      const time = `"${new Date(s.submittedAt).toLocaleString()}"`;
+
+      csvContent += `${uin},${name},${branch},${div},${batch},${attempt},${paramId},${val},${unit},${penalty}%,${evalStatus},${marks},${time}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Gradesheet_${student.uin}_${student.name.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    app.showToast(`Exported CSV Gradesheet for ${student.name} (${mySubmissions.length} records)`, 'success');
+  },
+
+  printStudentGradesheet() {
+    // Show printable headers & footers temporarily for printing
+    const printableHeader = document.querySelector('.printable-header');
+    const printableFooter = document.querySelector('.printable-footer');
+    if (printableHeader) printableHeader.style.display = 'block';
+    if (printableFooter) printableFooter.style.display = 'flex';
+
+    window.print();
+
+    // Re-hide printable elements after browser print dialog closes
+    setTimeout(() => {
+      if (printableHeader) printableHeader.style.display = 'none';
+      if (printableFooter) printableFooter.style.display = 'none';
+    }, 1000);
   }
 };
