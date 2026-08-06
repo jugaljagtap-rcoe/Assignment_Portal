@@ -299,10 +299,11 @@ const facultyView = {
                 <th>Subject</th>
                 <th>Module Code</th>
                 <th>Module Title</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${(app.data.modules || []).length === 0 ? `<tr><td colspan="3" style="text-align:center; padding:16px;">No modules defined yet. Click "+ Add Subject Module" above.</td></tr>` : 
+              ${(app.data.modules || []).length === 0 ? `<tr><td colspan="4" style="text-align:center; padding:16px;">No modules defined yet. Click "+ Add Subject Module" above.</td></tr>` : 
                 (app.data.modules || []).map(m => {
                   const sub = app.data.subjects.find(s => s.id === m.subjectId);
                   return `
@@ -310,6 +311,9 @@ const facultyView = {
                       <td><span class="tag tag-co">${sub ? sub.code : '-'}</span></td>
                       <td style="font-weight:700; font-family:var(--font-mono);">${m.code}</td>
                       <td style="font-weight:500;">${m.title}</td>
+                      <td>
+                        <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteModule('${m.id}')">🗑️ Delete</button>
+                      </td>
                     </tr>
                   `;
                 }).join('')
@@ -328,21 +332,50 @@ const facultyView = {
                 <th>CO Code</th>
                 <th>Course Outcome Description</th>
                 <th>Mapped PO</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${app.data.courseOutcomes.map(co => `
-                <tr>
-                  <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
-                  <td style="font-weight:500;">${co.description}</td>
-                  <td><span class="tag tag-bt">${co.poId || 'PO1'}</span></td>
-                </tr>
-              `).join('')}
+              ${app.data.courseOutcomes.length === 0 ? `<tr><td colspan="4" style="text-align:center; padding:16px;">No course outcomes defined yet. Click "+ Add Course Outcome (CO)" above.</td></tr>` :
+                app.data.courseOutcomes.map(co => `
+                  <tr>
+                    <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
+                    <td style="font-weight:500;">${co.description}</td>
+                    <td><span class="tag tag-bt">${co.poId || 'PO1'}</span></td>
+                    <td>
+                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
+                    </td>
+                  </tr>
+                `).join('')
+              }
             </tbody>
           </table>
         </div>
       </div>
     `;
+  },
+
+  deleteModule(moduleId) {
+    const mod = (app.data.modules || []).find(m => m.id === moduleId);
+    if (!mod) return;
+    if (!confirm(`Are you sure you want to delete module "${mod.code}: ${mod.title}"?`)) return;
+
+    app.data.modules = (app.data.modules || []).filter(m => m.id !== moduleId);
+    app.saveState();
+    app.showToast(`Deleted module ${mod.code}`, 'info');
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
+  },
+
+  deleteCO(coId) {
+    const co = app.data.courseOutcomes.find(c => c.id === coId);
+    if (!co) return;
+    if (!confirm(`Are you sure you want to delete Course Outcome "${co.code}"?`)) return;
+
+    app.data.courseOutcomes = app.data.courseOutcomes.filter(c => c.id !== coId);
+    app.saveState();
+    app.showToast(`Deleted Course Outcome ${co.code}`, 'info');
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
+  },
   },
 
   openAddModuleModal() {
@@ -672,6 +705,7 @@ const facultyView = {
               <div>
                 <span class="tag tag-co" style="margin-right:8px;">${rub.isShared ? 'Shared College Preset' : 'Private'}</span>
                 <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditRubricModal('${rub.id}')">✏️ Edit Criteria & Levels</button>
+                <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteRubric('${rub.id}')">🗑️ Delete</button>
               </div>
             </div>
 
@@ -965,6 +999,17 @@ const facultyView = {
     app.saveState();
     app.closeModal();
     app.showToast(`Created rubric "${name}" with ${criteriaList.length} criteria`, 'success');
+    this.renderRubricBuilder(document.getElementById('main-content'));
+  },
+
+  deleteRubric(rubricId) {
+    const rub = (app.data.rubricPresets || []).find(r => r.id === rubricId);
+    if (!rub) return;
+    if (!confirm(`Are you sure you want to delete rubric preset "${rub.name}"?`)) return;
+
+    app.data.rubricPresets = (app.data.rubricPresets || []).filter(r => r.id !== rubricId);
+    app.saveState();
+    app.showToast(`Deleted rubric preset "${rub.name}"`, 'info');
     this.renderRubricBuilder(document.getElementById('main-content'));
   },
 

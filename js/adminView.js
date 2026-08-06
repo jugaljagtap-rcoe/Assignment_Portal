@@ -622,7 +622,13 @@ const adminView = {
       </div>
 
       <div class="card">
-        <h3 class="card-title">FE Subject Courses</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 class="card-title">FE Subject Courses</h3>
+            <p class="card-subtitle">Manage subject courses and department assignments</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminView.openAddSubjectModal()">+ Add New Subject Course</button>
+        </div>
         <div class="table-container" style="margin-top:12px;">
           <table class="custom-table">
             <thead>
@@ -631,25 +637,137 @@ const adminView = {
                 <th>Short Name</th>
                 <th>Full Name</th>
                 <th>Department</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${app.data.subjects.map(s => {
-                const d = app.data.departments.find(dept => dept.id === s.departmentId);
-                return `
-                  <tr>
-                    <td style="font-family:var(--font-mono); font-weight:700;">${s.code}</td>
-                    <td style="font-weight:600;">${s.shortName}</td>
-                    <td>${s.fullName}</td>
-                    <td><span class="tag tag-co">${d ? d.name : '-'}</span></td>
-                  </tr>
-                `;
-              }).join('')}
+              ${app.data.subjects.length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:16px;">No subject courses added yet. Click "+ Add New Subject Course" above.</td></tr>` :
+                app.data.subjects.map(s => {
+                  const d = app.data.departments.find(dept => dept.id === s.departmentId);
+                  const shortName = s.shortName || s.code;
+                  return `
+                    <tr>
+                      <td style="font-family:var(--font-mono); font-weight:700;">${s.code}</td>
+                      <td style="font-weight:600;">${shortName}</td>
+                      <td>${s.fullName}</td>
+                      <td><span class="tag tag-co">${d ? d.name : '-'}</span></td>
+                      <td>
+                        <button class="btn btn-secondary btn-sm" onclick="adminView.openEditSubjectModal('${s.id}')">✏️ Edit</button>
+                        <button class="btn btn-destructive btn-sm" onclick="adminView.deleteSubject('${s.id}')">🗑️ Delete</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')
+              }
             </tbody>
           </table>
         </div>
       </div>
     `;
+  },
+
+  openAddSubjectModal() {
+    app.showModal('Add New FE Subject Course', `
+      <form onsubmit="adminView.saveSubject(event)">
+        <div class="form-group">
+          <label class="form-label">Subject Code</label>
+          <input type="text" id="sub-code" class="form-input code-font" placeholder="24051181 or FEL101" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Short Name / Abbreviation</label>
+          <input type="text" id="sub-short" class="form-input" placeholder="MVDS Lab or BEE Lab" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Course Name</label>
+          <input type="text" id="sub-full" class="form-input" placeholder="Mechanical Vibration & Dynamic Systems Lab" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Managing Department</label>
+          <select id="sub-dept" class="form-select">
+            ${app.data.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Subject</button>
+        </div>
+      </form>
+    `);
+  },
+
+  openEditSubjectModal(subjectId) {
+    const sub = app.data.subjects.find(s => s.id === subjectId);
+    if (!sub) return;
+
+    app.showModal(`Edit Subject Course — ${sub.code}`, `
+      <form onsubmit="adminView.saveSubject(event, '${sub.id}')">
+        <div class="form-group">
+          <label class="form-label">Subject Code</label>
+          <input type="text" id="sub-code" class="form-input code-font" value="${sub.code}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Short Name / Abbreviation</label>
+          <input type="text" id="sub-short" class="form-input" value="${sub.shortName || sub.code}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Course Name</label>
+          <input type="text" id="sub-full" class="form-input" value="${sub.fullName}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Managing Department</label>
+          <select id="sub-dept" class="form-select">
+            ${app.data.departments.map(d => `<option value="${d.id}" ${d.id === sub.departmentId ? 'selected' : ''}>${d.name}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Subject</button>
+        </div>
+      </form>
+    `);
+  },
+
+  saveSubject(e, subjectId = null) {
+    e.preventDefault();
+    const code = document.getElementById('sub-code').value.trim();
+    const shortName = document.getElementById('sub-short').value.trim();
+    const fullName = document.getElementById('sub-full').value.trim();
+    const deptId = document.getElementById('sub-dept').value;
+
+    if (subjectId) {
+      const sub = app.data.subjects.find(s => s.id === subjectId);
+      if (sub) {
+        sub.code = code;
+        sub.shortName = shortName;
+        sub.fullName = fullName;
+        sub.departmentId = deptId;
+      }
+    } else {
+      const newSub = {
+        id: 'sub-' + Date.now(),
+        code: code,
+        shortName: shortName,
+        fullName: fullName,
+        departmentId: deptId
+      };
+      app.data.subjects.push(newSub);
+    }
+
+    app.saveState();
+    app.closeModal();
+    app.showToast(`Saved subject course ${code}`, 'success');
+    this.renderDepartmentManager(document.getElementById('main-content'));
+  },
+
+  deleteSubject(subjectId) {
+    const sub = app.data.subjects.find(s => s.id === subjectId);
+    if (!sub) return;
+    if (!confirm(`Are you sure you want to delete subject course "${sub.code} - ${sub.fullName}"?`)) return;
+
+    app.data.subjects = app.data.subjects.filter(s => s.id !== subjectId);
+    app.saveState();
+    app.showToast(`Deleted subject course ${sub.code}`, 'info');
+    this.renderDepartmentManager(document.getElementById('main-content'));
   },
 
   openEditDeptVisionMissionModal(deptId) {
