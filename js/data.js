@@ -153,66 +153,14 @@ const INITIAL_DATA = {
   students: [],
 
   faculty: [
-    { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: ["24051181", "FEL101"], isDualRole: true }
+    { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: [], isDualRole: true }
   ],
 
-  subjects: [
-    { id: "sub-mech-101", code: "24051181", fullName: "Mechanical Vibration & Dynamic Systems Lab", departmentId: "dept-mech" },
-    { id: "sub-fe-101", code: "FEL101", fullName: "Basic Electrical & Physics Engineering Lab", departmentId: "dept-fe" }
-  ],
+  subjects: [],
 
-  courseOutcomes: [
-    { id: "co-101", subjectId: "sub-mech-101", code: "24051181.CO1", description: "To familiarize with mechanical vibration fundamentals and free undamped systems.", poId: "PO1" },
-    { id: "co-102", subjectId: "sub-mech-101", code: "24051181.CO2", description: "Analyze damping parameters and logarithmic decrement in dynamic systems.", poId: "PO2" }
-  ],
+  courseOutcomes: [],
 
-  assignments: [
-    {
-      id: "asg-001",
-      code: "RCOE/FE/2026-27/LAB_A001",
-      subjectId: "sub-mech-101",
-      facultyId: "fac-admin-jugal",
-      number: 1,
-      title: "Lab Sheet A001: Free & Damped Vibrations Analysis",
-      className: "FE Mechanical",
-      semester: "Semester I",
-      assessmentType: "Direct",
-      modulesCovered: "Module 01: Natural Frequency Measurement of Dynamic Systems",
-      outcomeCovered: "24051181.CO1: To familiarize with mechanical vibration fundamentals",
-      publishDate: "2026-08-01T09:00",
-      deadline: "2026-08-10T23:59",
-      rubricPresetId: "rub-001",
-      createdAt: "2026-08-01",
-      schedules: [
-        {
-          id: "sch-001",
-          scopeType: "batch",
-          scopeValue: "A1",
-          publishDate: "2026-08-01T09:00",
-          deadline: "2026-08-10T23:59",
-          submissionsOpen: true,
-          gradesReleased: true,
-          latePenaltyValue: 10,
-          lateMaxCap: 30
-        }
-      ],
-      questions: [
-        {
-          id: "q-001",
-          order: 1,
-          sectionLabel: "Q1",
-          text: "Calculate natural frequency for system with mass m = {{var_m_kg}} kg and stiffness k = {{var_k_Nmm}} N/mm.",
-          imageUrl: "",
-          coId: "24051181.CO1",
-          btLevel: "BT3",
-          parameters: [
-            { id: "param-q1-p1", code: "Q001_P01", order: 1, label: "Natural Frequency (omega_n)", acceptedUnits: ["rad/s", "Hz"], unitRequired: true, valueMarks: 4, unitMarks: 1, tolerancePct: 5 },
-            { id: "param-q1-p2", code: "Q001_P02", order: 2, label: "Static Deflection (delta_st)", acceptedUnits: ["mm", "m"], unitRequired: true, valueMarks: 3, unitMarks: 1, tolerancePct: 5 }
-          ]
-        }
-      ]
-    }
-  ],
+  assignments: [],
 
   studentVariables: [],
 

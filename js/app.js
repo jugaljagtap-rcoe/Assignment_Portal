@@ -393,10 +393,10 @@ class AppEngine {
     }
 
     if (!state.students) state.students = [];
-    if (!state.faculty || state.faculty.length === 0) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
-    if (!state.subjects || state.subjects.length === 0) state.subjects = JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
-    if (!state.courseOutcomes || state.courseOutcomes.length === 0) state.courseOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.courseOutcomes));
-    if (!state.assignments || state.assignments.length === 0) state.assignments = JSON.parse(JSON.stringify(INITIAL_DATA.assignments));
+    if (!state.faculty) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
+    if (!state.subjects) state.subjects = [];
+    if (!state.courseOutcomes) state.courseOutcomes = [];
+    if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
 
     // Force strict 6 Hardcoded Departments
