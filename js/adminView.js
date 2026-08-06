@@ -579,6 +579,19 @@ const adminView = {
     this.renderFacultyRoster(document.getElementById('main-content'));
   },
 
+  toggleAdminGroup(groupId) {
+    const el = document.getElementById(groupId);
+    const arrow = document.getElementById('arrow-' + groupId);
+    if (!el) return;
+    if (el.style.display === 'none') {
+      el.style.display = 'block';
+      if (arrow) arrow.innerText = '▼';
+    } else {
+      el.style.display = 'none';
+      if (arrow) arrow.innerText = '▶';
+    }
+  },
+
   renderDepartments(container) {
     container.innerHTML = `
       <div class="page-header-container">
@@ -621,47 +634,69 @@ const adminView = {
         `).join('')}
       </div>
 
-      <!-- Department Academic Classes Roster -->
+      <!-- Department Academic Classes Roster (Collapsible Grouping) -->
       <div class="card" style="margin-bottom:24px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
           <div>
             <h3 class="card-title">Department Academic Classes & Semesters</h3>
-            <p class="card-subtitle">Manage class rosters (e.g. SE Mechanical linked to Semester III & Semester IV)</p>
+            <p class="card-subtitle">Collapsible rosters by department for Academic Year 2026-27</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="adminView.openAddClassModal()">+ Add Academic Class</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="adminView.openAddClassModal()">+ Add Academic Class</button>
+          </div>
         </div>
-        <div class="table-container" style="margin-top:12px;">
-          <table class="custom-table">
-            <thead>
-              <tr>
-                <th>Class Code</th>
-                <th>Class Name & Branch</th>
-                <th>Department</th>
-                <th>Linked Semesters</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(app.data.academicClasses || []).length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:16px;">No academic classes added yet. Click "+ Add Academic Class" above.</td></tr>` :
-                (app.data.academicClasses || []).map(c => {
-                  const d = app.data.departments.find(dept => dept.id === c.departmentId);
-                  return `
-                    <tr>
-                      <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">${c.code || c.name}</td>
-                      <td style="font-weight:600;">${c.name}</td>
-                      <td><span class="tag tag-co">${d ? (d.shortName || d.name) : '-'}</span></td>
-                      <td>
-                        ${(c.semesters || []).map(sem => `<span class="tag tag-bt" style="margin-right:4px;">${sem}</span>`).join('')}
-                      </td>
-                      <td>
-                        <button class="btn btn-destructive btn-sm" onclick="adminView.deleteClass('${c.id}')">🗑️ Delete</button>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')
-              }
-            </tbody>
-          </table>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          ${app.data.departments.map(d => {
+            const deptClasses = (app.data.academicClasses || []).filter(c => c.departmentId === d.id);
+            const groupId = `class-group-${d.id}`;
+            return `
+              <div class="subject-group-card" style="border:1px solid var(--border-color); border-radius:var(--radius-md); overflow:hidden; background:var(--bg-card);">
+                <div class="subject-group-header" onclick="adminView.toggleAdminGroup('${groupId}')" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--bg-tertiary); cursor:pointer; font-weight:700; border-bottom:1px solid var(--border-color);">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <span id="arrow-${groupId}" style="font-size:12px; color:var(--text-secondary); transition:transform 0.2s;">▼</span>
+                    <span style="font-size:14px; color:var(--text-primary);">${d.name}</span>
+                    <span class="tag tag-co" style="font-size:11px;">${d.shortName || d.id}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="tag tag-bt" style="font-size:11px;">AY 2026-27</span>
+                    <span style="background:var(--accent-blue-subtle); color:var(--accent-blue); padding:3px 10px; border-radius:12px; font-size:12px; font-weight:700;">${deptClasses.length} ${deptClasses.length === 1 ? 'Class' : 'Classes'}</span>
+                  </div>
+                </div>
+
+                <div id="${groupId}" class="table-container" style="display:block;">
+                  <table class="custom-table" style="margin:0;">
+                    <thead>
+                      <tr>
+                        <th>Class Code</th>
+                        <th>Class Name & Branch</th>
+                        <th>Academic Year</th>
+                        <th>Linked Semesters</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${deptClasses.length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:14px; color:var(--text-muted);">No classes configured for ${d.shortName || d.name}. Click "+ Add Academic Class" above.</td></tr>` :
+                        deptClasses.map(c => `
+                          <tr>
+                            <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">${c.code || c.name}</td>
+                            <td style="font-weight:600;">${c.name}</td>
+                            <td><span class="tag tag-bt">2026-27</span></td>
+                            <td>
+                              ${(c.semesters || []).map(sem => `<span class="tag tag-success" style="margin-right:4px;">${sem}</span>`).join('')}
+                            </td>
+                            <td>
+                              <button class="btn btn-destructive btn-sm" onclick="adminView.deleteClass('${c.id}')">🗑️ Delete</button>
+                            </td>
+                          </tr>
+                        `).join('')
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
