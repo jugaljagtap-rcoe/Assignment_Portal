@@ -94,14 +94,33 @@ const INITIAL_DATA = {
   departments: JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS)),
 
   academicClasses: [
-    { id: "class-fe", name: "FE Mechanical", code: "FE", departmentId: "dept-fe", semesters: ["Semester I", "Semester II"] },
-    { id: "class-aids-se", name: "SE AI&DS", code: "SE AI&DS", departmentId: "dept-aids", semesters: ["Semester III", "Semester IV"] },
-    { id: "class-civil-se", name: "SE Civil", code: "SE Civil", departmentId: "dept-civil", semesters: ["Semester III", "Semester IV"] },
-    { id: "class-comp-se", name: "SE Comp", code: "SE Comp", departmentId: "dept-comp", semesters: ["Semester III", "Semester IV"] },
-    { id: "class-ecs-se", name: "SE ECS", code: "SE ECS", departmentId: "dept-ecs", semesters: ["Semester III", "Semester IV"] },
-    { id: "class-mech-se", name: "SE Mechanical", code: "SE Mech", departmentId: "dept-mech", semesters: ["Semester III", "Semester IV"] },
-    { id: "class-mech-te", name: "TE Mechanical", code: "TE Mech", departmentId: "dept-mech", semesters: ["Semester V", "Semester VI"] },
-    { id: "class-mech-be", name: "BE Mechanical", code: "BE Mech", departmentId: "dept-mech", semesters: ["Semester VII", "Semester VIII"] }
+    // First Year Engineering
+    { id: "class-fe", code: "FE", name: "First Year Engineering", departmentId: "dept-fe", semesters: ["Semester I", "Semester II"] },
+
+    // Artificial Intelligence & Data Science
+    { id: "class-aids-se", code: "SE AI&DS", name: "Second Year Artificial Intelligence & Data Science", departmentId: "dept-aids", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-aids-te", code: "TE AI&DS", name: "Third Year Artificial Intelligence & Data Science", departmentId: "dept-aids", semesters: ["Semester V", "Semester VI"] },
+    { id: "class-aids-be", code: "BE AI&DS", name: "Final Year Artificial Intelligence & Data Science", departmentId: "dept-aids", semesters: ["Semester VII", "Semester VIII"] },
+
+    // Civil Engineering
+    { id: "class-civil-se", code: "SE Civil", name: "Second Year Civil Engineering", departmentId: "dept-civil", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-civil-te", code: "TE Civil", name: "Third Year Civil Engineering", departmentId: "dept-civil", semesters: ["Semester V", "Semester VI"] },
+    { id: "class-civil-be", code: "BE Civil", name: "Final Year Civil Engineering", departmentId: "dept-civil", semesters: ["Semester VII", "Semester VIII"] },
+
+    // Computer Engineering
+    { id: "class-comp-se", code: "SE Comp", name: "Second Year Computer Engineering", departmentId: "dept-comp", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-comp-te", code: "TE Comp", name: "Third Year Computer Engineering", departmentId: "dept-comp", semesters: ["Semester V", "Semester VI"] },
+    { id: "class-comp-be", code: "BE Comp", name: "Final Year Computer Engineering", departmentId: "dept-comp", semesters: ["Semester VII", "Semester VIII"] },
+
+    // Electronics & Computer Science
+    { id: "class-ecs-se", code: "SE ECS", name: "Second Year Electronics & Computer Science", departmentId: "dept-ecs", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-ecs-te", code: "TE ECS", name: "Third Year Electronics & Computer Science", departmentId: "dept-ecs", semesters: ["Semester V", "Semester VI"] },
+    { id: "class-ecs-be", code: "BE ECS", name: "Final Year Electronics & Computer Science", departmentId: "dept-ecs", semesters: ["Semester VII", "Semester VIII"] },
+
+    // Mechanical Engineering
+    { id: "class-mech-se", code: "SE Mech", name: "Second Year Mechanical Engineering", departmentId: "dept-mech", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-mech-te", code: "TE Mech", name: "Third Year Mechanical Engineering", departmentId: "dept-mech", semesters: ["Semester V", "Semester VI"] },
+    { id: "class-mech-be", code: "BE Mech", name: "Final Year Mechanical Engineering", departmentId: "dept-mech", semesters: ["Semester VII", "Semester VIII"] }
   ],
 
   programOutcomes: [

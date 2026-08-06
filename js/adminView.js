@@ -716,8 +716,22 @@ const adminView = {
     `;
   },
 
+  onSubjectClassChange() {
+    const classSelect = document.getElementById('sub-class');
+    const semSelect = document.getElementById('sub-sem');
+    if (!classSelect || !semSelect) return;
+
+    const selectedCode = classSelect.value;
+    const cls = (app.data.academicClasses || []).find(c => c.code === selectedCode || c.name === selectedCode);
+    const sems = cls ? cls.semesters : ['Semester III', 'Semester IV'];
+
+    semSelect.innerHTML = sems.map(s => `<option value="${s}">${s}</option>`).join('');
+  },
+
   openAddSubjectModal() {
     const classes = app.data.academicClasses || [];
+    const firstClass = classes.length > 0 ? classes[0] : null;
+    const initialSems = firstClass ? firstClass.semesters : ['Semester III', 'Semester IV'];
 
     app.showModal('Add New Subject Course & Link Class/Semester', `
       <form onsubmit="adminView.saveSubject(event)">
@@ -731,22 +745,14 @@ const adminView = {
         <div style="display:flex; gap:12px;">
           <div class="form-group" style="flex:1;">
             <label class="form-label">Link to Class & Branch</label>
-            <input type="text" id="sub-class" class="form-input" placeholder="e.g. SE Mechanical" required list="class-list-suggestions">
-            <datalist id="class-list-suggestions">
-              ${classes.map(c => `<option value="${c.name}">`).join('')}
-            </datalist>
+            <select id="sub-class" class="form-select" onchange="adminView.onSubjectClassChange()" required>
+              ${classes.map(c => `<option value="${c.code}">${c.code} - ${c.name}</option>`).join('')}
+            </select>
           </div>
           <div class="form-group" style="flex:1;">
             <label class="form-label">Link to Semester</label>
             <select id="sub-sem" class="form-select">
-              <option value="Semester I">Semester I</option>
-              <option value="Semester II">Semester II</option>
-              <option value="Semester III" selected>Semester III</option>
-              <option value="Semester IV">Semester IV</option>
-              <option value="Semester V">Semester V</option>
-              <option value="Semester VI">Semester VI</option>
-              <option value="Semester VII">Semester VII</option>
-              <option value="Semester VIII">Semester VIII</option>
+              ${initialSems.map(s => `<option value="${s}">${s}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -780,6 +786,10 @@ const adminView = {
     if (!sub) return;
     const classes = app.data.academicClasses || [];
 
+    const currentClassCode = sub.className || (classes.length > 0 ? classes[0].code : 'SE Mech');
+    const matchedClass = classes.find(c => c.code === currentClassCode || c.name === currentClassCode);
+    const availableSems = matchedClass ? matchedClass.semesters : ['Semester I','Semester II','Semester III','Semester IV','Semester V','Semester VI','Semester VII','Semester VIII'];
+
     app.showModal(`Edit Subject Course — ${sub.code}`, `
       <form onsubmit="adminView.saveSubject(event, '${sub.id}')">
         <div class="form-group">
@@ -792,15 +802,14 @@ const adminView = {
         <div style="display:flex; gap:12px;">
           <div class="form-group" style="flex:1;">
             <label class="form-label">Linked Class & Branch</label>
-            <input type="text" id="sub-class" class="form-input" value="${sub.className || 'SE Mechanical'}" required list="class-list-suggestions">
-            <datalist id="class-list-suggestions">
-              ${classes.map(c => `<option value="${c.name}">`).join('')}
-            </datalist>
+            <select id="sub-class" class="form-select" onchange="adminView.onSubjectClassChange()" required>
+              ${classes.map(c => `<option value="${c.code}" ${(c.code === currentClassCode || c.name === currentClassCode) ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
+            </select>
           </div>
           <div class="form-group" style="flex:1;">
             <label class="form-label">Linked Semester</label>
             <select id="sub-sem" class="form-select">
-              ${['Semester I','Semester II','Semester III','Semester IV','Semester V','Semester VI','Semester VII','Semester VIII'].map(sem => `
+              ${availableSems.map(sem => `
                 <option value="${sem}" ${sub.semester === sem ? 'selected' : ''}>${sem}</option>
               `).join('')}
             </select>
