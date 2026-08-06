@@ -401,14 +401,18 @@ class AppEngine {
     if (!state.submissions) state.submissions = [];
 
     // Clean and deduplicate subjects by subject code
-    const rawSubjects = (state.subjects && state.subjects.length > 0) ? state.subjects : JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
-    const uniqueSubMap = new Map();
-    rawSubjects.forEach(s => {
-      if (!uniqueSubMap.has(s.code)) {
-        uniqueSubMap.set(s.code, s);
-      }
-    });
-    state.subjects = Array.from(uniqueSubMap.values());
+    const initialSubs = JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
+    if (!state.subjects || state.subjects.length === 0 || state.subjects.filter(s => s.code === '24051181').length > 1) {
+      state.subjects = initialSubs;
+    } else {
+      const uniqueSubMap = new Map();
+      state.subjects.forEach(s => {
+        if (s && s.code && !uniqueSubMap.has(s.code)) {
+          uniqueSubMap.set(s.code, s);
+        }
+      });
+      state.subjects = Array.from(uniqueSubMap.values());
+    }
 
     // Force strict 6 Hardcoded Departments
     state.departments = JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS));

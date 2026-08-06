@@ -672,7 +672,10 @@ const adminView = {
             <h3 class="card-title">Department Subject Courses Master</h3>
             <p class="card-subtitle">Manage subject courses and linked class & semester assignments</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="adminView.openAddSubjectModal()">+ Add New Subject Course</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="adminView.resetDefaultSubjects()">🔄 Reset Clean Subjects</button>
+            <button class="btn btn-primary btn-sm" onclick="adminView.openAddSubjectModal()">+ Add New Subject Course</button>
+          </div>
         </div>
         <div class="table-container" style="margin-top:12px;">
           <table class="custom-table">
@@ -918,6 +921,14 @@ const adminView = {
     app.data.subjects = app.data.subjects.filter(s => s.id !== subjectId);
     app.saveState();
     app.showToast(`Deleted subject course ${sub.code}`, 'info');
+    this.renderDepartmentManager(document.getElementById('main-content'));
+  },
+
+  resetDefaultSubjects() {
+    if (!confirm("This will purge duplicate/test subject entries and reset to official clean subjects. Continue?")) return;
+    app.data.subjects = JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
+    app.saveState();
+    app.showToast("Subjects list clean reset successful!", "success");
     this.renderDepartmentManager(document.getElementById('main-content'));
   },
 
