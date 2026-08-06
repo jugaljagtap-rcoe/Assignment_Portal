@@ -579,16 +579,14 @@ const adminView = {
     this.renderFacultyRoster(document.getElementById('main-content'));
   },
 
-  renderDepartments(container) {
-    container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Departments & Vision/Mission Statements</h1>
-          <p class="page-subtitle">Configure department Vision & Mission statements pulled into assignment sheets</p>
+          <h1 class="page-title">Departments, Academic Classes & Subjects</h1>
+          <p class="page-subtitle">Configure department Vision/Mission, manage department classes/semesters, and assign subject courses</p>
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="btn btn-secondary" onclick="adminView.openAddDeptModal()">+ Add Dept</button>
-          <button class="btn btn-primary" onclick="adminView.openAddSubjectModal()">+ Add Subject</button>
+          <button class="btn btn-secondary" onclick="adminView.openAddClassModal()">+ Add Academic Class</button>
+          <button class="btn btn-primary" onclick="adminView.openAddSubjectModal()">+ Add Subject Course</button>
         </div>
       </div>
 
@@ -596,7 +594,7 @@ const adminView = {
         ${app.data.departments.map(d => `
           <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <h3 class="card-title">${d.name}</h3>
+              <h3 class="card-title">${d.name} <span class="tag tag-co" style="margin-left:6px;">${d.shortName || d.id}</span></h3>
               <button class="btn btn-secondary btn-sm" onclick="adminView.openEditDeptVisionMissionModal('${d.id}')">✏️ Edit Vision & Mission</button>
             </div>
 
@@ -621,11 +619,56 @@ const adminView = {
         `).join('')}
       </div>
 
+      <!-- Department Academic Classes Roster -->
+      <div class="card" style="margin-bottom:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 class="card-title">Department Academic Classes & Semesters</h3>
+            <p class="card-subtitle">Manage class rosters (e.g. SE Mechanical linked to Semester III & Semester IV)</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminView.openAddClassModal()">+ Add Academic Class</button>
+        </div>
+        <div class="table-container" style="margin-top:12px;">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Class Code</th>
+                <th>Class Name & Branch</th>
+                <th>Department</th>
+                <th>Linked Semesters</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(app.data.academicClasses || []).length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:16px;">No academic classes added yet. Click "+ Add Academic Class" above.</td></tr>` :
+                (app.data.academicClasses || []).map(c => {
+                  const d = app.data.departments.find(dept => dept.id === c.departmentId);
+                  return `
+                    <tr>
+                      <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">${c.code || c.name}</td>
+                      <td style="font-weight:600;">${c.name}</td>
+                      <td><span class="tag tag-co">${d ? (d.shortName || d.name) : '-'}</span></td>
+                      <td>
+                        ${(c.semesters || []).map(sem => `<span class="tag tag-bt" style="margin-right:4px;">${sem}</span>`).join('')}
+                      </td>
+                      <td>
+                        <button class="btn btn-destructive btn-sm" onclick="adminView.deleteClass('${c.id}')">🗑️ Delete</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Subject Courses Master -->
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div>
-            <h3 class="card-title">FE Subject Courses</h3>
-            <p class="card-subtitle">Manage subject courses and department assignments</p>
+            <h3 class="card-title">Department Subject Courses Master</h3>
+            <p class="card-subtitle">Manage subject courses and linked class & semester assignments</p>
           </div>
           <button class="btn btn-primary btn-sm" onclick="adminView.openAddSubjectModal()">+ Add New Subject Course</button>
         </div>
@@ -633,26 +676,31 @@ const adminView = {
           <table class="custom-table">
             <thead>
               <tr>
-                <th>Code</th>
+                <th>Subject Code</th>
                 <th>Short Name</th>
-                <th>Full Name</th>
+                <th>Full Course Name</th>
                 <th>Department</th>
+                <th>Linked Class & Sem</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              ${app.data.subjects.length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:16px;">No subject courses added yet. Click "+ Add New Subject Course" above.</td></tr>` :
+              ${app.data.subjects.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:16px;">No subject courses added yet. Click "+ Add New Subject Course" above.</td></tr>` :
                 app.data.subjects.map(s => {
                   const d = app.data.departments.find(dept => dept.id === s.departmentId);
                   const shortName = s.shortName || s.code;
                   return `
                     <tr>
-                      <td style="font-family:var(--font-mono); font-weight:700;">${s.code}</td>
+                      <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">${s.code}</td>
                       <td style="font-weight:600;">${shortName}</td>
                       <td>${s.fullName}</td>
-                      <td><span class="tag tag-co">${d ? d.name : '-'}</span></td>
+                      <td><span class="tag tag-co">${d ? (d.shortName || d.name) : '-'}</span></td>
                       <td>
-                        <button class="btn btn-secondary btn-sm" onclick="adminView.openEditSubjectModal('${s.id}')">✏️ Edit</button>
+                        <span class="tag tag-bt">${s.className || 'SE Mechanical'}</span>
+                        <span class="tag tag-success" style="margin-left:4px;">${s.semester || 'Semester III'}</span>
+                      </td>
+                      <td style="display:flex; gap:6px;">
+                        <button class="btn btn-secondary btn-sm" onclick="adminView.openEditSubjectModal('${s.id}')">✏️ Edit / Modify</button>
                         <button class="btn btn-destructive btn-sm" onclick="adminView.deleteSubject('${s.id}')">🗑️ Delete</button>
                       </td>
                     </tr>
@@ -827,6 +875,81 @@ const adminView = {
     app.data.subjects = app.data.subjects.filter(s => s.id !== subjectId);
     app.saveState();
     app.showToast(`Deleted subject course ${sub.code}`, 'info');
+    this.renderDepartmentManager(document.getElementById('main-content'));
+  },
+
+  openAddClassModal() {
+    app.showModal('Add Academic Class & Assign Semesters', `
+      <form onsubmit="adminView.saveClass(event)">
+        <div class="form-group">
+          <label class="form-label">Managing Department</label>
+          <select id="class-dept" class="form-select">
+            ${app.data.departments.map(d => `<option value="${d.id}">${d.name} (${d.shortName || d.id})</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Class Code / Abbreviation</label>
+            <input type="text" id="class-code" class="form-input code-font" placeholder="e.g. SE Mech" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Full Class Name & Branch</label>
+            <input type="text" id="class-name" class="form-input" placeholder="e.g. Second Year Mechanical Engineering" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Assign Semesters (Select All Applicable)</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+            ${['Semester I','Semester II','Semester III','Semester IV','Semester V','Semester VI','Semester VII','Semester VIII'].map(sem => `
+              <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" name="class-sems" value="${sem}"> ${sem}
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Academic Class</button>
+        </div>
+      </form>
+    `);
+  },
+
+  saveClass(e) {
+    e.preventDefault();
+    if (!app.data.academicClasses) app.data.academicClasses = [];
+
+    const deptId = document.getElementById('class-dept').value;
+    const code = document.getElementById('class-code').value.trim();
+    const name = document.getElementById('class-name').value.trim();
+    const checkedSems = Array.from(document.querySelectorAll('input[name="class-sems"]:checked')).map(cb => cb.value);
+
+    const newClass = {
+      id: 'class-' + Date.now(),
+      code: code,
+      name: name,
+      departmentId: deptId,
+      semesters: checkedSems.length > 0 ? checkedSems : ['Semester III', 'Semester IV']
+    };
+
+    app.data.academicClasses.push(newClass);
+    app.saveState();
+    app.closeModal();
+    app.showToast(`Added Academic Class ${newClass.name}`, 'success');
+    this.renderDepartmentManager(document.getElementById('main-content'));
+  },
+
+  deleteClass(classId) {
+    const cls = (app.data.academicClasses || []).find(c => c.id === classId);
+    if (!cls) return;
+    if (!confirm(`Are you sure you want to delete Academic Class "${cls.name}"?`)) return;
+
+    app.data.academicClasses = (app.data.academicClasses || []).filter(c => c.id !== classId);
+    app.saveState();
+    app.showToast(`Deleted class ${cls.name}`, 'info');
     this.renderDepartmentManager(document.getElementById('main-content'));
   },
 
