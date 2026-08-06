@@ -338,7 +338,8 @@ const facultyView = {
                       <td><span class="tag tag-co">${sub ? sub.code : '-'}</span></td>
                       <td style="font-weight:700; font-family:var(--font-mono);">${m.code}</td>
                       <td style="font-weight:500;">${m.title}</td>
-                      <td>
+                      <td style="display:flex; gap:6px;">
+                        <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditModuleModal('${m.id}')">✏️ Edit</button>
                         <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteModule('${m.id}')">🗑️ Delete</button>
                       </td>
                     </tr>
@@ -383,7 +384,8 @@ const facultyView = {
                         ${psoList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
                           psoList.map(pso => `<span class="tag tag-success" style="margin-right:4px;">${pso}</span>`).join('')}
                       </td>
-                      <td>
+                      <td style="display:flex; gap:6px;">
+                        <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditCOModal('${co.id}')">✏️ Edit</button>
                         <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
                       </td>
                     </tr>
@@ -455,7 +457,10 @@ const facultyView = {
 
                 return `
                   <tr>
-                    <td style="text-align:left; font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
+                    <td style="text-align:left; font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">
+                      ${co.code}
+                      <button class="btn btn-secondary btn-sm" style="padding:1px 5px; font-size:10px; margin-left:4px;" title="Edit Outcome" onclick="facultyView.openEditCOModal('${co.id}')">✏️</button>
+                    </td>
                     <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type}</span></td>
                     <td style="text-align:left; font-size:12px; max-width:280px; white-space:normal;">${co.description}</td>
                     ${pos.map(po => {
@@ -528,6 +533,114 @@ const facultyView = {
     app.data.courseOutcomes = app.data.courseOutcomes.filter(c => c.id !== coId);
     app.saveState();
     app.showToast(`Deleted Outcome ${co.code}`, 'info');
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
+  },
+
+  openEditModuleModal(moduleId) {
+    const mod = (app.data.modules || []).find(m => m.id === moduleId);
+    if (!mod) return;
+
+    app.showModal(`Edit Subject Module (${mod.code})`, `
+      <form onsubmit="facultyView.updateModule(event, '${mod.id}')">
+        <div class="form-group">
+          <label class="form-label">Subject</label>
+          <select id="edit-mod-sub" class="form-select">
+            ${app.data.subjects.map(s => `<option value="${s.id}" ${s.id === mod.subjectId ? 'selected' : ''}>${s.code} - ${s.fullName}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Module Code</label>
+          <input type="text" id="edit-mod-code" class="form-input code-font" value="${mod.code}" required style="font-weight:700; color:var(--accent-blue);">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Module Title</label>
+          <input type="text" id="edit-mod-title" class="form-input" value="${mod.title}" required>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Module</button>
+        </div>
+      </form>
+    `);
+  },
+
+  updateModule(e, moduleId) {
+    e.preventDefault();
+    const mod = (app.data.modules || []).find(m => m.id === moduleId);
+    if (!mod) return;
+
+    mod.subjectId = document.getElementById('edit-mod-sub').value;
+    mod.code = document.getElementById('edit-mod-code').value.trim();
+    mod.title = document.getElementById('edit-mod-title').value.trim();
+
+    app.saveState();
+    app.closeModal();
+    app.showToast(`Updated module ${mod.code}`, 'success');
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
+  },
+
+  openEditCOModal(coId) {
+    const co = (app.data.courseOutcomes || []).find(c => c.id === coId);
+    if (!co) return;
+
+    const currentType = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+
+    app.showModal(`Edit Outcome (${co.code})`, `
+      <form onsubmit="facultyView.updateCO(event, '${co.id}')">
+        <div class="form-group">
+          <label class="form-label">Outcome Category Type</label>
+          <div style="display:flex; gap:16px; margin-top:6px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:14px;">
+              <input type="radio" name="edit-co-type" value="CO" ${currentType === 'CO' ? 'checked' : ''}> 📖 Course Outcome (CO)
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; font-size:14px;">
+              <input type="radio" name="edit-co-type" value="LO" ${currentType === 'LO' ? 'checked' : ''}> 🧪 Lab Outcome (LO)
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Subject</label>
+          <select id="edit-co-sub" class="form-select">
+            ${app.data.subjects.map(s => `<option value="${s.id}" ${s.id === co.subjectId ? 'selected' : ''}>${s.code} - ${s.fullName}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Outcome Code</label>
+          <input type="text" id="edit-co-code" class="form-input code-font" value="${co.code}" required style="font-weight:700; color:var(--accent-blue);">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Outcome Description</label>
+          <textarea id="edit-co-desc" class="form-textarea" rows="3" required>${co.description}</textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Outcome</button>
+        </div>
+      </form>
+    `);
+  },
+
+  updateCO(e, coId) {
+    e.preventDefault();
+    const co = (app.data.courseOutcomes || []).find(c => c.id === coId);
+    if (!co) return;
+
+    const typeRadio = document.querySelector('input[name="edit-co-type"]:checked');
+    co.type = typeRadio ? typeRadio.value : 'CO';
+    co.subjectId = document.getElementById('edit-co-sub').value;
+    co.code = document.getElementById('edit-co-code').value.trim();
+    co.description = document.getElementById('edit-co-desc').value.trim();
+
+    app.saveState();
+    app.closeModal();
+    app.showToast(`Updated outcome ${co.code}`, 'success');
     this.renderCOAndModulesManager(document.getElementById('main-content'));
   },
 
