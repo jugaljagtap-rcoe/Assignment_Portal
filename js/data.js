@@ -14,6 +14,7 @@ const HARDCODED_DEPARTMENTS = [
   {
     id: "dept-fe",
     name: "First Year Engineering Department",
+    shortName: "FE",
     vision: "To establish a strong foundation in basic sciences, engineering principles, ethics, and interdisciplinary skills for all first-year engineering students.",
     mission: [
       "To nurture fundamental engineering knowledge and analytical problem-solving abilities.",
@@ -24,6 +25,7 @@ const HARDCODED_DEPARTMENTS = [
   {
     id: "dept-aids",
     name: "Artificial Intelligence & Data Science",
+    shortName: "AI&DS",
     vision: "To excel in data-driven innovation and intelligence engineering, producing professionals who transform industries through ethical AI and advanced data analytics.",
     mission: [
       "To impart deep knowledge in Machine Learning, Deep Learning, and Big Data technologies.",
@@ -34,6 +36,7 @@ const HARDCODED_DEPARTMENTS = [
   {
     id: "dept-civil",
     name: "Civil Engineering",
+    shortName: "Civil",
     vision: "To develop sustainable infrastructure engineers equipped with advanced structural design, environmental awareness, and project management skills.",
     mission: [
       "To deliver comprehensive technical education in civil and structural engineering.",
@@ -44,6 +47,7 @@ const HARDCODED_DEPARTMENTS = [
   {
     id: "dept-comp",
     name: "Computer Engineering",
+    shortName: "Comp",
     vision: "To create globally competent computer engineers capable of solving complex computational problems and driving innovation in artificial intelligence, software design, and digital systems.",
     mission: [
       "To provide robust technical education in computer science core principles and modern software methodologies.",
@@ -54,6 +58,7 @@ const HARDCODED_DEPARTMENTS = [
   {
     id: "dept-ecs",
     name: "Electronics & Computer Science",
+    shortName: "ECS",
     vision: "To pioneer integrated hardware-software engineering education, preparing students for leadership in embedded systems, IoT, and modern electronics.",
     mission: [
       "To offer cutting-edge instruction in hardware design and software integration.",
@@ -64,6 +69,7 @@ const HARDCODED_DEPARTMENTS = [
   {
     id: "dept-mech",
     name: "Mechanical Engineering",
+    shortName: "Mech",
     vision: "To achieve excellence in transforming all aspirants into globally recognized mechanical engineers of the highest caliber with core competencies backed by multidisciplinary evolutions and innovations, proficient in sustainable design, development and services.",
     mission: [
       "To enrich the learners with strong fundamentals of Mechanical Engineering and professional ethics, using the latest technologies of teaching-learning methodologies.",
@@ -86,6 +92,17 @@ const INITIAL_DATA = {
   ],
   
   departments: JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS)),
+
+  academicClasses: [
+    { id: "class-fe", name: "FE Mechanical", code: "FE", departmentId: "dept-fe", semesters: ["Semester I", "Semester II"] },
+    { id: "class-aids-se", name: "SE AI&DS", code: "SE AI&DS", departmentId: "dept-aids", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-civil-se", name: "SE Civil", code: "SE Civil", departmentId: "dept-civil", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-comp-se", name: "SE Comp", code: "SE Comp", departmentId: "dept-comp", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-ecs-se", name: "SE ECS", code: "SE ECS", departmentId: "dept-ecs", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-mech-se", name: "SE Mechanical", code: "SE Mech", departmentId: "dept-mech", semesters: ["Semester III", "Semester IV"] },
+    { id: "class-mech-te", name: "TE Mechanical", code: "TE Mech", departmentId: "dept-mech", semesters: ["Semester V", "Semester VI"] },
+    { id: "class-mech-be", name: "BE Mechanical", code: "BE Mech", departmentId: "dept-mech", semesters: ["Semester VII", "Semester VIII"] }
+  ],
 
   programOutcomes: [
     { id: "PO1", code: "PO1", description: "Engineering Knowledge: Apply math, science, and engineering fundamentals." },

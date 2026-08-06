@@ -397,6 +397,7 @@ class AppEngine {
     if (!state.subjects) state.subjects = [];
     if (!state.courseOutcomes) state.courseOutcomes = [];
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
+    if (!state.academicClasses) state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
     if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
 
@@ -413,6 +414,19 @@ class AppEngine {
     });
 
     return state;
+  }
+
+  getDepartmentShortName(deptId) {
+    const dept = (this.data.departments || []).find(d => d.id === deptId);
+    if (!dept) return 'FE';
+    if (dept.shortName) return dept.shortName;
+    if (dept.id === 'dept-fe') return 'FE';
+    if (dept.id === 'dept-aids') return 'AI&DS';
+    if (dept.id === 'dept-civil') return 'Civil';
+    if (dept.id === 'dept-comp') return 'Comp';
+    if (dept.id === 'dept-ecs') return 'ECS';
+    if (dept.id === 'dept-mech') return 'Mech';
+    return 'FE';
   }
 
   saveState() {

@@ -1822,31 +1822,87 @@ const facultyView = {
     app.showToast(`Retroactive Auto-Grading Complete: ${reEvaluated} submissions re-evaluated against ground truth`, 'success');
   },
 
-  openCreateAssignmentModal() {
-    const autoCode = `RCOE/FE/2026-27/LAB_A00${app.data.assignments.length+1}`;
+  generateAssignmentCode(subjectId) {
+    const sub = (app.data.subjects || []).find(s => s.id === subjectId);
+    const deptShort = app.getDepartmentShortName(sub ? sub.departmentId : 'dept-fe');
+    const ay = (app.data.academicYears || []).find(a => a.active);
+    const ayLabel = ay ? ay.label : '2026-27';
     
+    let labShort = 'LAB';
+    if (sub) {
+      labShort = (sub.shortName || sub.code).replace(/[^a-zA-Z0-9]/g, '');
+      if (!labShort) labShort = sub.code || 'LAB';
+    }
+
+    const num = (app.data.assignments || []).length + 1;
+    const padNum = String(num).padStart(3, '0');
+    return `RCOE/${deptShort}/${ayLabel}/${labShort}_A${padNum}`;
+  },
+
+  onAssignmentSubjectChange() {
+    const subSelect = document.getElementById('new-asg-subject');
+    if (!subSelect) return;
+    const selectedSubId = subSelect.value;
+    const sub = (app.data.subjects || []).find(s => s.id === selectedSubId);
+
+    // 1. Update Auto Assignment Code
+    const codeInput = document.getElementById('new-asg-code');
+    if (codeInput) {
+      codeInput.value = this.generateAssignmentCode(selectedSubId);
+    }
+
+    // 2. Auto-fill Class & Branch and Semester
+    const classInput = document.getElementById('new-asg-class');
+    const semInput = document.getElementById('new-asg-sem');
+    if (sub) {
+      if (classInput) classInput.value = sub.className || 'SE Mechanical';
+      if (semInput) semInput.value = sub.semester || 'Semester III';
+    }
+
+    // 3. Filter Modules Covered for this Subject Only
+    const modSelect = document.getElementById('new-asg-module');
+    if (modSelect) {
+      const filteredMods = (app.data.modules || []).filter(m => m.subjectId === selectedSubId);
+      if (filteredMods.length > 0) {
+        modSelect.innerHTML = filteredMods.map(m => `<option value="${m.code}: ${m.title}">${m.code}: ${m.title}</option>`).join('');
+      } else {
+        modSelect.innerHTML = '<option value="">-- No Modules Defined For This Subject --</option>';
+      }
+    }
+
+    // 4. Filter Outcomes Covered for this Subject Only
+    const coSelect = document.getElementById('new-asg-co');
+    if (coSelect) {
+      const filteredCOs = (app.data.courseOutcomes || []).filter(c => c.subjectId === selectedSubId);
+      if (filteredCOs.length > 0) {
+        coSelect.innerHTML = filteredCOs.map(co => {
+          const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+          return `<option value="${co.code}: ${co.description}">[${type}] ${co.code}: ${co.description}</option>`;
+        }).join('');
+      } else {
+        coSelect.innerHTML = '<option value="">-- No Outcomes Defined For This Subject --</option>';
+      }
+    }
+  },
+
+  openCreateAssignmentModal() {
     const subjectOptions = (app.data.subjects && app.data.subjects.length > 0) ?
       app.data.subjects.map(s => `<option value="${s.id}">${s.code} - ${s.fullName}</option>`).join('') :
       '<option value="">-- No Subjects Defined Yet --</option>';
 
-    const moduleOptions = (app.data.modules && app.data.modules.length > 0) ?
-      app.data.modules.map(m => `<option value="${m.title}">${m.code ? m.code + ': ' : ''}${m.title}</option>`).join('') :
-      '<option value="">-- No Modules Defined Yet --</option>';
-
-    const coOptions = (app.data.courseOutcomes && app.data.courseOutcomes.length > 0) ?
-      app.data.courseOutcomes.map(co => `<option value="${co.code}: ${co.description}">${co.code}: ${co.description}</option>`).join('') :
-      '<option value="">-- No Course Outcomes Defined Yet --</option>';
+    const firstSubId = app.data.subjects && app.data.subjects.length > 0 ? app.data.subjects[0].id : '';
+    const initialCode = this.generateAssignmentCode(firstSubId);
 
     app.showModal('Create New Lab Assignment Sheet', `
       <form onsubmit="facultyView.saveAssignment(event)">
         <div class="form-group">
-          <label class="form-label">Auto Assignment Code</label>
-          <input type="text" id="new-asg-code" class="form-input code-font" value="${autoCode}" readonly style="background:var(--bg-subtle);">
+          <label class="form-label">Auto Assignment Code (Editable)</label>
+          <input type="text" id="new-asg-code" class="form-input code-font" value="${initialCode}" required style="font-weight:700; color:var(--accent-blue);">
         </div>
 
         <div class="form-group">
           <label class="form-label">Select Subject Course</label>
-          <select id="new-asg-subject" class="form-select" required>
+          <select id="new-asg-subject" class="form-select" required onchange="facultyView.onAssignmentSubjectChange()">
             ${subjectOptions}
           </select>
         </div>
@@ -1870,14 +1926,14 @@ const facultyView = {
         <div class="form-group">
           <label class="form-label">Modules Covered</label>
           <select id="new-asg-module" class="form-select">
-            ${moduleOptions}
+            <option value="">-- Select Subject First --</option>
           </select>
         </div>
 
         <div class="form-group">
           <label class="form-label">Lab Outcome/s Covered (Course Outcomes)</label>
           <select id="new-asg-co" class="form-select">
-            ${coOptions}
+            <option value="">-- Select Subject First --</option>
           </select>
         </div>
 
@@ -1905,6 +1961,9 @@ const facultyView = {
         </div>
       </form>
     `);
+
+    // Trigger dependent dropdown population for default subject
+    setTimeout(() => this.onAssignmentSubjectChange(), 50);
   },
 
   saveAssignment(e) {

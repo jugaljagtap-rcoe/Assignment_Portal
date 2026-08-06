@@ -667,29 +667,59 @@ const adminView = {
   },
 
   openAddSubjectModal() {
-    app.showModal('Add New FE Subject Course', `
+    const classes = app.data.academicClasses || [];
+
+    app.showModal('Add New Subject Course & Link Class/Semester', `
       <form onsubmit="adminView.saveSubject(event)">
-        <div class="form-group">
-          <label class="form-label">Subject Code</label>
-          <input type="text" id="sub-code" class="form-input code-font" placeholder="24051181 or FEL101" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Short Name / Abbreviation</label>
-          <input type="text" id="sub-short" class="form-input" placeholder="MVDS Lab or BEE Lab" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Full Course Name</label>
-          <input type="text" id="sub-full" class="form-input" placeholder="Mechanical Vibration & Dynamic Systems Lab" required>
-        </div>
         <div class="form-group">
           <label class="form-label">Managing Department</label>
           <select id="sub-dept" class="form-select">
-            ${app.data.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+            ${app.data.departments.map(d => `<option value="${d.id}">${d.name} (${d.shortName || d.id})</option>`).join('')}
           </select>
         </div>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Link to Class & Branch</label>
+            <input type="text" id="sub-class" class="form-input" placeholder="e.g. SE Mechanical" required list="class-list-suggestions">
+            <datalist id="class-list-suggestions">
+              ${classes.map(c => `<option value="${c.name}">`).join('')}
+            </datalist>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Link to Semester</label>
+            <select id="sub-sem" class="form-select">
+              <option value="Semester I">Semester I</option>
+              <option value="Semester II">Semester II</option>
+              <option value="Semester III" selected>Semester III</option>
+              <option value="Semester IV">Semester IV</option>
+              <option value="Semester V">Semester V</option>
+              <option value="Semester VI">Semester VI</option>
+              <option value="Semester VII">Semester VII</option>
+              <option value="Semester VIII">Semester VIII</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Subject Code</label>
+            <input type="text" id="sub-code" class="form-input code-font" placeholder="24051181" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Lab Short Name / Abbreviation</label>
+            <input type="text" id="sub-short" class="form-input" placeholder="VMD or BEE" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Full Course Name</label>
+          <input type="text" id="sub-full" class="form-input" placeholder="Vibration and Machinery Diagnostics Laboratory" required>
+        </div>
+
         <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Subject</button>
+          <button type="submit" class="btn btn-primary">Save Subject Course</button>
         </div>
       </form>
     `);
@@ -698,30 +728,54 @@ const adminView = {
   openEditSubjectModal(subjectId) {
     const sub = app.data.subjects.find(s => s.id === subjectId);
     if (!sub) return;
+    const classes = app.data.academicClasses || [];
 
     app.showModal(`Edit Subject Course — ${sub.code}`, `
       <form onsubmit="adminView.saveSubject(event, '${sub.id}')">
         <div class="form-group">
-          <label class="form-label">Subject Code</label>
-          <input type="text" id="sub-code" class="form-input code-font" value="${sub.code}" required>
+          <label class="form-label">Managing Department</label>
+          <select id="sub-dept" class="form-select">
+            ${app.data.departments.map(d => `<option value="${d.id}" ${d.id === sub.departmentId ? 'selected' : ''}>${d.name} (${d.shortName || d.id})</option>`).join('')}
+          </select>
         </div>
-        <div class="form-group">
-          <label class="form-label">Short Name / Abbreviation</label>
-          <input type="text" id="sub-short" class="form-input" value="${sub.shortName || sub.code}" required>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Linked Class & Branch</label>
+            <input type="text" id="sub-class" class="form-input" value="${sub.className || 'SE Mechanical'}" required list="class-list-suggestions">
+            <datalist id="class-list-suggestions">
+              ${classes.map(c => `<option value="${c.name}">`).join('')}
+            </datalist>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Linked Semester</label>
+            <select id="sub-sem" class="form-select">
+              ${['Semester I','Semester II','Semester III','Semester IV','Semester V','Semester VI','Semester VII','Semester VIII'].map(sem => `
+                <option value="${sem}" ${sub.semester === sem ? 'selected' : ''}>${sem}</option>
+              `).join('')}
+            </select>
+          </div>
         </div>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Subject Code</label>
+            <input type="text" id="sub-code" class="form-input code-font" value="${sub.code}" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Lab Short Name / Abbreviation</label>
+            <input type="text" id="sub-short" class="form-input" value="${sub.shortName || sub.code}" required>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Full Course Name</label>
           <input type="text" id="sub-full" class="form-input" value="${sub.fullName}" required>
         </div>
-        <div class="form-group">
-          <label class="form-label">Managing Department</label>
-          <select id="sub-dept" class="form-select">
-            ${app.data.departments.map(d => `<option value="${d.id}" ${d.id === sub.departmentId ? 'selected' : ''}>${d.name}</option>`).join('')}
-          </select>
-        </div>
+
         <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Update Subject</button>
+          <button type="submit" class="btn btn-primary">Update Subject Course</button>
         </div>
       </form>
     `);
@@ -733,6 +787,8 @@ const adminView = {
     const shortName = document.getElementById('sub-short').value.trim();
     const fullName = document.getElementById('sub-full').value.trim();
     const deptId = document.getElementById('sub-dept').value;
+    const className = document.getElementById('sub-class').value.trim();
+    const semester = document.getElementById('sub-sem').value;
 
     if (subjectId) {
       const sub = app.data.subjects.find(s => s.id === subjectId);
@@ -741,6 +797,8 @@ const adminView = {
         sub.shortName = shortName;
         sub.fullName = fullName;
         sub.departmentId = deptId;
+        sub.className = className;
+        sub.semester = semester;
       }
     } else {
       const newSub = {
@@ -748,7 +806,9 @@ const adminView = {
         code: code,
         shortName: shortName,
         fullName: fullName,
-        departmentId: deptId
+        departmentId: deptId,
+        className: className,
+        semester: semester
       };
       app.data.subjects.push(newSub);
     }
