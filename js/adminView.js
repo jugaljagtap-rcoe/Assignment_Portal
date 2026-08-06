@@ -716,6 +716,20 @@ const adminView = {
     `;
   },
 
+  onSubjectDeptChange() {
+    const deptSelect = document.getElementById('sub-dept');
+    const classSelect = document.getElementById('sub-class');
+    if (!deptSelect || !classSelect) return;
+
+    const selectedDeptId = deptSelect.value;
+    const allClasses = app.data.academicClasses || [];
+    const deptClasses = allClasses.filter(c => c.departmentId === selectedDeptId);
+    const classesToShow = deptClasses.length > 0 ? deptClasses : allClasses;
+
+    classSelect.innerHTML = classesToShow.map(c => `<option value="${c.code}">${c.code} - ${c.name}</option>`).join('');
+    this.onSubjectClassChange();
+  },
+
   onSubjectClassChange() {
     const classSelect = document.getElementById('sub-class');
     const semSelect = document.getElementById('sub-sem');
@@ -729,15 +743,18 @@ const adminView = {
   },
 
   openAddSubjectModal() {
-    const classes = app.data.academicClasses || [];
-    const firstClass = classes.length > 0 ? classes[0] : null;
+    const defaultDept = app.data.departments.length > 0 ? app.data.departments[0] : null;
+    const allClasses = app.data.academicClasses || [];
+    const deptClasses = defaultDept ? allClasses.filter(c => c.departmentId === defaultDept.id) : allClasses;
+    const classesToShow = deptClasses.length > 0 ? deptClasses : allClasses;
+    const firstClass = classesToShow.length > 0 ? classesToShow[0] : null;
     const initialSems = firstClass ? firstClass.semesters : ['Semester III', 'Semester IV'];
 
     app.showModal('Add New Subject Course & Link Class/Semester', `
       <form onsubmit="adminView.saveSubject(event)">
         <div class="form-group">
           <label class="form-label">Managing Department</label>
-          <select id="sub-dept" class="form-select">
+          <select id="sub-dept" class="form-select" onchange="adminView.onSubjectDeptChange()">
             ${app.data.departments.map(d => `<option value="${d.id}">${d.name} (${d.shortName || d.id})</option>`).join('')}
           </select>
         </div>
@@ -746,7 +763,7 @@ const adminView = {
           <div class="form-group" style="flex:1;">
             <label class="form-label">Link to Class & Branch</label>
             <select id="sub-class" class="form-select" onchange="adminView.onSubjectClassChange()" required>
-              ${classes.map(c => `<option value="${c.code}">${c.code} - ${c.name}</option>`).join('')}
+              ${classesToShow.map(c => `<option value="${c.code}">${c.code} - ${c.name}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="flex:1;">
@@ -784,30 +801,35 @@ const adminView = {
   openEditSubjectModal(subjectId) {
     const sub = app.data.subjects.find(s => s.id === subjectId);
     if (!sub) return;
-    const classes = app.data.academicClasses || [];
+    const allClasses = app.data.academicClasses || [];
+    
+    // Filter classes belonging to the subject's department
+    const deptId = sub.departmentId || (app.data.departments.length > 0 ? app.data.departments[0].id : '');
+    const deptClasses = allClasses.filter(c => c.departmentId === deptId);
+    const classesToShow = deptClasses.length > 0 ? deptClasses : allClasses;
 
-    const currentClassCode = sub.className || (classes.length > 0 ? classes[0].code : 'SE Mech');
-    const matchedClass = classes.find(c => c.code === currentClassCode || c.name === currentClassCode);
+    const currentClassCode = sub.className || (classesToShow.length > 0 ? classesToShow[0].code : 'SE Mech');
+    const matchedClass = allClasses.find(c => c.code === currentClassCode || c.name === currentClassCode);
     const availableSems = matchedClass ? matchedClass.semesters : ['Semester I','Semester II','Semester III','Semester IV','Semester V','Semester VI','Semester VII','Semester VIII'];
 
     app.showModal(`Edit Subject Course — ${sub.code}`, `
       <form onsubmit="adminView.saveSubject(event, '${sub.id}')">
         <div class="form-group">
           <label class="form-label">Managing Department</label>
-          <select id="sub-dept" class="form-select">
-            ${app.data.departments.map(d => `<option value="${d.id}" ${d.id === sub.departmentId ? 'selected' : ''}>${d.name} (${d.shortName || d.id})</option>`).join('')}
+          <select id="sub-dept" class="form-select" onchange="adminView.onSubjectDeptChange()">
+            ${app.data.departments.map(d => `<option value="${d.id}" ${d.id === deptId ? 'selected' : ''}>${d.name} (${d.shortName || d.id})</option>`).join('')}
           </select>
         </div>
 
         <div style="display:flex; gap:12px;">
           <div class="form-group" style="flex:1;">
-            <label class="form-label">Linked Class & Branch</label>
+            <label class="form-label">Link to Class & Branch</label>
             <select id="sub-class" class="form-select" onchange="adminView.onSubjectClassChange()" required>
-              ${classes.map(c => `<option value="${c.code}" ${(c.code === currentClassCode || c.name === currentClassCode) ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
+              ${classesToShow.map(c => `<option value="${c.code}" ${(c.code === currentClassCode || c.name === currentClassCode) ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" style="flex:1;">
-            <label class="form-label">Linked Semester</label>
+            <label class="form-label">Link to Semester</label>
             <select id="sub-sem" class="form-select">
               ${availableSems.map(sem => `
                 <option value="${sem}" ${sub.semester === sem ? 'selected' : ''}>${sem}</option>
@@ -849,16 +871,21 @@ const adminView = {
     const className = document.getElementById('sub-class').value.trim();
     const semester = document.getElementById('sub-sem').value;
 
-    if (subjectId) {
-      const sub = app.data.subjects.find(s => s.id === subjectId);
-      if (sub) {
-        sub.code = code;
-        sub.shortName = shortName;
-        sub.fullName = fullName;
-        sub.departmentId = deptId;
-        sub.className = className;
-        sub.semester = semester;
-      }
+    let existingSub = null;
+    if (subjectId && subjectId !== 'null' && subjectId !== 'undefined') {
+      existingSub = app.data.subjects.find(s => s.id === subjectId);
+    }
+    if (!existingSub) {
+      existingSub = app.data.subjects.find(s => s.code === code);
+    }
+
+    if (existingSub) {
+      existingSub.code = code;
+      existingSub.shortName = shortName;
+      existingSub.fullName = fullName;
+      existingSub.departmentId = deptId;
+      existingSub.className = className;
+      existingSub.semester = semester;
     } else {
       const newSub = {
         id: 'sub-' + Date.now(),
