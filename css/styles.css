@@ -1,50 +1,56 @@
 /* ==========================================================================
    Rizvi College of Engineering - First Year Engineering Assignment Portal
-   Design System: Light Mode, Apple & Linear Aesthetic
+   Design System: Luma Sticky App Layout Edition
    ========================================================================== */
 
 :root {
-  /* Color Palette */
-  --bg-primary: #F5F5F7;
+  /* Color Palette (Luma Sticky App Edition) */
+  --bg-primary: #F8F9FA;
   --bg-surface: #FFFFFF;
-  --bg-subtle: #F2F2F2;
+  --bg-subtle: #F1F5F9;
 
-  --border-default: #E5E5E7;
-  --border-strong: #C7C7CC;
+  --border-default: #E2E8F0;
+  --border-strong: #CBD5E1;
 
-  --text-primary: #1D1D1F;
-  --text-secondary: #6E6E73;
-  --text-tertiary: #76767C;
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
 
-  --accent-blue: #0066CC;
-  --accent-blue-hover: #0077ED;
-  --accent-blue-subtle: #E8F0FB;
+  --accent-blue: #1889E6;
+  --accent-blue-hover: #1577C8;
+  --accent-blue-subtle: #EBF5FF;
 
-  --success: #34C759;
-  --success-subtle: #F0FBF3;
+  --accent-navy: #182430;
+  --accent-navy-hover: #223042;
+  --accent-pink: #F83D68;
 
-  --warning: #FF9F0A;
-  --warning-subtle: #FFF8EC;
+  --success: #10B981;
+  --success-subtle: #ECFDF5;
 
-  --danger: #FF3B30;
-  --danger-subtle: #FFF2F1;
+  --warning: #F59E0B;
+  --warning-subtle: #FFFBEB;
 
-  --purple: #5E5CE6;
-  --purple-subtle: #F0F0FF;
+  --danger: #EF4444;
+  --danger-subtle: #FEF2F2;
+
+  --purple: #8B5CF6;
+  --purple-subtle: #F5F3FF;
 
   /* Elevation & Shadows */
   --shadow-level-0: none;
-  --shadow-level-1: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-level-2: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-level-3: 0 12px 32px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
-  --shadow-level-4: 0 24px 64px rgba(0, 0, 0, 0.16), 0 8px 16px rgba(0, 0, 0, 0.08);
+  --shadow-level-1: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-level-2: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-level-3: 0 10px 25px rgba(0, 0, 0, 0.10);
+  --shadow-level-4: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --navbar-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Exo 2', 'Roboto', 'Lato', -apple-system, sans-serif;
+  --font-sans: 'Lato', 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: 'JetBrains Mono', SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
 
   /* Spacing & Radius */
-  --radius-sm: 6px;
+  --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
@@ -98,6 +104,27 @@
   overflow-wrap: break-word;
 }
 
+/* Custom Browser Theme Polish */
+::selection {
+  background: var(--accent-blue-subtle);
+  color: var(--accent-blue);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
 /* Motion Sensitivity Opt-Out */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -126,6 +153,7 @@ body {
   height: 64px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--navbar-shadow);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -152,6 +180,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: 16px;
   letter-spacing: -0.02em;
@@ -159,6 +188,7 @@ body {
 }
 
 .brand-title {
+  font-family: var(--font-display);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -178,7 +208,7 @@ body {
 
 .role-switcher {
   display: flex;
-  background: var(--bg-primary);
+  background: var(--bg-subtle);
   padding: 3px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
@@ -208,7 +238,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
-  background: var(--bg-primary);
+  background: var(--bg-subtle);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -256,7 +286,7 @@ body {
 }
 
 .nav-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-subtle);
   color: var(--text-primary);
 }
 
@@ -291,13 +321,14 @@ body {
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 24px;
   box-shadow: var(--shadow-level-1);
-  transition: box-shadow var(--transition-fast);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .card:hover {
   box-shadow: var(--shadow-level-2);
+  border-color: var(--border-strong);
 }
 
 .card-header {
@@ -308,6 +339,7 @@ body {
 }
 
 .card-title {
+  font-family: var(--font-sans);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -322,6 +354,7 @@ body {
 
 /* Typography & Headings */
 h1.page-title {
+  font-family: var(--font-display);
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -338,6 +371,31 @@ h1.page-title {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+}
+
+/* Luma Page Section Separator Pattern */
+.page-separator {
+  display: flex;
+  align-items: center;
+  margin: 20px 0 16px 0;
+  border-bottom: 1px solid var(--border-default);
+  position: relative;
+}
+
+.page-separator__text {
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateY(50%);
 }
 
 /* KPI Dashboard Grid */
@@ -404,17 +462,19 @@ h1.page-title {
 .btn-primary {
   background: var(--accent-blue);
   color: #FFF;
+  font-weight: 600;
 }
 
 .btn-primary:hover {
   background: var(--accent-blue-hover);
-  box-shadow: 0 2px 6px rgba(0, 102, 204, 0.25);
+  box-shadow: 0 2px 8px rgba(24, 137, 230, 0.3);
 }
 
 .btn-secondary {
   background: var(--bg-surface);
   border-color: var(--border-default);
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .btn-secondary:hover {
@@ -426,6 +486,7 @@ h1.page-title {
   background: var(--bg-surface);
   border-color: var(--danger);
   color: var(--danger);
+  font-weight: 600;
 }
 
 .btn-destructive:hover {
@@ -435,6 +496,7 @@ h1.page-title {
 .btn-ghost {
   background: transparent;
   color: var(--accent-blue);
+  font-weight: 600;
 }
 
 .btn-ghost:hover {
@@ -466,9 +528,9 @@ h1.page-title {
 
 .form-input, .form-select, .form-textarea {
   height: 42px;
-  padding: 0 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-default);
+  padding: 0 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   font-size: 14px;
   font-family: inherit;
@@ -479,13 +541,13 @@ h1.page-title {
 
 .form-textarea {
   height: auto;
-  padding: 10px 12px;
+  padding: 10px 14px;
   resize: vertical;
 }
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+  box-shadow: 0 0 0 3px rgba(24, 137, 230, 0.15);
   background: var(--bg-surface);
 }
 
@@ -739,14 +801,14 @@ h1.page-title {
 .var-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
+  padding: 3px 8px;
   background: var(--accent-blue-subtle);
   color: var(--accent-blue);
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 600;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 102, 204, 0.2);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(24, 137, 230, 0.25);
 }
 
 .parameter-input-row {
