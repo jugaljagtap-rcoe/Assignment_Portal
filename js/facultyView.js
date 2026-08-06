@@ -117,6 +117,7 @@ const facultyView = {
                     <td>
                       <button class="btn btn-secondary btn-sm" onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('assignments');">Edit Questions</button>
                       <button class="btn btn-primary btn-sm" onclick="facultyView.activeCSVAssignmentId='${asg.id}'; app.switchNav('csv-pipeline');">Upload CSV Key</button>
+                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteAssignment('${asg.id}')">🗑️ Delete</button>
                     </td>
                   </tr>
                 `;
@@ -126,6 +127,17 @@ const facultyView = {
         </div>
       </div>
     `;
+  },
+
+  deleteAssignment(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+    if (!confirm(`Are you sure you want to delete "${asg.title}" (${asg.code})?`)) return;
+
+    app.data.assignments = app.data.assignments.filter(a => a.id !== asgId);
+    app.saveState();
+    app.showToast(`Deleted assignment ${asg.code}`, 'info');
+    this.renderDashboard(document.getElementById('main-content'));
   },
 
   searchStudentSheet() {
