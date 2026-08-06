@@ -423,6 +423,27 @@ const facultyView = {
 
   renderAssignmentBuilder(container) {
     const asg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0];
+    if (!asg) {
+      container.innerHTML = `
+        <div class="page-header-container">
+          <div>
+            <h1 class="page-title">Assignment Question Builder</h1>
+            <p class="page-subtitle">No active lab assignments found</p>
+          </div>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
+        </div>
+        <div class="card" style="text-align:center; padding:48px 24px;">
+          <div style="font-size:48px; margin-bottom:12px;">📑</div>
+          <h3 style="font-size:18px; font-weight:700; margin-bottom:8px;">No Assignments Created Yet</h3>
+          <p style="color:var(--text-secondary); max-width:480px; margin:0 auto 20px auto; font-size:13px;">
+            Create your first lab sheet assignment to start adding questions, dynamic parameter placeholders, and evaluation rules.
+          </p>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
+        </div>
+      `;
+      return;
+    }
+
     container.innerHTML = `
       <div class="page-header-container">
         <div>
@@ -936,7 +957,28 @@ const facultyView = {
   },
 
   renderScheduleManager(container) {
-    const asg = app.data.assignments[0];
+    const asg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0];
+    if (!asg) {
+      container.innerHTML = `
+        <div class="page-header-container">
+          <div>
+            <h1 class="page-title">Multi-Batch Schedule & Deduction Manager</h1>
+            <p class="page-subtitle">No active lab assignments found</p>
+          </div>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
+        </div>
+        <div class="card" style="text-align:center; padding:48px 24px;">
+          <div style="font-size:48px; margin-bottom:12px;">📅</div>
+          <h3 style="font-size:18px; font-weight:700; margin-bottom:8px;">No Active Assignment Schedules</h3>
+          <p style="color:var(--text-secondary); max-width:480px; margin:0 auto 20px auto; font-size:13px;">
+            Create an assignment to configure multi-batch submission deadlines, attempt penalty rules, and release policies.
+          </p>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
+        </div>
+      `;
+      return;
+    }
+
     container.innerHTML = `
       <div class="page-header-container">
         <div>
@@ -1024,6 +1066,26 @@ const facultyView = {
 
   renderCSVPipeline(container) {
     const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId) || app.data.assignments[0];
+    if (!selectedAsg) {
+      container.innerHTML = `
+        <div class="page-header-container">
+          <div>
+            <h1 class="page-title">Double CSV Upload & Solution Pipeline</h1>
+            <p class="page-subtitle">No active lab assignments found</p>
+          </div>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
+        </div>
+        <div class="card" style="text-align:center; padding:48px 24px;">
+          <div style="font-size:48px; margin-bottom:12px;">📂</div>
+          <h3 style="font-size:18px; font-weight:700; margin-bottom:8px;">No Assignments for CSV Pipeline</h3>
+          <p style="color:var(--text-secondary); max-width:480px; margin:0 auto 20px auto; font-size:13px;">
+            Create an assignment to upload personalized question variables and 2-row ground truth solution CSV keys.
+          </p>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
+        </div>
+      `;
+      return;
+    }
 
     container.innerHTML = `
       <div class="page-header-container">
