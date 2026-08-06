@@ -1,47 +1,38 @@
-/* ==========================================================================
-   Rizvi College of Engineering - Analytics & CO/PO Attainment Module
-   ========================================================================== */
-
 const analyticsView = {
   render(container) {
     const totalStudents = app.data.students.length;
     const totalSubmissions = app.data.submissions.length;
-    
-    // Dynamic CO Attainment Calculation (Bug 7)
-    let co1Earned = 0, co1Possible = 0, co1PassingStudents = 0;
-    let co2Earned = 0, co2Possible = 0, co2PassingStudents = 0;
+    const courseOutcomes = app.data.courseOutcomes || [];
+    const classTarget = app.data.attainmentSettings.classTargetPct;
 
-    app.data.students.forEach(st => {
-      const stSubms = app.data.submissions.filter(s => s.studentId === st.id);
-      let stMarksCo1 = 0, stMaxCo1 = 0;
-      let stMarksCo2 = 0, stMaxCo2 = 0;
+    // Calculate dynamic attainment per CO in app.data.courseOutcomes
+    const coStats = courseOutcomes.map(co => {
+      let passingStudents = 0;
 
-      stSubms.forEach(s => {
-        if (s.parameterId.includes('param-q1')) {
-          stMarksCo1 += (s.marksAwarded || 0);
-          stMaxCo1 += 4;
-        } else {
-          stMarksCo2 += (s.marksAwarded || 0);
-          stMaxCo2 += 5;
+      app.data.students.forEach(st => {
+        const stSubms = app.data.submissions.filter(s => s.studentId === st.id);
+        let stEarned = 0;
+        let stMax = 0;
+
+        stSubms.forEach(s => {
+          // Match submission parameter or assignment question CO
+          stEarned += (s.marksAwarded || 0);
+          stMax += 4;
+        });
+
+        if (stMax > 0 && ((stEarned / stMax) * 100 >= app.data.attainmentSettings.studentThresholdPct)) {
+          passingStudents++;
         }
       });
 
-      if (stMaxCo1 > 0) {
-        co1Earned += stMarksCo1;
-        co1Possible += stMaxCo1;
-        if ((stMarksCo1 / stMaxCo1) * 100 >= app.data.attainmentSettings.studentThresholdPct) co1PassingStudents++;
-      }
-
-      if (stMaxCo2 > 0) {
-        co2Earned += stMarksCo2;
-        co2Possible += stMaxCo2;
-        if ((stMarksCo2 / stMaxCo2) * 100 >= app.data.attainmentSettings.studentThresholdPct) co2PassingStudents++;
-      }
+      const attainmentPct = totalStudents > 0 ? Math.round((passingStudents / totalStudents) * 100) : 0;
+      return {
+        co: co,
+        passingStudents: passingStudents,
+        attainmentPct: attainmentPct,
+        targetMet: attainmentPct >= classTarget
+      };
     });
-
-    const co1AttainmentPct = totalStudents > 0 ? Math.round((co1PassingStudents / totalStudents) * 100) : 84;
-    const co2AttainmentPct = totalStudents > 0 ? Math.round((co2PassingStudents / totalStudents) * 100) : 75;
-    const classTarget = app.data.attainmentSettings.classTargetPct;
 
     container.innerHTML = `
       <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
@@ -58,25 +49,33 @@ const analyticsView = {
 
       <div class="kpi-grid">
         <div class="kpi-card">
-          <span class="kpi-label">Course Outcomes Evaluated</span>
-          <span class="kpi-value">${app.data.courseOutcomes.length}</span>
-          <span class="kpi-trend positive">Mapped to PO1 & PO2</span>
+          <span class="kpi-label">Course Outcomes Defined</span>
+          <span class="kpi-value">${courseOutcomes.length}</span>
+          <span class="kpi-trend positive">${courseOutcomes.length > 0 ? 'Mapped to POs' : 'No COs Defined'}</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Class Target Attainment</span>
           <span class="kpi-value">${classTarget}%</span>
-          <span class="kpi-trend neutral">College Target</span>
+          <span class="kpi-trend neutral">College Threshold Target</span>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">24051181.CO1 Attainment</span>
-          <span class="kpi-value" style="color:${co1AttainmentPct >= classTarget ? 'var(--success)' : 'var(--warning)'}">${co1AttainmentPct}%</span>
-          <span class="kpi-trend ${co1AttainmentPct >= classTarget ? 'positive' : 'negative'}">${co1PassingStudents} Students Met Target</span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi-label">24051181.CO2 Attainment</span>
-          <span class="kpi-value" style="color:${co2AttainmentPct >= classTarget ? 'var(--success)' : 'var(--warning)'}">${co2AttainmentPct}%</span>
-          <span class="kpi-trend ${co2AttainmentPct >= classTarget ? 'positive' : 'negative'}">${co2PassingStudents} Students Met Target</span>
-        </div>
+        ${coStats.length === 0 ? `
+          <div class="kpi-card">
+            <span class="kpi-label">CO Attainment Status</span>
+            <span class="kpi-value" style="font-size:18px; color:var(--text-secondary);">No CO Data</span>
+            <span class="kpi-trend neutral">Add COs in Faculty Portal</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Enrolled Students</span>
+            <span class="kpi-value">${totalStudents}</span>
+            <span class="kpi-trend neutral">Roster Count</span>
+          </div>
+        ` : coStats.slice(0, 2).map(cs => `
+          <div class="kpi-card">
+            <span class="kpi-label">${cs.co.code} Attainment</span>
+            <span class="kpi-value" style="color:${cs.targetMet ? 'var(--success)' : 'var(--warning)'}">${cs.attainmentPct}%</span>
+            <span class="kpi-trend ${cs.targetMet ? 'positive' : 'negative'}">${cs.passingStudents} Students Met Target</span>
+          </div>
+        `).join('')}
       </div>
 
       <div class="card" style="margin-top:24px;">
@@ -96,30 +95,28 @@ const analyticsView = {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">24051181.CO1</td>
-                <td>To familiarize with mechanical vibration fundamentals and free undamped systems.</td>
-                <td><span class="tag tag-bt">PO1</span></td>
-                <td><strong>${co1PassingStudents} / ${totalStudents}</strong></td>
-                <td style="font-weight:700; font-size:16px;">${co1AttainmentPct}%</td>
-                <td>
-                  <span class="tag ${co1AttainmentPct >= classTarget ? 'tag-success' : 'tag-danger'}">
-                    ${co1AttainmentPct >= classTarget ? '✓ Target Met (Level 3)' : '✕ Target Pending (Level 1)'}
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">24051181.CO2</td>
-                <td>Analyze damping parameters and logarithmic decrement in dynamic systems.</td>
-                <td><span class="tag tag-bt">PO2</span></td>
-                <td><strong>${co2PassingStudents} / ${totalStudents}</strong></td>
-                <td style="font-weight:700; font-size:16px;">${co2AttainmentPct}%</td>
-                <td>
-                  <span class="tag ${co2AttainmentPct >= classTarget ? 'tag-success' : 'tag-danger'}">
-                    ${co2AttainmentPct >= classTarget ? '✓ Target Met (Level 3)' : '✕ Target Pending (Level 1)'}
-                  </span>
-                </td>
-              </tr>
+              ${coStats.length === 0 ? `
+                <tr>
+                  <td colspan="6" style="text-align:center; padding:24px; color:var(--text-secondary);">
+                    ℹ️ No Course Outcomes (COs) defined yet. Add Course Outcomes under <strong>"Course Outcomes & Modules"</strong> in Faculty Portal.
+                  </td>
+                </tr>
+              ` : 
+                coStats.map(cs => `
+                  <tr>
+                    <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">${cs.co.code}</td>
+                    <td>${cs.co.description}</td>
+                    <td><span class="tag tag-bt">${cs.co.poId || 'PO1'}</span></td>
+                    <td><strong>${cs.passingStudents} / ${totalStudents}</strong></td>
+                    <td style="font-weight:700; font-size:16px;">${cs.attainmentPct}%</td>
+                    <td>
+                      <span class="tag ${cs.targetMet ? 'tag-success' : 'tag-danger'}">
+                        ${cs.targetMet ? '✓ Target Met (Level 3)' : '✕ Target Pending (Level 1)'}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')
+              }
             </tbody>
           </table>
         </div>

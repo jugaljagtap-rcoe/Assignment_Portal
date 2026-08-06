@@ -376,7 +376,6 @@ const facultyView = {
     app.showToast(`Deleted Course Outcome ${co.code}`, 'info');
     this.renderCOAndModulesManager(document.getElementById('main-content'));
   },
-  },
 
   openAddModuleModal() {
     app.showModal('Add Subject Module', `
