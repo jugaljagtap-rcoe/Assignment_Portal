@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-06T23:48:00.000Z",
+  "title": "Design System: Rizvi FE Assignment Portal (Luma Edition)",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Luma Dodger Blue",
+        "canonical": "#1889E6",
+        "tonalRamp": ["#0B3A63", "#0F4F87", "#1365AB", "#1889E6", "#3FA2F0", "#6EC0F5", "#A8DCFA", "#EBF5FF"]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Header & Drawer Navy",
+        "canonical": "#182430",
+        "tonalRamp": ["#0A0F14", "#121B24", "#182430", "#223042", "#32445C", "#485E7B", "#657C9C", "#E2E8F0"]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Slate Canvas Background",
+        "canonical": "#F8F9FA",
+        "tonalRamp": ["#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F8F9FA"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display Title",
+        "purpose": "Exo 2 / Roboto 28px Bold for main page view headings."
+      },
+      "body": {
+        "displayName": "Body & UI",
+        "purpose": "Lato / Roboto 15px for interface labels and question text."
+      },
+      "mono": {
+        "displayName": "Monospaced Formula & Parameters",
+        "purpose": "JetBrains Mono for student UINs, mathematical formulas, and parameter chips."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-level-1",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03)",
+        "purpose": "Resting cards, header navbar, and static containers."
+      },
+      {
+        "name": "shadow-level-2",
+        "value": "0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)",
+        "purpose": "Interactive hover states, popover menus, and dropdowns."
+      },
+      {
+        "name": "shadow-level-3",
+        "value": "0 10px 25px rgba(0, 0, 0, 0.10)",
+        "purpose": "Digital assignment paper canvas and sticky toasts."
+      },
+      {
+        "name": "shadow-level-4",
+        "value": "0 20px 50px rgba(0, 0, 0, 0.15)",
+        "purpose": "High-priority modal overlay dialogs."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-fast",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Fast transitions for button hover, tab switches, and badge pops."
+      },
+      {
+        "name": "transition-normal",
+        "value": "250ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Normal transitions for sidebar expansion and modal fade-ins."
+      }
+    ],
+    "breakpoints": [
+      { "name": "max-width", "value": "1280px" },
+      { "name": "drawer", "value": "250px" },
+      { "name": "canvas", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action button for submit and main CTAs.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">SUBMIT SOLUTION</button>",
+      "css": ".ds-btn { height: 40px; padding: 0 18px; font-size: 14px; font-weight: 600; border-radius: 8px; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-family: Lato, sans-serif; transition: all 150ms ease; } .ds-btn-primary { background: #1889E6; color: #FFFFFF; } .ds-btn-primary:hover { background: #1577C8; box-shadow: 0 2px 8px rgba(24, 137, 230, 0.3); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary outlined action button.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Export Roster</button>",
+      "css": ".ds-btn { height: 40px; padding: 0 18px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-family: Lato, sans-serif; transition: all 150ms ease; } .ds-btn-secondary { background: #FFFFFF; border: 1px solid #E2E8F0; color: #1E293B; } .ds-btn-secondary:hover { background: #F1F5F9; border-color: #CBD5E1; }"
+    },
+    {
+      "name": "Form Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Standard input field with Luma focus ring.",
+      "html": "<input type=\"text\" class=\"ds-form-input\" placeholder=\"Search assignments or UIN...\" />",
+      "css": ".ds-form-input { height: 42px; padding: 0 14px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; font-size: 14px; font-family: Lato, sans-serif; color: #1E293B; outline: none; transition: all 150ms ease; } .ds-form-input:focus { border-color: #1889E6; box-shadow: 0 0 0 3px rgba(24, 137, 230, 0.15); }"
+    },
+    {
+      "name": "Variable Parameter Chip",
+      "kind": "chip",
+      "refersTo": "chip-var",
+      "description": "Monospaced parameter badge for dynamic student question values.",
+      "html": "<span class=\"ds-var-chip\">R = 450.50 Ω</span>",
+      "css": ".ds-var-chip { display: inline-flex; align-items: center; padding: 3px 8px; background: #EBF5FF; color: #1889E6; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; border-radius: 4px; border: 1px solid rgba(24, 137, 230, 0.25); }"
+    },
+    {
+      "name": "Page Separator",
+      "kind": "custom",
+      "refersTo": "page-separator",
+      "description": "Luma section separator with embedded label badge.",
+      "html": "<div class=\"ds-page-separator\"><div class=\"ds-page-separator-text\">Overview & Analytics</div></div>",
+      "css": ".ds-page-separator { display: flex; align-items: center; margin: 24px 0; border-bottom: 1px solid #E2E8F0; position: relative; } .ds-page-separator-text { background: #F1F5F9; color: #64748B; padding: 4px 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; border-radius: 4px; font-family: Lato, sans-serif; transform: translateY(50%); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sticky Academy Desktop",
+    "overview": "Extracted directly from Luma Sticky App Layout, this design system combines a clean slate canvas background (#F8F9FA) with sticky top headers, deep dark navy drawer accents (#182430), pristine white surface cards (#FFFFFF), 1px structural borders (#E2E8F0), and vibrant Dodger Blue focal points (#1889E6).",
+    "keyCharacteristics": [
+      "Sticky App Layout Architecture (64px topbar, 250px navigation drawer, sticky subnavs)",
+      "Section Separators with Uppercase Label Badges (.page-separator)",
+      "Dodger Blue & Deep Navy Palette (#1889E6 blue primary with #182430 dark navy drawer tones)",
+      "Equal-Height Card Grid System with Level-1 subtle elevation",
+      "Dual-Font System (Lato/Roboto/Exo 2 for UI, JetBrains Mono for dynamic formulas & UINs)"
+    ],
+    "rules": [
+      {
+        "name": "The Dodger Blue Focal Rule",
+        "body": "Luma Dodger Blue (#1889E6) must be applied exclusively to actionable focal points (primary CTA buttons, active tab indicators, and progress meters). It must never exceed 10% of total viewport area.",
+        "section": "colors"
+      },
+      {
+        "name": "The Pure Monospace Formula Rule",
+        "body": "All variable values, calculated key limits, and student UIN entries must strictly use JetBrains Mono. Proportional fonts must never be rendered inside dynamic variable inputs.",
+        "section": "typography"
+      },
+      {
+        "name": "The One-Level Jump Rule",
+        "body": "Hovering over resting Level 1 cards must smoothly transition exclusively to Level 2 (0 4px 14px rgba(0,0,0,0.08)). Multi-level jumps are strictly prohibited.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use #F8F9FA for main page canvas background and #FFFFFF for content cards",
+      "Do format all dynamic variable numbers and student UIN entries in JetBrains Mono",
+      "Do utilize .page-separator divider bars with uppercase label pills to demarcate dashboard sections",
+      "Do apply strict 1px #E2E8F0 structural border lines to all card containers"
+    ],
+    "donts": [
+      "Don't use heavy dark drop shadows or un-layered saturated backgrounds",
+      "Don't mix proportional sans-serif fonts inside dynamic formula fields or parameter inputs",
+      "Don't hardcode random border radii outside the 4px, 8px, 12px, 16px, 9999px scale",
+      "Don't alter institutional whitelist constraints or core academic domain requirements (@eng.rizvi.edu.in)"
+    ]
+  }
+}
