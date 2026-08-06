@@ -1046,9 +1046,16 @@ const facultyView = {
       { label: `Q${nextQNum}: Parameter 1`, acceptedUnits: ["none"], valueMarks: 4, unitMarks: 1, tolerancePct: 5 }
     ];
 
-    const coOptions = (app.data.courseOutcomes && app.data.courseOutcomes.length > 0) ?
-      app.data.courseOutcomes.map(co => `<option value="${co.code}">${co.code}</option>`).join('') :
-      '<option value="">-- No COs Defined --</option>';
+    const subjectId = asg ? asg.subjectId : '';
+    const filteredCOs = (app.data.courseOutcomes || []).filter(co => !subjectId || co.subjectId === subjectId);
+    const targetCOs = filteredCOs.length > 0 ? filteredCOs : (app.data.courseOutcomes || []);
+
+    const coOptions = (targetCOs.length > 0) ?
+      targetCOs.map(co => {
+        const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+        return `<option value="${co.code}">[${type}] ${co.code}</option>`;
+      }).join('') :
+      '<option value="">-- No Outcomes Defined For This Subject --</option>';
 
     app.showModal('Add Question with Multiple Parameters', `
       <form onsubmit="facultyView.saveQuestion(event, '${asgId}')">
