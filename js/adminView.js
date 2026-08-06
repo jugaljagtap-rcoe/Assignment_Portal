@@ -579,6 +579,8 @@ const adminView = {
     this.renderFacultyRoster(document.getElementById('main-content'));
   },
 
+  renderDepartments(container) {
+    container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Departments, Academic Classes & Subjects</h1>
