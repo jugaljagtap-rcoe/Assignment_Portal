@@ -65,7 +65,7 @@ const facultyView = {
         <div class="kpi-card">
           <span class="kpi-label">Active Experiments</span>
           <span class="kpi-value">${app.data.assignments.length}</span>
-          <span class="kpi-trend positive">Physics & Vibration Lab</span>
+          <span class="kpi-trend positive">Faculty Dashboard</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Scheduled Batches</span>
@@ -536,21 +536,27 @@ const facultyView = {
   },
 
   openAddQuestionModal(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    const nextQNum = asg ? (asg.questions.length + 1) : 1;
     this.tempModalParameters = [
-      { label: "Q3: Critical Damping Coefficient (c_c)", acceptedUnits: ["N*s/m", "ratio"], valueMarks: 4, unitMarks: 1, tolerancePct: 2 }
+      { label: `Q${nextQNum}: Parameter 1`, acceptedUnits: ["none"], valueMarks: 4, unitMarks: 1, tolerancePct: 5 }
     ];
+
+    const coOptions = (app.data.courseOutcomes && app.data.courseOutcomes.length > 0) ?
+      app.data.courseOutcomes.map(co => `<option value="${co.code}">${co.code}</option>`).join('') :
+      '<option value="">-- No COs Defined --</option>';
 
     app.showModal('Add Question with Multiple Parameters', `
       <form onsubmit="facultyView.saveQuestion(event, '${asgId}')">
         <div style="display:flex; gap:12px;">
           <div class="form-group" style="flex:1;">
             <label class="form-label">Section Label</label>
-            <input type="text" id="q-label" class="form-input code-font" value="Q3" required>
+            <input type="text" id="q-label" class="form-input code-font" value="Q${nextQNum}" required>
           </div>
           <div class="form-group" style="flex:1;">
             <label class="form-label">Course Outcome</label>
             <select id="q-co" class="form-select">
-              ${app.data.courseOutcomes.map(co => `<option value="${co.code}">${co.code}</option>`).join('')}
+              ${coOptions}
             </select>
           </div>
           <div class="form-group" style="flex:1;">
@@ -567,7 +573,7 @@ const facultyView = {
 
         <div class="form-group">
           <label class="form-label">Question Text (Use {{variable_name}} syntax)</label>
-          <textarea id="q-text" class="form-textarea" rows="3" placeholder="Calculate the critical damping coefficient c_c when stiffness k = {{var_k_Nmm}}..." required></textarea>
+          <textarea id="q-text" class="form-textarea" rows="3" placeholder="Enter question text using {{var_name}} placeholders for dynamic student variables..." required></textarea>
         </div>
 
         <div class="form-group">
@@ -1045,7 +1051,7 @@ const facultyView = {
 
       <div class="card" style="margin-bottom:24px; background:var(--warning-subtle); border-color:rgba(255,159,10,0.3);">
         <h3 class="card-title" style="color:#D97706; font-size:16px;">⚡ Attempt & Late Submission Deduction Policy</h3>
-        <p class="card-subtitle" style="margin-bottom:14px;">Rules governing student retries and late submissions for Experiment 3</p>
+        <p class="card-subtitle" style="margin-bottom:14px;">Rules governing student retries and late submission penalties for this assignment</p>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:13px;">
           <div style="background:#FFF; padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
@@ -1068,7 +1074,7 @@ const facultyView = {
       </div>
 
       <div class="card">
-        <h3 class="card-title" style="margin-bottom:16px;">Active Schedules for Experiment 3</h3>
+        <h3 class="card-title" style="margin-bottom:16px;">Active Schedules for ${asg.code || asg.title}</h3>
         <div class="table-container">
           <table class="custom-table">
             <thead>
@@ -1315,18 +1321,17 @@ const facultyView = {
   openCreateAssignmentModal() {
     const autoCode = `RCOE/FE/2026-27/LAB_A00${app.data.assignments.length+1}`;
     
-    const subjectOptions = app.data.subjects.map(s => 
-      `<option value="${s.id}">${s.code} - ${s.fullName}</option>`
-    ).join('');
+    const subjectOptions = (app.data.subjects && app.data.subjects.length > 0) ?
+      app.data.subjects.map(s => `<option value="${s.id}">${s.code} - ${s.fullName}</option>`).join('') :
+      '<option value="">-- No Subjects Defined Yet --</option>';
 
-    const moduleOptions = (app.data.modules || [
-      { title: "Module 01: Natural Frequency Measurement of Dynamic Systems" },
-      { title: "Module 02: Damped Free Vibration Systems & Logarithmic Decrement" }
-    ]).map(m => `<option value="${m.title}">${m.title}</option>`).join('');
+    const moduleOptions = (app.data.modules && app.data.modules.length > 0) ?
+      app.data.modules.map(m => `<option value="${m.title}">${m.code ? m.code + ': ' : ''}${m.title}</option>`).join('') :
+      '<option value="">-- No Modules Defined Yet --</option>';
 
-    const coOptions = app.data.courseOutcomes.map(co => 
-      `<option value="${co.code}: ${co.description}">${co.code}: ${co.description}</option>`
-    ).join('');
+    const coOptions = (app.data.courseOutcomes && app.data.courseOutcomes.length > 0) ?
+      app.data.courseOutcomes.map(co => `<option value="${co.code}: ${co.description}">${co.code}: ${co.description}</option>`).join('') :
+      '<option value="">-- No Course Outcomes Defined Yet --</option>';
 
     app.showModal('Create New Lab Assignment Sheet', `
       <form onsubmit="facultyView.saveAssignment(event)">
@@ -1344,17 +1349,17 @@ const facultyView = {
 
         <div class="form-group">
           <label class="form-label">Assignment Title</label>
-          <input type="text" id="new-asg-title" class="form-input" value="Lab Sheet A002: Experimental Analysis" required>
+          <input type="text" id="new-asg-title" class="form-input" placeholder="e.g. Lab Sheet 01: Free Vibrations Analysis" required>
         </div>
 
         <div style="display:flex; gap:12px;">
           <div class="form-group" style="flex:1;">
             <label class="form-label">Class & Branch</label>
-            <input type="text" id="new-asg-class" class="form-input" value="FE Mechanical" required>
+            <input type="text" id="new-asg-class" class="form-input" placeholder="e.g. FE Mechanical" required>
           </div>
           <div class="form-group" style="flex:1;">
             <label class="form-label">Semester</label>
-            <input type="text" id="new-asg-sem" class="form-input" value="Semester I" required>
+            <input type="text" id="new-asg-sem" class="form-input" placeholder="e.g. Semester I" required>
           </div>
         </div>
 
