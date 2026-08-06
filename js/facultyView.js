@@ -315,86 +315,215 @@ const facultyView = {
     `;
   },
 
+  collapsedSubjectIds: {},
+
+  toggleSubjectGroup(groupKey) {
+    this.collapsedSubjectIds[groupKey] = !this.collapsedSubjectIds[groupKey];
+    this.renderCOAndModulesManager(document.getElementById('main-content'));
+  },
+
   renderOutcomesListHTML() {
-    return `
-      <div class="card" style="margin-bottom:24px;">
-        <h3 class="card-title" style="margin-bottom:12px;">Syllabus Modules</h3>
-        <div class="table-container">
-          <table class="custom-table">
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>Module Code</th>
-                <th>Module Title</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(app.data.modules || []).length === 0 ? `<tr><td colspan="4" style="text-align:center; padding:16px;">No modules defined yet. Click "+ Add Subject Module" above.</td></tr>` : 
-                (app.data.modules || []).map(m => {
-                  const sub = app.data.subjects.find(s => s.id === m.subjectId);
-                  return `
+    const subjects = app.data.subjects || [];
+    const allModules = app.data.modules || [];
+    const allOutcomes = app.data.courseOutcomes || [];
+
+    // 1. Render Grouped Syllabus Modules by Subject
+    const groupedModulesHTML = subjects.map(sub => {
+      const subMods = allModules.filter(m => m.subjectId === sub.id);
+      if (subMods.length === 0) return '';
+      const groupKey = 'mod-' + sub.id;
+      const isCollapsed = !!this.collapsedSubjectIds[groupKey];
+
+      return `
+        <div class="subject-group-card">
+          <div class="subject-group-header" onclick="facultyView.toggleSubjectGroup('${groupKey}')">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span class="subject-group-toggle-icon">${isCollapsed ? '►' : '▼'}</span>
+              <span class="subject-code-badge">${sub.code}</span>
+              <h4 class="subject-title-text">${sub.fullName}</h4>
+            </div>
+            <div>
+              <span class="tag tag-bt" style="font-weight:600;">${subMods.length} Module${subMods.length > 1 ? 's' : ''} Defined</span>
+            </div>
+          </div>
+          ${!isCollapsed ? `
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th style="min-width:140px;">Module Code</th>
+                    <th>Module Title</th>
+                    <th style="width:120px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${subMods.map(m => `
                     <tr>
-                      <td><span class="tag tag-co">${sub ? sub.code : '-'}</span></td>
-                      <td style="font-weight:700; font-family:var(--font-mono);">${m.code}</td>
+                      <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">${m.code}</td>
                       <td style="font-weight:500;">${m.title}</td>
                       <td style="display:flex; gap:6px;">
                         <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditModuleModal('${m.id}')">✏️ Edit</button>
                         <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteModule('${m.id}')">🗑️ Delete</button>
                       </td>
                     </tr>
-                  `;
-                }).join('')
-              }
-            </tbody>
-          </table>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
         </div>
+      `;
+    }).join('');
+
+    // 2. Render Grouped Outcomes (COs & LOs) by Subject
+    const groupedOutcomesHTML = subjects.map(sub => {
+      const subCOs = allOutcomes.filter(co => co.subjectId === sub.id);
+      if (subCOs.length === 0) return '';
+      const groupKey = 'co-' + sub.id;
+      const isCollapsed = !!this.collapsedSubjectIds[groupKey];
+      const coCount = subCOs.filter(c => (c.type || (c.code && c.code.includes('.LO') ? 'LO' : 'CO')) === 'CO').length;
+      const loCount = subCOs.filter(c => (c.type || (c.code && c.code.includes('.LO') ? 'LO' : 'CO')) === 'LO').length;
+
+      return `
+        <div class="subject-group-card">
+          <div class="subject-group-header" onclick="facultyView.toggleSubjectGroup('${groupKey}')">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span class="subject-group-toggle-icon">${isCollapsed ? '►' : '▼'}</span>
+              <span class="subject-code-badge">${sub.code}</span>
+              <h4 class="subject-title-text">${sub.fullName}</h4>
+            </div>
+            <div style="display:flex; gap:8px;">
+              ${coCount > 0 ? `<span class="tag tag-co" style="font-weight:600;">${coCount} CO${coCount > 1 ? 's' : ''}</span>` : ''}
+              ${loCount > 0 ? `<span class="tag tag-lo" style="font-weight:600;">${loCount} LO${loCount > 1 ? 's' : ''}</span>` : ''}
+            </div>
+          </div>
+          ${!isCollapsed ? `
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Outcome Code</th>
+                    <th>Description</th>
+                    <th>Mapped POs</th>
+                    <th>Mapped PSOs</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${subCOs.map(co => {
+                    const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+                    const poList = (co.poIds && co.poIds.length > 0) ? co.poIds : (co.poId ? [co.poId] : []);
+                    const psoList = co.psoIds || [];
+                    return `
+                      <tr>
+                        <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type === 'LO' ? '🧪 Lab (LO)' : '📖 Course (CO)'}</span></td>
+                        <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
+                        <td style="font-weight:500;">${co.description}</td>
+                        <td>
+                          ${poList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                            poList.map(po => `<span class="tag tag-bt" style="margin-right:4px;">${po}</span>`).join('')}
+                        </td>
+                        <td>
+                          ${psoList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                            psoList.map(pso => `<span class="tag tag-success" style="margin-right:4px;">${pso}</span>`).join('')}
+                        </td>
+                        <td style="display:flex; gap:6px;">
+                          <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditCOModal('${co.id}')">✏️ Edit</button>
+                          <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Handle orphan outcomes (if subjectId not matching any subject)
+    const orphanCOs = allOutcomes.filter(co => !subjects.some(s => s.id === co.subjectId));
+    let orphanHTML = '';
+    if (orphanCOs.length > 0) {
+      const groupKey = 'co-orphan';
+      const isCollapsed = !!this.collapsedSubjectIds[groupKey];
+      orphanHTML = `
+        <div class="subject-group-card">
+          <div class="subject-group-header" onclick="facultyView.toggleSubjectGroup('${groupKey}')">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span class="subject-group-toggle-icon">${isCollapsed ? '►' : '▼'}</span>
+              <span class="subject-code-badge" style="background:var(--warning-subtle); color:var(--warning);">OTHER</span>
+              <h4 class="subject-title-text">Unassigned / General Outcomes</h4>
+            </div>
+            <div>
+              <span class="tag tag-warning">${orphanCOs.length} Outcomes</span>
+            </div>
+          </div>
+          ${!isCollapsed ? `
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Outcome Code</th>
+                    <th>Description</th>
+                    <th>Mapped POs</th>
+                    <th>Mapped PSOs</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${orphanCOs.map(co => {
+                    const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+                    const poList = (co.poIds && co.poIds.length > 0) ? co.poIds : (co.poId ? [co.poId] : []);
+                    const psoList = co.psoIds || [];
+                    return `
+                      <tr>
+                        <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type === 'LO' ? '🧪 Lab (LO)' : '📖 Course (CO)'}</span></td>
+                        <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
+                        <td style="font-weight:500;">${co.description}</td>
+                        <td>
+                          ${poList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                            poList.map(po => `<span class="tag tag-bt" style="margin-right:4px;">${po}</span>`).join('')}
+                        </td>
+                        <td>
+                          ${psoList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
+                            psoList.map(pso => `<span class="tag tag-success" style="margin-right:4px;">${pso}</span>`).join('')}
+                        </td>
+                        <td style="display:flex; gap:6px;">
+                          <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditCOModal('${co.id}')">✏️ Edit</button>
+                          <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    return `
+      <div style="margin-bottom:32px;">
+        <h3 class="card-title" style="margin-bottom:14px; font-size:16px;">Syllabus Modules (Grouped by Subject / Lab)</h3>
+        ${allModules.length === 0 ? `
+          <div class="card" style="text-align:center; padding:24px; color:var(--text-muted);">
+            No modules defined yet. Click "+ Add Subject Module" above.
+          </div>
+        ` : (groupedModulesHTML || '<div class="card" style="text-align:center; padding:24px; color:var(--text-muted);">No modules defined for active subjects.</div>')}
       </div>
 
-      <div class="card">
-        <h3 class="card-title" style="margin-bottom:12px;">Course Outcomes (COs) & Lab Outcomes (LOs)</h3>
-        <div class="table-container">
-          <table class="custom-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Outcome Code</th>
-                <th>Description</th>
-                <th>Mapped POs</th>
-                <th>Mapped PSOs</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(app.data.courseOutcomes || []).length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:16px;">No outcomes defined yet. Click "+ Add Outcome (CO / LO)" above.</td></tr>` :
-                app.data.courseOutcomes.map(co => {
-                  const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
-                  const poList = (co.poIds && co.poIds.length > 0) ? co.poIds : (co.poId ? [co.poId] : []);
-                  const psoList = co.psoIds || [];
-                  return `
-                    <tr>
-                      <td><span class="tag ${type === 'LO' ? 'tag-lo' : 'tag-co'}">${type === 'LO' ? '🧪 Lab (LO)' : '📖 Course (CO)'}</span></td>
-                      <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${co.code}</td>
-                      <td style="font-weight:500;">${co.description}</td>
-                      <td>
-                        ${poList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
-                          poList.map(po => `<span class="tag tag-bt" style="margin-right:4px;">${po}</span>`).join('')}
-                      </td>
-                      <td>
-                        ${psoList.length === 0 ? '<span style="color:var(--text-muted); font-size:12px;">Unmapped</span>' :
-                          psoList.map(pso => `<span class="tag tag-success" style="margin-right:4px;">${pso}</span>`).join('')}
-                      </td>
-                      <td style="display:flex; gap:6px;">
-                        <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditCOModal('${co.id}')">✏️ Edit</button>
-                        <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteCO('${co.id}')">🗑️ Delete</button>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')
-              }
-            </tbody>
-          </table>
-        </div>
+      <div>
+        <h3 class="card-title" style="margin-bottom:14px; font-size:16px;">Course Outcomes (COs) & Lab Outcomes (LOs) (Grouped by Subject / Lab)</h3>
+        ${allOutcomes.length === 0 ? `
+          <div class="card" style="text-align:center; padding:24px; color:var(--text-muted);">
+            No outcomes defined yet. Click "+ Add Outcome (CO / LO)" above.
+          </div>
+        ` : (groupedOutcomesHTML + orphanHTML)}
       </div>
     `;
   },
