@@ -1088,6 +1088,13 @@ const facultyView = {
         </div>
 
         <div class="form-group">
+          <label class="form-label">Attach Evaluation Rubric</label>
+          <select id="q-rubric" class="form-select">
+            ${(app.data.rubricPresets || []).map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
           <label class="form-label">Diagram Image URL / Google Drive Share Link</label>
           <input type="url" id="q-img" class="form-input" placeholder="https://drive.google.com/... or https://images.unsplash.com/...">
         </div>
@@ -1750,7 +1757,67 @@ const facultyView = {
   handleQuestionCSVUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-    app.showToast(`Processed Question Variables CSV: ${file.name}`, 'success');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+      if (lines.length < 2) {
+        app.showToast("CSV must have at least 2 rows (header + data)", "danger");
+        return;
+      }
+
+      const headerParts = lines[0].split(',').map(c => c.trim());
+      const variableKeys = headerParts.slice(1);
+      const assignmentId = this.activeCSVAssignmentId;
+
+      if (!app.data.studentVariables) {
+        app.data.studentVariables = [];
+      }
+
+      let updatedCount = 0;
+      let matchedStudentCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(',').map(p => p.trim());
+        const uin = parts[0];
+        if (!uin) continue;
+
+        const student = app.data.students.find(s => s.uin === uin);
+        if (!student) continue;
+
+        matchedStudentCount++;
+
+        variableKeys.forEach((key, idx) => {
+          const val = parts[idx + 1];
+          if (val === undefined || val === '') return;
+
+          let existing = app.data.studentVariables.find(v =>
+            v.studentId === student.id &&
+            v.assignmentId === assignmentId &&
+            v.key === key
+          );
+
+          if (existing) {
+            existing.value = val;
+          } else {
+            app.data.studentVariables.push({
+              id: 'svar-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+              studentId: student.id,
+              assignmentId: assignmentId,
+              key: key,
+              value: val
+            });
+          }
+          updatedCount++;
+        });
+      }
+
+      app.saveState();
+      app.showToast(`Loaded question variables for ${matchedStudentCount} students (${updatedCount} variable entries updated)`, 'success');
+      this.renderCSVPipeline(document.getElementById('main-content'));
+    };
+    reader.readAsText(file);
   },
 
   handleSolutionCSVUpload(e) {

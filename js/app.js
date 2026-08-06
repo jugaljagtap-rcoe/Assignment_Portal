@@ -397,6 +397,7 @@ class AppEngine {
     if (!state.courseOutcomes) state.courseOutcomes = [];
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
+    state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
     if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
 

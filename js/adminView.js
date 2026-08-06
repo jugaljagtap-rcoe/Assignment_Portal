@@ -945,7 +945,7 @@ const adminView = {
     app.saveState();
     app.closeModal();
     app.showToast(`Saved subject course ${code} (${className} — ${semester})`, 'success');
-    this.renderDepartmentManager(document.getElementById('main-content'));
+    this.renderDepartments(document.getElementById('main-content'));
   },
 
   deleteSubject(subjectId) {
@@ -956,7 +956,7 @@ const adminView = {
     app.data.subjects = app.data.subjects.filter(s => s.id !== subjectId);
     app.saveState();
     app.showToast(`Deleted subject course ${sub.code}`, 'info');
-    this.renderDepartmentManager(document.getElementById('main-content'));
+    this.renderDepartments(document.getElementById('main-content'));
   },
 
   resetDefaultSubjects() {
@@ -964,7 +964,7 @@ const adminView = {
     app.data.subjects = JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
     app.saveState();
     app.showToast("Subjects list clean reset successful!", "success");
-    this.renderDepartmentManager(document.getElementById('main-content'));
+    this.renderDepartments(document.getElementById('main-content'));
   },
 
   openAddClassModal() {
@@ -1028,7 +1028,7 @@ const adminView = {
     app.saveState();
     app.closeModal();
     app.showToast(`Added Academic Class ${newClass.name}`, 'success');
-    this.renderDepartmentManager(document.getElementById('main-content'));
+    this.renderDepartments(document.getElementById('main-content'));
   },
 
   deleteClass(classId) {
@@ -1039,7 +1039,7 @@ const adminView = {
     app.data.academicClasses = (app.data.academicClasses || []).filter(c => c.id !== classId);
     app.saveState();
     app.showToast(`Deleted class ${cls.name}`, 'info');
-    this.renderDepartmentManager(document.getElementById('main-content'));
+    this.renderDepartments(document.getElementById('main-content'));
   },
 
   openEditDeptVisionMissionModal(deptId) {

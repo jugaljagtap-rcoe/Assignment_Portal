@@ -147,44 +147,80 @@ const INITIAL_DATA = {
 
   rubricPresets: [
     {
-      id: "rub-001",
-      name: "Standard Auto-Graded Lab Rubric",
+      id: "rub-analytical-001",
+      name: "Grading Rubric (Analytical)",
+      type: "grading_analytical",
       isShared: true,
       facultyId: "fac-admin-jugal",
-      totalMarks: 10,
+      totalMarks: 20,
       criteria: [
         {
-          id: "crit-1",
-          title: "Criteria 01 (Numerical Values)",
+          id: "crit-num-acc",
+          title: "1. Numerical Calculation Accuracy",
           type: "auto_numerical",
-          tolerancePct: 5,
+          maxMarks: 12,
           levels: [
-            { level: "Level 3", minPct: 90, marks: 4, description: "≥ 90% parameters within ±5% tolerance" },
-            { level: "Level 2", minPct: 50, marks: 3, description: "≥ 50% parameters within ±5% tolerance" },
-            { level: "Level 1", minPct: 1,  marks: 1, description: "< 50% parameters within ±10% tolerance" },
-            { level: "Level 0", minPct: 0,  marks: 0, description: "0% parameters correct / nowhere near" }
+            { level: "Exemplary", minPct: 90, marks: 12, description: "All calculated values fall within ±2% tolerance of formula." },
+            { level: "Proficient", minPct: 75, marks: 9, description: "Calculated values fall within ±5% tolerance of formula." },
+            { level: "Developing", minPct: 50, marks: 6, description: "Calculated values fall within ±10% tolerance of formula." },
+            { level: "Unsatisfactory", minPct: 0, marks: 0, description: "Values exceed ±10% error margin or wrong formulas throughout." }
           ]
         },
         {
-          id: "crit-2",
-          title: "Criteria 02 (Units)",
+          id: "crit-units-sel",
+          title: "2. Engineering Units Selection",
           type: "auto_units",
+          maxMarks: 5,
           levels: [
-            { level: "Level 3", minPct: 90, marks: 3, description: "≥ 90% units correct" },
-            { level: "Level 2", minPct: 50, marks: 2, description: "≥ 50% units correct" },
-            { level: "Level 1", minPct: 1,  marks: 1, description: "< 50% units correct" },
-            { level: "Level 0", minPct: 0,  marks: 0, description: "No correct units" }
+            { level: "Exemplary", minPct: 90, marks: 5, description: "100% of parameters have correct engineering units (e.g. rad/s, N/m)." },
+            { level: "Proficient", minPct: 75, marks: 3.75, description: "≥75% of parameters have correct engineering units." },
+            { level: "Developing", minPct: 50, marks: 2.5, description: "50% of parameters have correct engineering units." },
+            { level: "Unsatisfactory", minPct: 0, marks: 0, description: "Units missing or wrong units throughout." }
           ]
         },
         {
-          id: "crit-3",
-          title: "Criteria 03 (Diagrams & Setup)",
-          type: "manual",
+          id: "crit-comp-rate",
+          title: "3. Parameter Completion Rate",
+          type: "completion",
+          maxMarks: 2,
           levels: [
-            { level: "Level 3", minPct: 90, marks: 3, description: "To scale, named correctly" },
-            { level: "Level 2", minPct: 50, marks: 2, description: "Either not to scale or not named" },
-            { level: "Level 1", minPct: 1,  marks: 1, description: "Neither to scale nor named" },
-            { level: "Level 0", minPct: 0,  marks: 0, description: "No diagram provided" }
+            { level: "Exemplary", minPct: 100, marks: 2, description: "100% (6/6 parameters) attempted & submitted." },
+            { level: "Proficient", minPct: 75, marks: 1.5, description: "75-90% (4-5 parameters) attempted & submitted." },
+            { level: "Developing", minPct: 50, marks: 1, description: "50% (3 parameters) attempted & submitted." },
+            { level: "Unsatisfactory", minPct: 0, marks: 0, description: "<50% (<3 parameters) attempted & submitted." }
+          ]
+        },
+        {
+          id: "crit-sub-timeliness",
+          title: "4. Submission Timeliness",
+          type: "timeliness",
+          maxMarks: 1,
+          levels: [
+            { level: "Exemplary", minPct: 100, marks: 1, description: "Submitted on or before deadline." },
+            { level: "Proficient", minPct: 75, marks: 0.75, description: "Submitted <2 hours late." },
+            { level: "Developing", minPct: 50, marks: 0.5, description: "Submitted 2-24 hours late." },
+            { level: "Unsatisfactory", minPct: 0, marks: 0, description: "Submitted >24 hours late without approval." }
+          ]
+        }
+      ]
+    },
+    {
+      id: "rub-nba-threshold-001",
+      name: "NBA Attainment Rubric (Threshold)",
+      type: "nba_threshold",
+      isShared: true,
+      facultyId: "fac-admin-jugal",
+      totalMarks: 100,
+      criteria: [
+        {
+          id: "crit-nba-levels",
+          title: "NBA CO/LO Attainment Mapping Levels",
+          type: "threshold",
+          levels: [
+            { level: "Level 3 (High Attainment)", minPct: 80, marks: 3, description: "Scored ≥ 80% marks on assignment questions." },
+            { level: "Level 2 (Moderate Attainment)", minPct: 50, marks: 2, description: "Scored 50% - 79% marks on assignment questions." },
+            { level: "Level 1 (Low Attainment)", minPct: 1, marks: 1, description: "Scored 1% - 49% marks on assignment questions." },
+            { level: "Level 0 (Unattained)", minPct: 0, marks: 0, description: "Scored 0% / Not attempted." }
           ]
         }
       ]
