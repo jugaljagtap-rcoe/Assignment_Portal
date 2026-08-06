@@ -531,45 +531,91 @@ const facultyView = {
     this.renderCOAndModulesManager(document.getElementById('main-content'));
   },
 
+  autoGenerateModuleCode(subjectId) {
+    const sub = app.data.subjects.find(s => s.id === subjectId);
+    const subPrefix = sub ? (sub.code || 'MOD') : 'MOD';
+    const existing = (app.data.modules || []).filter(m => m.subjectId === subjectId);
+    const count = existing.length + 1;
+    return `${subPrefix}.MO${count}`;
+  },
+
+  updateModuleCodePreview() {
+    const subId = document.getElementById('mod-sub').value;
+    const autoCode = this.autoGenerateModuleCode(subId);
+    const codeInput = document.getElementById('mod-code');
+    if (codeInput) codeInput.value = autoCode;
+  },
+
   openAddModuleModal() {
+    const firstSubId = app.data.subjects.length > 0 ? app.data.subjects[0].id : '';
+    const initialCode = firstSubId ? this.autoGenerateModuleCode(firstSubId) : '24051181.MO1';
+
     app.showModal('Add Subject Module', `
-      <form onsubmit="facultyView.saveModule(event)">
+      <form id="mod-form" onsubmit="facultyView.saveModule(event, false)">
         <div class="form-group">
           <label class="form-label">Subject</label>
-          <select id="mod-sub" class="form-select">
+          <select id="mod-sub" class="form-select" onchange="facultyView.updateModuleCodePreview()">
             ${app.data.subjects.map(s => `<option value="${s.id}">${s.code} - ${s.fullName}</option>`).join('')}
           </select>
         </div>
+
         <div class="form-group">
-          <label class="form-label">Module Code</label>
-          <input type="text" id="mod-code" class="form-input code-font" placeholder="Module 03" required>
+          <label class="form-label">Auto-Generated Module Code (Subject-Prefixed)</label>
+          <input type="text" id="mod-code" class="form-input code-font" value="${initialCode}" required style="font-weight:700; color:var(--accent-blue);">
         </div>
+
         <div class="form-group">
           <label class="form-label">Module Title</label>
-          <input type="text" id="mod-title" class="form-input" placeholder="Module 03: Forced Vibration & Resonance Analysis" required>
+          <input type="text" id="mod-title" class="form-input" placeholder="e.g. Module 01: Free Vibrations & Damping Analysis" required autofocus>
         </div>
-        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
-          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Module</button>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:12px; border-top:1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Close / Done</button>
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-primary" onclick="facultyView.saveModule(event, true)">+ Save & Add Next</button>
+            <button type="submit" class="btn btn-secondary">Save & Close</button>
+          </div>
         </div>
       </form>
     `);
   },
 
-  saveModule(e) {
-    e.preventDefault();
+  saveModule(e, keepOpen = false) {
+    if (e) e.preventDefault();
+
+    const titleInput = document.getElementById('mod-title');
+    const codeInput = document.getElementById('mod-code');
+    const subSelect = document.getElementById('mod-sub');
+
+    if (!titleInput || !titleInput.value.trim()) {
+      app.showToast('Please enter a module title', 'warning');
+      if (titleInput) titleInput.focus();
+      return;
+    }
+
     if (!app.data.modules) app.data.modules = [];
+
     const newMod = {
       id: 'mod-' + Date.now(),
-      subjectId: document.getElementById('mod-sub').value,
-      code: document.getElementById('mod-code').value,
-      title: document.getElementById('mod-title').value
+      subjectId: subSelect ? subSelect.value : '',
+      code: codeInput ? codeInput.value.trim() : 'MO1',
+      title: titleInput.value.trim()
     };
+
     app.data.modules.push(newMod);
     app.saveState();
-    app.closeModal();
+
     app.showToast(`Added module ${newMod.code}`, 'success');
-    this.renderCOAndModulesManager(document.getElementById('main-content'));
+
+    if (keepOpen) {
+      titleInput.value = '';
+      this.updateModuleCodePreview();
+      titleInput.focus();
+      this.renderCOAndModulesManager(document.getElementById('main-content'));
+    } else {
+      app.closeModal();
+      this.renderCOAndModulesManager(document.getElementById('main-content'));
+    }
   },
 
   autoGenerateOutcomeCode(subjectId, type) {
