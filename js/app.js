@@ -34,7 +34,7 @@ class AppEngine {
     this.data = this.loadState();
     this.currentUser = this.loadUserSession();
     this.currentRole = this.currentUser ? this.currentUser.role : 'faculty'; // 'admin', 'faculty', 'student'
-    this.activeStudentId = this.currentUser && this.currentUser.studentId ? this.currentUser.studentId : 'st-101'; 
+    this.activeStudentId = this.currentUser && this.currentUser.studentId ? this.currentUser.studentId : (this.data.students.length > 0 ? this.data.students[0].id : null); 
     this.activeNav = 'dashboard';
     this.activeAssignmentId = 'asg-001';
   }
