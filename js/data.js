@@ -197,7 +197,26 @@ const INITIAL_DATA = {
     { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: [], isDualRole: true }
   ],
 
-  subjects: [],
+  subjects: [
+    {
+      id: "sub-24051181",
+      code: "24051181",
+      shortName: "VMD Lab",
+      fullName: "Vibration and Machinery Diagnostics Laboratory (PEL-I)",
+      departmentId: "dept-mech",
+      className: "TE Mech",
+      semester: "Semester V"
+    },
+    {
+      id: "sub-esl101",
+      code: "ESL101",
+      shortName: "EM Lab",
+      fullName: "Engineering Mechanics Lab",
+      departmentId: "dept-fe",
+      className: "FE",
+      semester: "Semester I"
+    }
+  ],
 
   courseOutcomes: [],
 

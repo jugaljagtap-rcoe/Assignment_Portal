@@ -871,22 +871,27 @@ const adminView = {
     const className = document.getElementById('sub-class').value.trim();
     const semester = document.getElementById('sub-sem').value;
 
-    let existingSub = null;
+    // Purge any pre-existing duplicate subjects with this code from array first
+    let targetSub = null;
     if (subjectId && subjectId !== 'null' && subjectId !== 'undefined') {
-      existingSub = app.data.subjects.find(s => s.id === subjectId);
+      targetSub = app.data.subjects.find(s => s.id === subjectId);
     }
-    if (!existingSub) {
-      existingSub = app.data.subjects.find(s => s.code === code);
+    if (!targetSub) {
+      targetSub = app.data.subjects.find(s => s.code === code);
     }
 
-    if (existingSub) {
-      existingSub.code = code;
-      existingSub.shortName = shortName;
-      existingSub.fullName = fullName;
-      existingSub.departmentId = deptId;
-      existingSub.className = className;
-      existingSub.semester = semester;
+    if (targetSub) {
+      targetSub.code = code;
+      targetSub.shortName = shortName;
+      targetSub.fullName = fullName;
+      targetSub.departmentId = deptId;
+      targetSub.className = className;
+      targetSub.semester = semester;
+
+      // Keep only 1 instance of this subject code
+      app.data.subjects = app.data.subjects.filter(s => s === targetSub || s.code !== code);
     } else {
+      app.data.subjects = app.data.subjects.filter(s => s.code !== code);
       const newSub = {
         id: 'sub-' + Date.now(),
         code: code,
@@ -901,7 +906,7 @@ const adminView = {
 
     app.saveState();
     app.closeModal();
-    app.showToast(`Saved subject course ${code}`, 'success');
+    app.showToast(`Saved subject course ${code} (${className} — ${semester})`, 'success');
     this.renderDepartmentManager(document.getElementById('main-content'));
   },
 

@@ -394,12 +394,21 @@ class AppEngine {
 
     if (!state.students) state.students = [];
     if (!state.faculty) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
-    if (!state.subjects) state.subjects = [];
     if (!state.courseOutcomes) state.courseOutcomes = [];
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
     if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
+
+    // Clean and deduplicate subjects by subject code
+    const rawSubjects = (state.subjects && state.subjects.length > 0) ? state.subjects : JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
+    const uniqueSubMap = new Map();
+    rawSubjects.forEach(s => {
+      if (!uniqueSubMap.has(s.code)) {
+        uniqueSubMap.set(s.code, s);
+      }
+    });
+    state.subjects = Array.from(uniqueSubMap.values());
 
     // Force strict 6 Hardcoded Departments
     state.departments = JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS));
