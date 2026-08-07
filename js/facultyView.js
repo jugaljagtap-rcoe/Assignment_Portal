@@ -8,14 +8,11 @@ const facultyView = {
 
   render(container, activeNav) {
     switch(activeNav) {
-      case 'assignments':
-        this.renderAssignmentBuilder(container);
-        break;
-      case 'outcomes':
+      case 'course':
         this.renderCOAndModulesManager(container);
         break;
-      case 'rubrics':
-        this.renderRubricBuilder(container);
+      case 'assignments':
+        this.renderAssignmentBuilder(container);
         break;
       case 'schedules':
         this.renderScheduleManager(container);
@@ -23,7 +20,7 @@ const facultyView = {
       case 'csv-pipeline':
         this.renderCSVPipeline(container);
         break;
-      case 'analytics':
+      case 'reports':
         analyticsView.render(container);
         break;
       case 'dashboard':
@@ -40,7 +37,7 @@ const facultyView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Faculty Lab Portal</h1>
+          <h1 class="page-title">Overview</h1>
           <p class="page-subtitle">Manage lab assignments, student variables, and solution CSV pipelines</p>
         </div>
         <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
@@ -1071,6 +1068,12 @@ const facultyView = {
           </div>
         </div>
       `).join('')}
+
+      <div class="page-separator" style="margin: 32px 0 20px 0; border-top: 1px dashed var(--border-default); text-align: center; position: relative;">
+        <span class="page-separator__text" style="background: var(--bg-primary); padding: 0 12px; font-weight: 700; color: var(--text-secondary); font-size: 13px;">📐 Rubric Presets</span>
+      </div>
+
+      ${this.getRubricBuilderHTML()}
     `;
   },
 
@@ -1243,14 +1246,22 @@ const facultyView = {
   },
 
   renderRubricBuilder(container) {
+    if (container && container.id === 'main-content') {
+      this.renderAssignmentBuilder(container);
+      return;
+    }
+    container.innerHTML = this.getRubricBuilderHTML();
+  },
+
+  getRubricBuilderHTML() {
     const rubrics = app.data.rubricPresets || [];
-    container.innerHTML = `
+    return `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Lab Rubric Builder & Custom Criteria Presets</h1>
+          <h1 class="page-title" style="font-size:18px;">Lab Rubric Builder & Custom Criteria Presets</h1>
           <p class="page-subtitle">Configure 2 to 4+ custom criteria variables per rubric depending on assignment needs</p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openAddRubricModal()">+ Create Rubric Preset</button>
+        <button class="btn btn-primary btn-sm" onclick="facultyView.openAddRubricModal()">+ Create Rubric Preset</button>
       </div>
 
       ${rubrics.length === 0 ? `<div class="card"><p>No rubric presets found. Click "+ Create Rubric Preset" to create one.</p></div>` :

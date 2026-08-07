@@ -62,7 +62,7 @@ const studentView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Student Lab Portal</h1>
+          <h1 class="page-title">Home</h1>
           <p class="page-subtitle">${studentHeader}</p>
         </div>
         ${activeAsg ? `
@@ -191,7 +191,7 @@ const studentView = {
       container.innerHTML = `
         <div class="page-header-container">
           <div>
-            <h1 class="page-title">Digital Canvas Assignment Sheet</h1>
+            <h1 class="page-title">Solve Assignment</h1>
             <p class="page-subtitle">${asg.code} — ${asg.title}</p>
           </div>
           <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Back to Dashboard</button>
@@ -244,7 +244,7 @@ const studentView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Digital Canvas Assignment Sheet</h1>
+          <h1 class="page-title">Solve Assignment</h1>
           <p class="page-subtitle">${asg.code} — ${asg.title}</p>
         </div>
         <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
@@ -636,7 +636,7 @@ const studentView = {
     container.innerHTML = `
       <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
-          <h1 class="page-title">My Grades & Rubric Evaluation</h1>
+          <h1 class="page-title">My Results</h1>
           <p class="page-subtitle">Personalized Gradesheet & Assessment Report for <strong>${studentTitle}</strong></p>
         </div>
         <div class="print-hide" style="display:flex; gap:10px;">

@@ -835,33 +835,28 @@ class AppEngine {
     let items = [];
     if (this.currentRole === 'admin') {
       items = [
-        { id: 'dashboard', label: 'Admin Dashboard', icon: '⚡' },
-        { id: 'students', label: `Student Master (${this.data.students.length})`, icon: '🎓' },
-        { id: 'faculty', label: 'Faculty Roster', icon: '👨‍🏫' },
-        { id: 'departments', label: 'Departments & Vision/Mission', icon: '🏛️' },
-        { id: 'google-auth', label: 'Google Auth & Roles', icon: '🔑' },
-        { id: 'pos', label: 'Program Outcomes (POs)', icon: '🎯' },
-        { id: 'analytics', label: 'CO/PO Accreditation', icon: '📊' }
+        { id: 'dashboard', label: 'Overview', icon: '⚡' },
+        { id: 'students', label: 'Students', icon: '🎓' },
+        { id: 'faculty', label: 'Faculty', icon: '👨‍🏫' },
+        { id: 'departments', label: 'Institution', icon: '🏛️' },
+        { id: 'google-auth', label: 'Access Control', icon: '🔑' },
+        { id: 'pos', label: 'Program Outcomes', icon: '🎯' },
+        { id: 'analytics', label: 'Reports', icon: '📊' }
       ];
     } else if (this.currentRole === 'faculty') {
       items = [
-        { id: 'dashboard', label: 'Faculty Dashboard', icon: '📋' },
-        { id: 'assignments', label: 'Assignment Builder', icon: '📝' },
-        { id: 'outcomes', label: 'Course Outcomes & Modules', icon: '🎯' },
-        { id: 'rubrics', label: 'Rubric Builder', icon: '📐' },
-        { id: 'schedules', label: 'Multi-Batch Schedules', icon: '📅' },
-        { id: 'csv-pipeline', label: 'CSV Upload & Solutions', icon: '📂' },
-        { id: 'analytics', label: 'CO Attainment Report', icon: '📊' }
+        { id: 'dashboard', label: 'Overview', icon: '📋' },
+        { id: 'course', label: 'My Course', icon: '📚' },
+        { id: 'assignments', label: 'Assignments', icon: '📝' },
+        { id: 'schedules', label: 'Schedule & Access', icon: '📅' },
+        { id: 'csv-pipeline', label: 'Grade & Evaluate', icon: '⚡' },
+        { id: 'reports', label: 'Reports', icon: '📊' }
       ];
     } else {
-      const activeAsgCode = this.data.assignments.length > 0
-        ? (this.data.assignments.find(a => a.id === this.activeAssignmentId) || this.data.assignments[0]).code
-        : null;
-
       items = [
-        { id: 'dashboard', label: `My Experiments (${this.data.assignments.length})`, icon: '🔬' },
-        { id: 'solver', label: activeAsgCode ? `Solve: ${activeAsgCode}` : 'Canvas Sheet', icon: '✏️' },
-        { id: 'grades', label: 'My Grades', icon: '🏆' }
+        { id: 'dashboard', label: 'Home', icon: '🏠' },
+        { id: 'solver', label: 'Solve Assignment', icon: '✏️' },
+        { id: 'grades', label: 'My Results', icon: '🏆' }
       ];
     }
 

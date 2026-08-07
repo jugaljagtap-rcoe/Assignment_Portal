@@ -101,7 +101,7 @@ const adminView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Institutional Admin Dashboard</h1>
+          <h1 class="page-title">Overview</h1>
           <p class="page-subtitle">Rizvi College of Engineering — Academic & Accreditation Overview</p>
         </div>
         <div style="display:flex; gap:10px;">
@@ -246,7 +246,7 @@ const adminView = {
               <h2 class="card-title">College-Wide CO Attainment Summary</h2>
               <p class="card-subtitle">NBA accreditation attainment status across all defined outcomes</p>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="app.switchNav('analytics')">
+            <button class="btn btn-secondary btn-sm" onclick="app.switchNav('reports')">
               📊 Full Attainment Report
             </button>
           </div>
