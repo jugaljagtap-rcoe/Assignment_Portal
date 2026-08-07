@@ -451,6 +451,7 @@ const adminView = {
           <button class="btn btn-secondary" onclick="adminView.downloadStudentCSVTemplate()">📥 Sample CSV</button>
           <input type="file" id="bulk-student-file" accept=".csv" style="display:none;" onchange="adminView.handleBulkStudentCSV(event)">
           <button class="btn btn-secondary" onclick="document.getElementById('bulk-student-file').click()">📤 Bulk Import (.csv)</button>
+          <button class="btn btn-secondary" onclick="adminView.openAutoAssignBatchesModal()">⚡ Auto-Assign Batches</button>
           <button class="btn btn-primary" onclick="adminView.openAddStudentModal()">+ Enroll Student</button>
         </div>
       </div>
@@ -490,7 +491,7 @@ const adminView = {
                 <th>UIN</th>
                 <th>Full Name</th>
                 <th>Institutional Email</th>
-                <th>Academic Year</th>
+                <th>Year</th>
                 <th>Engineering Branch</th>
                 <th>Division</th>
                 <th>Lab Batch</th>
@@ -515,7 +516,7 @@ const adminView = {
         <td style="font-family:var(--font-mono); font-weight:600;">${s.uin}</td>
         <td style="font-weight:500;">${s.name}</td>
         <td style="font-size:12px; color:var(--accent-blue);">${s.email || `${s.uin}@eng.rizvi.edu.in`}</td>
-        <td><span class="tag tag-co" style="font-size:11px; background:var(--bg-subtle); color:var(--text-secondary);">${s.academicYear || '2026-27'}</span></td>
+        <td><span class="tag tag-co" style="font-size:11px; font-weight:700; background:var(--accent-blue-subtle); color:var(--accent-blue);">${s.yearOfStudy || 'FE'}</span></td>
         <td><span class="tag tag-co" style="font-size:11px;">${s.branch || 'Mechanical Engineering'}</span></td>
         <td><span class="tag tag-bt">Div ${s.division}</span></td>
         <td><span class="tag tag-bt">Batch ${s.batch}</span></td>
@@ -564,21 +565,242 @@ const adminView = {
   },
 
   downloadStudentCSVTemplate() {
-    const csvContent = "data:text/csv;charset=utf-8,uin,full_name,email,branch,division,batch\n24051009,Rohan Kulkarni,24051009@eng.rizvi.edu.in,Mechanical Engineering,A,A1\n24051010,Sanjana Deshmukh,24051010@eng.rizvi.edu.in,Computer Engineering,B,B2";
+    const csvContent = "data:text/csv;charset=utf-8,uin,full_name,email,year_of_study,branch,division,batch,academic_year\n24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,FE,Computer Engineering,A,A1,2026-27\n24051021,Ananya Patel,24051021@eng.rizvi.edu.in,FE,Computer Engineering,A,A2,2026-27\n23051005,Rohan Kulkarni,23051005@eng.rizvi.edu.in,SE,Mechanical Engineering,B,B1,2026-27";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "FE_Student_Bulk_Google_Sync_Template.csv");
+    link.setAttribute("download", "Student_Master_Roster_Template.csv");
     document.body.appendChild(link);
     link.click();
     link.remove();
-    app.showToast("Downloaded Bulk Student Google Sync Template", "success");
+    app.showToast("Downloaded Student Master Roster Template with Year of Study (FE/SE/TE/BE)", "success");
   },
 
   handleBulkStudentCSV(e) {
     const file = e.target.files[0];
     if (!file) return;
-    app.showToast(`Bulk imported 360 students for @eng.rizvi.edu.in Google Auth: ${file.name}`, 'success');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length < 2) {
+        app.showToast("CSV file must contain a header row and at least one data row", "danger");
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const uinIdx = headers.indexOf('uin');
+      const nameIdx = headers.indexOf('full_name') >= 0 ? headers.indexOf('full_name') : headers.indexOf('name');
+      const emailIdx = headers.indexOf('email');
+      const yearIdx = headers.indexOf('year_of_study') >= 0 ? headers.indexOf('year_of_study') : headers.indexOf('year');
+      const branchIdx = headers.indexOf('branch');
+      const divIdx = headers.indexOf('division') >= 0 ? headers.indexOf('division') : headers.indexOf('div');
+      const batchIdx = headers.indexOf('batch');
+      const ayIdx = headers.indexOf('academic_year') >= 0 ? headers.indexOf('academic_year') : headers.indexOf('ay');
+
+      if (uinIdx === -1 || nameIdx === -1) {
+        app.showToast("CSV header missing required 'uin' or 'full_name' column", "danger");
+        return;
+      }
+
+      let countAdded = 0;
+      let countUpdated = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim());
+        const uin = cols[uinIdx];
+        if (!uin) continue;
+
+        const name = cols[nameIdx] || 'Student';
+        const email = emailIdx >= 0 && cols[emailIdx] ? cols[emailIdx].toLowerCase() : `${uin}@eng.rizvi.edu.in`;
+        const yearOfStudy = yearIdx >= 0 && cols[yearIdx] ? cols[yearIdx].toUpperCase() : 'FE';
+        const branch = branchIdx >= 0 && cols[branchIdx] ? cols[branchIdx] : 'Computer Engineering';
+        const division = divIdx >= 0 && cols[divIdx] ? cols[divIdx].toUpperCase() : 'A';
+        const batch = batchIdx >= 0 && cols[batchIdx] ? cols[batchIdx].toUpperCase() : 'A1';
+        const academicYear = ayIdx >= 0 && cols[ayIdx] ? cols[ayIdx] : '2026-27';
+
+        const existingIdx = app.data.students.findIndex(s => s.uin === uin || s.email === email);
+        const studentRecord = {
+          id: existingIdx >= 0 ? app.data.students[existingIdx].id : 'st-' + Date.now() + '-' + i,
+          uin: uin,
+          name: name,
+          email: email,
+          yearOfStudy: yearOfStudy,
+          academicYear: academicYear,
+          branch: branch,
+          division: division,
+          batch: batch
+        };
+
+        if (existingIdx >= 0) {
+          app.data.students[existingIdx] = studentRecord;
+          countUpdated++;
+        } else {
+          app.data.students.push(studentRecord);
+          countAdded++;
+        }
+
+        // Sync to Supabase Cloud if connected
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          supabaseClient.from('students').upsert({
+            id: studentRecord.id,
+            uin: studentRecord.uin,
+            name: studentRecord.name,
+            email: studentRecord.email,
+            academic_year: studentRecord.academicYear,
+            branch: studentRecord.branch,
+            division: studentRecord.division,
+            batch: studentRecord.batch
+          }).then(({ error }) => {
+            if (error) console.warn('Supabase cloud sync error for student:', uin, error);
+          });
+        }
+      }
+
+      app.saveState();
+      app.showToast(`Imported Student Roster: ${countAdded} enrolled, ${countUpdated} updated with Year (FE/SE/TE/BE), Branch, Div, & Batch`, 'success');
+      this.renderStudentsMaster(document.getElementById('main-content'));
+    };
+
+    reader.readAsText(file);
+  },
+
+  openAutoAssignBatchesModal() {
+    app.showModal('⚡ Auto-Assign Batches by UIN / Roll Range', `
+      <form onsubmit="adminView.executeAutoBatchAllocation(event)">
+        <div style="background:var(--accent-blue-subtle); padding:12px; border-radius:6px; border:1px solid rgba(0,102,204,0.2); font-size:12px; color:var(--accent-blue); margin-bottom:16px;">
+          💡 <strong>Batch Range Splitter:</strong> Automatically assign lab batches (e.g. A1, A2, A3) to enrolled students based on UIN/Roll ranges.
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Year of Study</label>
+            <select id="auto-batch-year" class="form-select">
+              <option value="FE">FE (First Year)</option>
+              <option value="SE">SE (Second Year)</option>
+              <option value="TE">TE (Third Year)</option>
+              <option value="BE">BE (Final Year)</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1.5;">
+            <label class="form-label">Engineering Branch</label>
+            <select id="auto-batch-branch" class="form-select">
+              ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Division</label>
+            <select id="auto-batch-div" class="form-select">
+              <option value="A">Division A</option>
+              <option value="B">Division B</option>
+              <option value="C">Division C</option>
+              <option value="D">Division D</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid #E2E8F0; padding-top:12px; margin-top:12px;">
+          <label class="form-label" style="font-weight:700; margin-bottom:8px;">Batch Split Rules:</label>
+          
+          <div style="display:flex; flex-direction:column; gap:8px;" id="batch-rules-container">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" class="form-input batch-name-input code-font" value="A1" placeholder="Batch Name" style="width:100px;">
+              <span style="font-size:12px; color:var(--text-secondary);">From UIN:</span>
+              <input type="text" class="form-input uin-start-input code-font" placeholder="24051001" style="flex:1;">
+              <span style="font-size:12px; color:var(--text-secondary);">To UIN:</span>
+              <input type="text" class="form-input uin-end-input code-font" placeholder="24051020" style="flex:1;">
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" class="form-input batch-name-input code-font" value="A2" placeholder="Batch Name" style="width:100px;">
+              <span style="font-size:12px; color:var(--text-secondary);">From UIN:</span>
+              <input type="text" class="form-input uin-start-input code-font" placeholder="24051021" style="flex:1;">
+              <span style="font-size:12px; color:var(--text-secondary);">To UIN:</span>
+              <input type="text" class="form-input uin-end-input code-font" placeholder="24051040" style="flex:1;">
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" class="form-input batch-name-input code-font" value="A3" placeholder="Batch Name" style="width:100px;">
+              <span style="font-size:12px; color:var(--text-secondary);">From UIN:</span>
+              <input type="text" class="form-input uin-start-input code-font" placeholder="24051041" style="flex:1;">
+              <span style="font-size:12px; color:var(--text-secondary);">To UIN:</span>
+              <input type="text" class="form-input uin-end-input code-font" placeholder="24051060" style="flex:1;">
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">⚡ Execute Auto-Batch Allocation</button>
+        </div>
+      </form>
+    `);
+  },
+
+  executeAutoBatchAllocation(e) {
+    e.preventDefault();
+    const targetYear = document.getElementById('auto-batch-year').value;
+    const targetBranch = document.getElementById('auto-batch-branch').value;
+    const targetDiv = document.getElementById('auto-batch-div').value;
+
+    const rows = document.querySelectorAll('#batch-rules-container > div');
+    const rules = [];
+
+    rows.forEach(r => {
+      const bName = r.querySelector('.batch-name-input').value.trim();
+      const uStart = r.querySelector('.uin-start-input').value.trim();
+      const uEnd = r.querySelector('.uin-end-input').value.trim();
+      if (bName && uStart && uEnd) {
+        rules.push({ batchName: bName, startUin: uStart, endUin: uEnd });
+      }
+    });
+
+    if (rules.length === 0) {
+      app.showToast('Please specify at least one batch UIN range rule', 'warning');
+      return;
+    }
+
+    let updatedCount = 0;
+
+    app.data.students.forEach(s => {
+      const matchYear = !s.yearOfStudy || s.yearOfStudy === targetYear;
+      const matchBranch = s.branch === targetBranch;
+      const matchDiv = s.division === targetDiv;
+
+      if (matchYear && matchBranch && matchDiv) {
+        const studentUinNum = parseInt(s.uin.replace(/\D/g, ''), 10) || 0;
+
+        rules.forEach(rule => {
+          const startNum = parseInt(rule.startUin.replace(/\D/g, ''), 10) || 0;
+          const endNum = parseInt(rule.endUin.replace(/\D/g, ''), 10) || 0;
+
+          if (studentUinNum >= startNum && studentUinNum <= endNum) {
+            s.batch = rule.batchName;
+            s.yearOfStudy = targetYear;
+            updatedCount++;
+
+            if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+              supabaseClient.from('students').upsert({
+                id: s.id,
+                uin: s.uin,
+                name: s.name,
+                email: s.email,
+                academic_year: s.academicYear || '2026-27',
+                branch: s.branch,
+                division: s.division,
+                batch: s.batch
+              }).then(({ error }) => {
+                if (error) console.warn('Supabase cloud sync notice:', error);
+              });
+            }
+          }
+        });
+      }
+    });
+
+    app.saveState();
+    app.closeModal();
+    app.showToast(`Auto-assigned ${updatedCount} student profiles into batches for ${targetYear} ${targetBranch} (Div ${targetDiv})`, 'success');
+    this.renderStudentsMaster(document.getElementById('main-content'));
   },
 
   openAddStudentModal() {
