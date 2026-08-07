@@ -36,7 +36,9 @@ class AppEngine {
     this.currentRole = this.currentUser ? this.currentUser.role : 'faculty'; // 'admin', 'faculty', 'student'
     this.activeStudentId = this.currentUser && this.currentUser.studentId ? this.currentUser.studentId : (this.data.students.length > 0 ? this.data.students[0].id : null); 
     this.activeNav = 'dashboard';
-    this.activeAssignmentId = 'asg-001';
+    const savedAsgId = localStorage.getItem('rizvi_fe_active_asg_id');
+    const firstAsgId = this.data.assignments.length > 0 ? this.data.assignments[0].id : null;
+    this.activeAssignmentId = savedAsgId || firstAsgId || null;
   }
 
   init() {
@@ -52,60 +54,301 @@ class AppEngine {
   }
 
   async syncWithSupabase() {
-    if (!supabaseClient) return;
+    if (!supabaseClient) {
+      this.showToast('Running in offline mode — Supabase not connected. Data saved locally only.', 'warning');
+      return;
+    }
     try {
       // Fetch students from Supabase
       const { data: stData, error: stErr } = await supabaseClient.from('students').select('*');
       if (!stErr && stData && Array.isArray(stData) && stData.length > 0) {
         stData.forEach(st => {
-          const existingIdx = this.data.students.findIndex(s => s.id === st.id || s.email === st.email || s.uin === st.uin);
-          const formattedSt = {
+          const existingIdx = this.data.students.findIndex(x => x.id === st.id);
+          const formatted = {
             id: st.id,
             uin: st.uin,
             name: st.name,
             email: st.email,
-            academicYear: st.academic_year || st.academicYear || '2026-27',
+            academicYear: st.academic_year,
             branch: st.branch,
             division: st.division,
             batch: st.batch
           };
           if (existingIdx >= 0) {
-            this.data.students[existingIdx] = formattedSt;
+            this.data.students[existingIdx] = formatted;
           } else {
-            this.data.students.push(formattedSt);
+            this.data.students.push(formatted);
           }
         });
-        this.saveState();
-        this.renderCurrentView();
       }
 
       // Fetch faculty from Supabase
-      const { data: facData, error: facErr } = await supabaseClient.from('faculty').select('*');
-      if (!facErr && facData && Array.isArray(facData) && facData.length > 0) {
-        facData.forEach(f => {
-          const existingIdx = this.data.faculty.findIndex(fac => fac.id === f.id || fac.email === f.email);
-          const formattedFac = {
-            id: f.id,
-            name: f.name,
-            email: f.email,
-            departmentId: f.department_id || f.departmentId,
-            role: f.role,
-            assignedSubjects: f.assigned_subjects || f.assignedSubjects || [],
-            isDualRole: f.is_dual_role || f.isDualRole || false
+      const { data: fcData, error: fcErr } = await supabaseClient.from('faculty').select('*');
+      if (!fcErr && fcData && Array.isArray(fcData) && fcData.length > 0) {
+        fcData.forEach(fc => {
+          const existingIdx = this.data.faculty.findIndex(x => x.id === fc.id);
+          const formatted = {
+            id: fc.id,
+            name: fc.name,
+            email: fc.email,
+            departmentId: fc.department_id,
+            role: fc.role,
+            assignedSubjects: fc.assigned_subjects || [],
+            isDualRole: fc.is_dual_role || false
           };
           if (existingIdx >= 0) {
-            this.data.faculty[existingIdx] = formattedFac;
+            this.data.faculty[existingIdx] = formatted;
           } else {
-            this.data.faculty.push(formattedFac);
+            this.data.faculty.push(formatted);
           }
         });
-        this.saveState();
-        this.renderCurrentView();
       }
+
+      // Fetch assignments from Supabase
+      const { data: asgData, error: asgErr } = await supabaseClient.from('assignments').select('*');
+      if (!asgErr && asgData && Array.isArray(asgData) && asgData.length > 0) {
+        asgData.forEach(asg => {
+          const existingIdx = this.data.assignments.findIndex(x => x.id === asg.id);
+          const formatted = {
+            id: asg.id,
+            code: asg.code,
+            subjectId: asg.subject_id,
+            facultyId: asg.faculty_id,
+            number: asg.number,
+            title: asg.title,
+            className: asg.class_name,
+            semester: asg.semester,
+            assessmentType: asg.assessment_type,
+            modulesCovered: asg.modules_covered,
+            outcomeCovered: asg.outcome_covered,
+            publishDate: asg.publish_date,
+            deadline: asg.deadline,
+            rubricPresetId: asg.rubric_preset_id,
+            createdAt: asg.created_at,
+            schedules: asg.schedules || [],
+            questions: asg.questions || []
+          };
+          if (existingIdx >= 0) {
+            this.data.assignments[existingIdx] = formatted;
+          } else {
+            this.data.assignments.push(formatted);
+          }
+        });
+      }
+
+      // Fetch submissions from Supabase
+      const { data: submData, error: submErr } = await supabaseClient.from('submissions').select('*');
+      if (!submErr && submData && Array.isArray(submData) && submData.length > 0) {
+        submData.forEach(s => {
+          const existingIdx = this.data.submissions.findIndex(x => x.id === s.id);
+          const formatted = {
+            id: s.id,
+            assignmentId: s.assignment_id,
+            studentId: s.student_id,
+            parameterId: s.parameter_id,
+            attemptNumber: s.attempt_number,
+            submittedValue: s.submitted_value,
+            submittedUnit: s.submitted_unit,
+            isCorrectValue: s.is_correct_value,
+            isCorrectUnit: s.is_correct_unit,
+            marksAwarded: s.marks_awarded,
+            attemptDeductionPct: s.attempt_deduction_pct || s.deduction_pct || 0,
+            latePenaltyPct: s.late_penalty_pct || 0,
+            deductionPct: s.deduction_pct || 0,
+            isLate: s.is_late || false,
+            submittedAt: s.submitted_at
+          };
+          if (existingIdx >= 0) {
+            this.data.submissions[existingIdx] = formatted;
+          } else {
+            this.data.submissions.push(formatted);
+          }
+        });
+      }
+
+      // Fetch student_variables from Supabase
+      const { data: svarData, error: svarErr } = await supabaseClient.from('student_variables').select('*');
+      if (!svarErr && svarData && Array.isArray(svarData) && svarData.length > 0) {
+        svarData.forEach(v => {
+          const existingIdx = this.data.studentVariables.findIndex(x => x.id === v.id);
+          const formatted = {
+            id: v.id,
+            studentId: v.student_id,
+            assignmentId: v.assignment_id,
+            key: v.key,
+            value: v.value
+          };
+          if (existingIdx >= 0) {
+            this.data.studentVariables[existingIdx] = formatted;
+          } else {
+            this.data.studentVariables.push(formatted);
+          }
+        });
+      }
+
+      // Fetch student_answers from Supabase
+      const { data: ansData, error: ansErr } = await supabaseClient.from('student_answers').select('*');
+      if (!ansErr && ansData && Array.isArray(ansData) && ansData.length > 0) {
+        ansData.forEach(a => {
+          const idKey = a.id || `ans-${a.student_id}-${a.parameter_id}`;
+          const existingIdx = this.data.studentAnswers.findIndex(x => x.id === idKey || (x.studentId === a.student_id && x.parameterId === a.parameter_id));
+          const formatted = {
+            id: idKey,
+            assignmentId: a.assignment_id,
+            studentId: a.student_id,
+            parameterId: a.parameter_id,
+            correctValue: a.correct_value,
+            correctUnit: a.correct_unit
+          };
+          if (existingIdx >= 0) {
+            this.data.studentAnswers[existingIdx] = formatted;
+          } else {
+            this.data.studentAnswers.push(formatted);
+          }
+        });
+      }
+
+      this.saveState();
+      this.renderCurrentView();
     } catch (e) {
       console.warn('Supabase cloud sync background notice:', e);
+      this.showToast('Cloud sync failed — working in offline mode. Changes saved locally.', 'warning');
     }
-  }
+  },
+
+  async syncAssignmentToSupabase(asg) {
+    if (!supabaseClient || !asg) return;
+    try {
+      const { error } = await supabaseClient.from('assignments').upsert({
+        id: asg.id,
+        code: asg.code,
+        subject_id: asg.subjectId,
+        faculty_id: asg.facultyId,
+        number: asg.number,
+        title: asg.title,
+        class_name: asg.className,
+        semester: asg.semester,
+        assessment_type: asg.assessmentType,
+        modules_covered: asg.modulesCovered,
+        outcome_covered: asg.outcomeCovered,
+        publish_date: asg.publishDate,
+        deadline: asg.deadline,
+        rubric_preset_id: asg.rubricPresetId,
+        created_at: asg.createdAt,
+        schedules: asg.schedules,
+        questions: asg.questions
+      });
+      if (error) console.warn('Supabase assignment sync notice:', error);
+    } catch(e) {
+      console.warn('Supabase assignment sync error:', e);
+    }
+  },
+
+  async deleteAssignmentFromSupabase(asgId) {
+    if (!supabaseClient || !asgId) return;
+    try {
+      // Delete the assignment record
+      const { error: asgErr } = await supabaseClient
+        .from('assignments')
+        .delete()
+        .eq('id', asgId);
+      if (asgErr) console.warn('Supabase delete assignment notice:', asgErr);
+
+      // Also delete all submissions for this assignment
+      const { error: submErr } = await supabaseClient
+        .from('submissions')
+        .delete()
+        .eq('assignment_id', asgId);
+      if (submErr) console.warn('Supabase delete submissions notice:', submErr);
+
+      // Also delete all student variables for this assignment
+      const { error: svarErr } = await supabaseClient
+        .from('student_variables')
+        .delete()
+        .eq('assignment_id', asgId);
+      if (svarErr) console.warn('Supabase delete student_variables notice:', svarErr);
+
+      // Also delete all student answers for this assignment
+      const { error: ansErr } = await supabaseClient
+        .from('student_answers')
+        .delete()
+        .eq('assignment_id', asgId);
+      if (ansErr) console.warn('Supabase delete student_answers notice:', ansErr);
+
+    } catch(e) {
+      console.warn('Supabase delete assignment error:', e);
+    }
+  },
+
+  async syncSubmissionToSupabase(submission) {
+    if (!supabaseClient || !submission) return;
+    try {
+      const { error } = await supabaseClient.from('submissions').upsert({
+        id: submission.id,
+        assignment_id: submission.assignmentId,
+        student_id: submission.studentId,
+        parameter_id: submission.parameterId,
+        attempt_number: submission.attemptNumber,
+        submitted_value: submission.submittedValue,
+        submitted_unit: submission.submittedUnit,
+        is_correct_value: submission.isCorrectValue,
+        is_correct_unit: submission.isCorrectUnit,
+        marks_awarded: submission.marksAwarded,
+        deduction_pct: submission.deductionPct || 0,
+        attempt_deduction_pct: submission.attemptDeductionPct || submission.deductionPct || 0,
+        late_penalty_pct: submission.latePenaltyPct || 0,
+        is_late: submission.isLate || false,
+        submitted_at: submission.submittedAt
+      });
+      if (error) console.warn('Supabase submission sync notice:', error);
+    } catch(e) {
+      console.warn('Supabase submission sync error:', e);
+    }
+  },
+
+  async syncStudentVariablesToSupabase(studentId, assignmentId) {
+    if (!supabaseClient) return;
+    try {
+      const vars = this.data.studentVariables.filter(
+        v => v.studentId === studentId && v.assignmentId === assignmentId
+      );
+      for (const v of vars) {
+        const { error } = await supabaseClient.from('student_variables').upsert({
+          id: v.id,
+          student_id: v.studentId,
+          assignment_id: v.assignmentId,
+          key: v.key,
+          value: v.value
+        });
+        if (error) console.warn('Supabase student_variables sync notice:', error);
+      }
+    } catch(e) {
+      console.warn('Supabase student_variables sync error:', e);
+    }
+  },
+
+  async syncStudentAnswersToSupabase(studentId, assignmentId) {
+    if (!supabaseClient) return;
+    try {
+      const answers = this.data.studentAnswers.filter(
+        a => a.studentId === studentId && a.assignmentId === assignmentId
+      );
+      for (const a of answers) {
+        const payload = {
+          assignment_id: a.assignmentId,
+          student_id: a.studentId,
+          parameter_id: a.parameterId,
+          correct_value: a.correctValue,
+          correct_unit: a.correctUnit
+        };
+        if (a.id) payload.id = a.id;
+        const { error } = await supabaseClient.from('student_answers').upsert(payload);
+        if (error) console.warn('Supabase student_answers sync notice:', error);
+      }
+    } catch(e) {
+      console.warn('Supabase student_answers sync error:', e);
+    }
+  },
 
   loadUserSession() {
     const saved = localStorage.getItem('rizvi_fe_portal_user');
@@ -400,6 +643,9 @@ class AppEngine {
     state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
     if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
+    if (!state.studentVariables) state.studentVariables = [];
+    if (!state.studentAnswers) state.studentAnswers = [];
+    if (!state.modules) state.modules = [];
 
     // Clean and deduplicate subjects by subject code
     const initialSubs = JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
@@ -425,6 +671,13 @@ class AppEngine {
       if (!co.psoIds) co.psoIds = [];
       if (!co.moduleIds) co.moduleIds = [];
       if (!co.experimentIds) co.experimentIds = [];
+    });
+
+    // Backwards compatibility for submission records saved before late penalty fields were added
+    (state.submissions || []).forEach(s => {
+      if (s.attemptDeductionPct === undefined) s.attemptDeductionPct = s.deductionPct || 0;
+      if (s.latePenaltyPct === undefined) s.latePenaltyPct = 0;
+      if (s.isLate === undefined) s.isLate = false;
     });
 
     return state;
@@ -481,9 +734,33 @@ class AppEngine {
   }
 
   switchNav(navId) {
+    // Guard: student trying to open solver with no assignments
+    if (navId === 'solver' && this.currentRole === 'student' && this.data.assignments.length === 0) {
+      this.showToast('No lab assignments are currently published. Check back with your faculty.', 'warning');
+      return;
+    }
+
+    // Guard: student trying to open grades with no assignments
+    if (navId === 'grades' && this.currentRole === 'student' && this.data.assignments.length === 0) {
+      this.showToast('No assignments found. Grades will appear once lab assignments are published.', 'warning');
+      return;
+    }
+
     this.activeNav = navId;
+    if (this.activeAssignmentId) {
+      localStorage.setItem('rizvi_fe_active_asg_id', this.activeAssignmentId);
+    }
     this.renderSidebar();
     this.renderCurrentView();
+  }
+
+  ensureActiveAssignment() {
+    if (!this.activeAssignmentId || !this.data.assignments.find(a => a.id === this.activeAssignmentId)) {
+      this.activeAssignmentId = this.data.assignments.length > 0 ? this.data.assignments[0].id : null;
+      if (this.activeAssignmentId) {
+        localStorage.setItem('rizvi_fe_active_asg_id', this.activeAssignmentId);
+      }
+    }
   }
 
   renderRoleSwitcher() {
@@ -577,10 +854,14 @@ class AppEngine {
         { id: 'analytics', label: 'CO Attainment Report', icon: '📊' }
       ];
     } else {
+      const activeAsgCode = this.data.assignments.length > 0
+        ? (this.data.assignments.find(a => a.id === this.activeAssignmentId) || this.data.assignments[0]).code
+        : null;
+
       items = [
-        { id: 'dashboard', label: 'My Experiments & Labs', icon: '🔬' },
-        { id: 'solver', label: 'Active Canvas Sheet', icon: '✏️' },
-        { id: 'grades', label: 'My Submissions & Rubric', icon: '🏆' }
+        { id: 'dashboard', label: `My Experiments (${this.data.assignments.length})`, icon: '🔬' },
+        { id: 'solver', label: activeAsgCode ? `Solve: ${activeAsgCode}` : 'Canvas Sheet', icon: '✏️' },
+        { id: 'grades', label: 'My Grades', icon: '🏆' }
       ];
     }
 
@@ -595,6 +876,9 @@ class AppEngine {
   renderCurrentView() {
     const main = document.getElementById('main-content');
     if (!main) return;
+
+    // Always ensure activeAssignmentId points to a valid assignment
+    this.ensureActiveAssignment();
 
     if (!this.currentUser) {
       main.innerHTML = `

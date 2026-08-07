@@ -36,23 +36,87 @@ const adminView = {
     const totalDepts = app.data.departments.length;
     const totalAssignments = app.data.assignments.length;
 
+    const totalSubmissions = app.data.submissions.length;
+    const totalAssignmentsWithQuestions = app.data.assignments.filter(a => a.questions && a.questions.length > 0).length;
+    const studentsWithSubmissions = new Set(app.data.submissions.map(s => s.studentId)).size;
+    const submissionRate = totalStudents > 0 ? Math.round((studentsWithSubmissions / totalStudents) * 100) : 0;
+
+    // Department-wise assignment count
+    const deptAssignmentCounts = app.data.departments.map(d => {
+      const deptSubjects = app.data.subjects.filter(s => s.departmentId === d.id);
+      const deptSubjectIds = deptSubjects.map(s => s.id);
+      const deptAssignments = app.data.assignments.filter(a => deptSubjectIds.includes(a.subjectId));
+      const deptSubmissions = app.data.submissions.filter(sub => 
+        deptAssignments.some(a => a.id === sub.assignmentId)
+      );
+      return {
+        dept: d,
+        assignmentCount: deptAssignments.length,
+        submissionCount: deptSubmissions.length
+      };
+    });
+
+    // CO attainment summary across all defined outcomes
+    const paramMap = {};
+    app.data.assignments.forEach(asg => {
+      (asg.questions || []).forEach(q => {
+        (q.parameters || []).forEach(p => {
+          paramMap[p.id] = { coId: q.coId, valueMarks: p.valueMarks || 4 };
+        });
+      });
+    });
+
+    const courseOutcomes = app.data.courseOutcomes || [];
+    const classTarget = app.data.attainmentSettings.classTargetPct;
+
+    const coSummary = courseOutcomes.map(co => {
+      const relevantParamIds = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
+      const maxMarksForCO = relevantParamIds.reduce((sum, pid) => sum + (paramMap[pid].valueMarks || 4), 0);
+      let passingStudents = 0;
+
+      app.data.students.forEach(st => {
+        let earned = 0;
+        relevantParamIds.forEach(pid => {
+          const attempts = app.data.submissions.filter(s => s.studentId === st.id && s.parameterId === pid);
+          if (attempts.length === 0) return;
+          const best = attempts.reduce((b, s) => (s.marksAwarded || 0) > (b.marksAwarded || 0) ? s : b, attempts[0]);
+          earned += (best.marksAwarded || 0);
+        });
+        const pct = maxMarksForCO > 0 ? (earned / maxMarksForCO * 100) : 0;
+        if (pct >= app.data.attainmentSettings.studentThresholdPct) passingStudents++;
+      });
+
+      const attainmentPct = totalStudents > 0 ? Math.round((passingStudents / totalStudents) * 100) : 0;
+      return {
+        co: co,
+        attainmentPct: attainmentPct,
+        targetMet: attainmentPct >= classTarget,
+        passingStudents: passingStudents
+      };
+    });
+
+    const cosMeetingTarget = coSummary.filter(c => c.targetMet).length;
+    const cosTotal = coSummary.length;
+
     container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Institutional Admin Dashboard</h1>
-          <p class="page-subtitle">Rizvi College of Engineering — Academic & Accreditation Roster</p>
+          <p class="page-subtitle">Rizvi College of Engineering — Academic & Accreditation Overview</p>
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="btn btn-secondary btn-sm" onclick="app.switchNav('google-auth')">🔑 @eng.rizvi.edu.in Google Auth</button>
-          <button class="btn btn-secondary btn-sm" onclick="app.resetState()">🔄 Reset Seed Database</button>
+          <button class="btn btn-secondary btn-sm" onclick="app.switchNav('google-auth')">🔑 Google Auth Settings</button>
+          <button class="btn btn-secondary btn-sm" onclick="adminView.openAttainmentModal()">⚙️ CO Thresholds</button>
+          <button class="btn btn-secondary btn-sm" onclick="app.resetState()">🔄 Reset Database</button>
         </div>
       </div>
 
+      <!-- Row 1: Core Institutional KPIs -->
       <div class="kpi-grid">
         <div class="kpi-card">
           <span class="kpi-label">Total FE Roster</span>
           <span class="kpi-value">${totalStudents}</span>
-          <span class="kpi-trend positive">5 Engineering Branches</span>
+          <span class="kpi-trend positive">Across ${HARDCODED_BRANCHES.length} Branches</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Active Lab Faculty</span>
@@ -60,38 +124,182 @@ const adminView = {
           <span class="kpi-trend neutral">Cross-Department</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">FE Departments</span>
-          <span class="kpi-value">${totalDepts}</span>
-          <span class="kpi-trend neutral">First Year + Engg</span>
+          <span class="kpi-label">Lab Assignments Published</span>
+          <span class="kpi-value">${totalAssignments}</span>
+          <span class="kpi-trend ${totalAssignmentsWithQuestions > 0 ? 'positive' : 'neutral'}">
+            ${totalAssignmentsWithQuestions} With Questions Built
+          </span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Active Lab Sheets</span>
-          <span class="kpi-value">${totalAssignments}</span>
-          <span class="kpi-trend positive">Multi-Batch Scheduled</span>
+          <span class="kpi-label">Student Submission Rate</span>
+          <span class="kpi-value" style="color:${submissionRate >= 70 ? 'var(--success)' : submissionRate > 0 ? 'var(--warning)' : 'var(--text-secondary)'};">
+            ${submissionRate}%
+          </span>
+          <span class="kpi-trend ${submissionRate >= 70 ? 'positive' : 'neutral'}">
+            ${studentsWithSubmissions} / ${totalStudents} Students Submitted
+          </span>
         </div>
       </div>
 
-      <div class="card" style="margin-top: 24px;">
+      <!-- Row 2: CO Attainment Summary -->
+      <div class="kpi-grid" style="margin-top:16px;">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Outcomes Defined</span>
+          <span class="kpi-value">${cosTotal}</span>
+          <span class="kpi-trend neutral">CO + LO Combined</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">COs Meeting Target</span>
+          <span class="kpi-value" style="color:${cosTotal > 0 && cosMeetingTarget === cosTotal ? 'var(--success)' : cosMeetingTarget > 0 ? 'var(--warning)' : 'var(--danger)'};">
+            ${cosMeetingTarget} / ${cosTotal}
+          </span>
+          <span class="kpi-trend ${cosMeetingTarget === cosTotal && cosTotal > 0 ? 'positive' : 'neutral'}">
+            Target: ≥ ${classTarget}% Class Attainment
+          </span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Student CO Threshold</span>
+          <span class="kpi-value">${app.data.attainmentSettings.studentThresholdPct}%</span>
+          <span class="kpi-trend neutral">Min Score to Attain CO</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Total Submissions Logged</span>
+          <span class="kpi-value">${totalSubmissions}</span>
+          <span class="kpi-trend neutral">Parameter-Level Attempts</span>
+        </div>
+      </div>
+
+      <!-- CO Attainment Settings Card -->
+      <div class="card" style="margin-top:24px;">
         <div class="card-header">
           <div>
-            <h2 class="card-title">College CO Attainment Settings</h2>
-            <p class="card-subtitle">Global accreditation parameters applied college-wide</p>
+            <h2 class="card-title">College CO Attainment Thresholds</h2>
+            <p class="card-subtitle">Global NBA accreditation parameters — faculty can override per subject</p>
           </div>
           <button class="btn btn-primary btn-sm" onclick="adminView.openAttainmentModal()">Edit Thresholds</button>
         </div>
-        <div style="display: flex; gap: 40px; margin-top: 12px;">
+        <div style="display:flex; gap:40px; margin-top:12px;">
           <div>
-            <span style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Student Target</span>
+            <span style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Student Score Target</span>
             <div style="font-size:24px; font-weight:700; color:var(--accent-blue);">${app.data.attainmentSettings.studentThresholdPct}%</div>
-            <span style="font-size:12px; color:var(--text-secondary);">Score needed for student to attain CO</span>
+            <span style="font-size:12px; color:var(--text-secondary);">Minimum score for a student to attain a CO</span>
           </div>
           <div>
             <span style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Class Attainment Target</span>
             <div style="font-size:24px; font-weight:700; color:var(--success);">${app.data.attainmentSettings.classTargetPct}%</div>
-            <span style="font-size:12px; color:var(--text-secondary);">% students required for class CO attainment</span>
+            <span style="font-size:12px; color:var(--text-secondary);">% of students required for class-level CO attainment</span>
           </div>
         </div>
       </div>
+
+      <!-- Department-wise Breakdown -->
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header" style="margin-bottom:16px;">
+          <div>
+            <h2 class="card-title">Department-wise Assignment & Submission Breakdown</h2>
+            <p class="card-subtitle">Activity summary per department for Academic Year 2026-27</p>
+          </div>
+        </div>
+        <div class="table-container">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Short Code</th>
+                <th>Subjects Defined</th>
+                <th>Assignments Published</th>
+                <th>Total Submissions</th>
+                <th>Activity Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${deptAssignmentCounts.map(d => `
+                <tr>
+                  <td style="font-weight:600;">${d.dept.name}</td>
+                  <td><span class="tag tag-co">${d.dept.shortName}</span></td>
+                  <td style="font-family:var(--font-mono); font-weight:700;">
+                    ${app.data.subjects.filter(s => s.departmentId === d.dept.id).length}
+                  </td>
+                  <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">
+                    ${d.assignmentCount}
+                  </td>
+                  <td style="font-family:var(--font-mono); font-weight:700;">
+                    ${d.submissionCount}
+                  </td>
+                  <td>
+                    <span class="tag ${d.assignmentCount > 0 && d.submissionCount > 0 ? 'tag-success' : d.assignmentCount > 0 ? 'tag-warning' : 'tag-bt'}">
+                      ${d.assignmentCount === 0 ? 'No Assignments' : d.submissionCount === 0 ? 'No Submissions Yet' : 'Active'}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CO Attainment Summary Table -->
+      ${cosTotal > 0 ? `
+        <div class="card" style="margin-top:24px;">
+          <div class="card-header" style="margin-bottom:16px;">
+            <div>
+              <h2 class="card-title">College-Wide CO Attainment Summary</h2>
+              <p class="card-subtitle">NBA accreditation attainment status across all defined outcomes</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="app.switchNav('analytics')">
+              📊 Full Attainment Report
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Outcome Code</th>
+                  <th>Description</th>
+                  <th>Students Attaining</th>
+                  <th>Class Attainment %</th>
+                  <th>NBA Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${coSummary.map(cs => `
+                  <tr>
+                    <td>
+                      <span class="tag ${cs.co.type === 'LO' ? 'tag-lo' : 'tag-co'}">
+                        ${cs.co.type || 'CO'}
+                      </span>
+                    </td>
+                    <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">${cs.co.code}</td>
+                    <td style="font-size:13px;">${cs.co.description}</td>
+                    <td style="font-weight:700;">
+                      ${cs.passingStudents} / ${totalStudents}
+                    </td>
+                    <td style="font-weight:700; font-size:15px; color:${cs.targetMet ? 'var(--success)' : 'var(--danger)'};">
+                      ${cs.attainmentPct}%
+                    </td>
+                    <td>
+                      <span class="tag ${cs.targetMet ? 'tag-success' : 'tag-danger'}">
+                        ${cs.targetMet ? '✓ NBA Target Met' : '✕ Target Not Met'}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : `
+        <div class="card" style="margin-top:24px; text-align:center; padding:32px;">
+          <div style="font-size:40px; margin-bottom:12px;">🎯</div>
+          <h3 style="font-size:16px; font-weight:700; margin-bottom:8px;">No Course Outcomes Defined Yet</h3>
+          <p style="color:var(--text-secondary); font-size:13px; max-width:480px; margin:0 auto;">
+            Faculty must define Course Outcomes (COs) and Lab Outcomes (LOs) under the 
+            Faculty Portal → Course Outcomes & Modules section before CO attainment data 
+            can appear here.
+          </p>
+        </div>
+      `}
     `;
   },
 

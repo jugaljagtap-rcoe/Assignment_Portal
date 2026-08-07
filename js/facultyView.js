@@ -132,11 +132,22 @@ const facultyView = {
   deleteAssignment(asgId) {
     const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
-    if (!confirm(`Are you sure you want to delete "${asg.title}" (${asg.code})?`)) return;
+    if (!confirm(`Are you sure you want to delete "${asg.title}" (${asg.code})?\n\nThis will also delete all submissions, student variables, and solution keys for this assignment. This cannot be undone.`)) return;
 
+    // Remove from local data
     app.data.assignments = app.data.assignments.filter(a => a.id !== asgId);
+
+    // Also clean up related local data
+    app.data.submissions = app.data.submissions.filter(s => s.assignmentId !== asgId);
+    app.data.studentVariables = app.data.studentVariables.filter(v => v.assignmentId !== asgId);
+    app.data.studentAnswers = app.data.studentAnswers.filter(a => a.assignmentId !== asgId);
+
     app.saveState();
-    app.showToast(`Deleted assignment ${asg.code}`, 'info');
+
+    // Sync deletion to Supabase
+    app.deleteAssignmentFromSupabase(asgId);
+
+    app.showToast(`Deleted assignment ${asg.code} and all related data`, 'info');
     this.renderDashboard(document.getElementById('main-content'));
   },
 
@@ -248,8 +259,12 @@ const facultyView = {
             <h4 style="font-size:13px; font-weight:700; margin-bottom:10px;">Substituted Question Set (${asg.title}):</h4>
             ${asg.questions.map(q => {
               const substitutedText = q.text.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
-                const val = studentVarsMap[p1] || "10.0";
-                return `<span style="background:#FEF3C7; color:#92400E; font-weight:700; padding:2px 6px; border-radius:4px;">${val}</span>`;
+                const val = studentVarsMap[p1];
+                if (val !== undefined) {
+                  return `<span style="background:#FEF3C7; color:#92400E; font-weight:700; padding:2px 6px; border-radius:4px; font-family:var(--font-mono);">${val}</span>`;
+                } else {
+                  return `<span style="background:var(--danger-subtle); color:var(--danger); font-weight:700; padding:2px 6px; border:1px solid var(--danger); border-radius:3px; font-family:var(--font-mono); font-size:11px;">{{${p1}}}</span>`;
+                }
               });
 
               return `
@@ -1001,6 +1016,22 @@ const facultyView = {
         <button class="btn btn-primary" onclick="facultyView.openAddQuestionModal('${asg.id}')">+ Add Question</button>
       </div>
 
+      ${app.data.assignments.length > 1 ? `
+        <div class="card" style="margin-bottom:16px; padding:14px 20px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <label style="font-size:13px; font-weight:600; white-space:nowrap;">Editing Assignment:</label>
+            <select class="form-select" style="flex:1; background:#FFF;"
+              onchange="app.activeAssignmentId=this.value; facultyView.renderAssignmentBuilder(document.getElementById('main-content'));">
+              ${app.data.assignments.map(a => `
+                <option value="${a.id}" ${a.id === asg.id ? 'selected' : ''}>
+                  ${a.code} — ${a.title} (${a.questions.length} question${a.questions.length !== 1 ? 's' : ''})
+                </option>
+              `).join('')}
+            </select>
+          </div>
+        </div>
+      ` : ''}
+
       <div class="card" style="margin-bottom: 20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
         <div style="display:flex; gap:12px; align-items:center;">
           <span style="font-size:20px;">💡</span>
@@ -1018,6 +1049,10 @@ const facultyView = {
               <span class="tag tag-co">${q.coId}</span>
               <span class="tag tag-bt">${q.btLevel}</span>
             </div>
+            <button class="btn btn-destructive btn-sm" 
+              onclick="facultyView.deleteQuestion('${asg.id}', '${q.id}')">
+              🗑️ Delete Question
+            </button>
           </div>
           <div class="question-text">${q.text.replace(/\{\{(.*?)\}\}/g, '<span class="var-chip">{{$1}}</span>')}</div>
 
@@ -1191,6 +1226,7 @@ const facultyView = {
 
     asg.questions.push(newQ);
     app.saveState();
+    app.syncAssignmentToSupabase(asg);
     app.closeModal();
     app.showToast(`Added Question with ${paramsList.length} evaluation parameters`, 'success');
     this.renderAssignmentBuilder(document.getElementById('main-content'));
@@ -1559,12 +1595,18 @@ const facultyView = {
       return;
     }
 
+    const lateSubmissions = app.data.submissions.filter(s => s.assignmentId === asg.id && s.isLate === true);
+    const onTimeSubmissions = app.data.submissions.filter(s => s.assignmentId === asg.id && !s.isLate);
+
     container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Multi-Batch Schedule & Deduction Manager</h1>
           <p class="page-subtitle">Configure Publish Dates, Deadlines, Attempt Deductions, & Late Penalties</p>
         </div>
+        <button class="btn btn-primary" onclick="facultyView.openAddScheduleModal('${asg.id}')">
+          + Add Batch Schedule
+        </button>
       </div>
 
       <div class="card" style="margin-bottom:24px; background:var(--warning-subtle); border-color:rgba(255,159,10,0.3);">
@@ -1604,6 +1646,7 @@ const facultyView = {
                 <th>Late Penalty Policy</th>
                 <th>Submissions Open</th>
                 <th>Grades Released</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1624,10 +1667,41 @@ const facultyView = {
                       ${s.gradesReleased ? '✅ Released' : '⏳ Hidden'}
                     </button>
                   </td>
+                  <td>
+                    <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteSchedule('${asg.id}', '${s.id}')">
+                      🗑️ Delete
+                    </button>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h3 class="card-title" style="margin-bottom:12px;">Late Submission Summary — ${asg.code}</h3>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">On-Time Submissions</span>
+            <span class="kpi-value" style="color:var(--success);">${onTimeSubmissions.length}</span>
+            <span class="kpi-trend positive">No Penalty Applied</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Late Submissions</span>
+            <span class="kpi-value" style="color:var(--danger);">${lateSubmissions.length}</span>
+            <span class="kpi-trend negative">Late Penalty Applied</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Total Submissions</span>
+            <span class="kpi-value">${lateSubmissions.length + onTimeSubmissions.length}</span>
+            <span class="kpi-trend neutral">Across All Batches</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Late Penalty Policy</span>
+            <span class="kpi-value" style="font-size:18px;">-${asg.schedules[0] ? asg.schedules[0].latePenaltyValue : 10}%/day</span>
+            <span class="kpi-trend neutral">Cap: ${asg.schedules[0] ? asg.schedules[0].lateMaxCap : 30}% Max</span>
+          </div>
         </div>
       </div>
     `;
@@ -1640,7 +1714,182 @@ const facultyView = {
     if (!sch) return;
     sch[key] = !sch[key];
     app.saveState();
-    app.showToast(`Updated ${key} status`, 'success');
+
+    // Sync the full assignment (including updated schedules JSONB) to Supabase
+    app.syncAssignmentToSupabase(asg);
+
+    const keyLabel = key === 'submissionsOpen' 
+      ? (sch[key] ? 'Submissions opened' : 'Submissions closed')
+      : key === 'gradesReleased'
+      ? (sch[key] ? 'Grades released to students' : 'Grades hidden from students')
+      : `Updated ${key}`;
+
+    app.showToast(keyLabel, 'success');
+    this.renderScheduleManager(document.getElementById('main-content'));
+  },
+
+  openAddScheduleModal(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    // Default publish date to now, deadline to 7 days from now
+    const now = new Date();
+    const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const formatForInput = (d) => d.toISOString().slice(0, 16);
+
+    app.showModal(`Add Batch Schedule — ${asg.code}`, `
+      <form onsubmit="facultyView.saveNewSchedule(event, '${asg.id}')">
+
+        <div class="form-group">
+          <label class="form-label">Schedule Scope Type</label>
+          <select id="sch-scope-type" class="form-select" onchange="facultyView.onScheduleScopeTypeChange()">
+            <option value="batch">Batch (e.g. A1, B2)</option>
+            <option value="division">Division (e.g. A, B)</option>
+            <option value="all">All Students</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="sch-scope-value-group">
+          <label class="form-label">Scope Value (Batch or Division Name)</label>
+          <input type="text" id="sch-scope-value" class="form-input code-font" 
+            placeholder="e.g. A1 or B2 or C1" required>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">
+            Enter the exact batch or division name this schedule applies to. 
+            Students are matched by their batch field from the Student Master roster.
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Publish Date & Time</label>
+            <input type="datetime-local" id="sch-publish" class="form-input" 
+              value="${formatForInput(now)}" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Submission Deadline</label>
+            <input type="datetime-local" id="sch-deadline" class="form-input" 
+              value="${formatForInput(sevenDaysLater)}" required>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Late Penalty (% per day)</label>
+            <input type="number" id="sch-late-penalty" class="form-input" 
+              value="10" min="0" max="100" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Late Penalty Cap (%)</label>
+            <input type="number" id="sch-late-cap" class="form-input" 
+              value="30" min="0" max="100" required>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:20px; margin-top:8px; margin-bottom:16px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
+            <input type="checkbox" id="sch-open" checked> 
+            Submissions Open on Publish
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
+            <input type="checkbox" id="sch-grades"> 
+            Grades Released Immediately
+          </label>
+        </div>
+
+        <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; font-size:12px; color:var(--warning); margin-bottom:16px;">
+          ⚠️ If a schedule already exists for this scope value, adding a new one will create a duplicate. 
+          Check the existing schedules table before adding. Each batch should have only one schedule.
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Schedule</button>
+        </div>
+      </form>
+    `);
+  },
+
+  onScheduleScopeTypeChange() {
+    const scopeType = document.getElementById('sch-scope-type').value;
+    const scopeValueGroup = document.getElementById('sch-scope-value-group');
+    const scopeValueInput = document.getElementById('sch-scope-value');
+
+    if (scopeType === 'all') {
+      scopeValueGroup.style.display = 'none';
+      if (scopeValueInput) scopeValueInput.removeAttribute('required');
+    } else {
+      scopeValueGroup.style.display = 'block';
+      if (scopeValueInput) scopeValueInput.setAttribute('required', 'required');
+    }
+  },
+
+  saveNewSchedule(e, asgId) {
+    e.preventDefault();
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const scopeType = document.getElementById('sch-scope-type').value;
+    const scopeValue = scopeType === 'all' 
+      ? 'ALL' 
+      : (document.getElementById('sch-scope-value').value || '').trim();
+
+    if (scopeType !== 'all' && !scopeValue) {
+      app.showToast('Please enter a scope value (batch or division name)', 'warning');
+      return;
+    }
+
+    const publishDate = document.getElementById('sch-publish').value;
+    const deadline = document.getElementById('sch-deadline').value;
+    const latePenaltyValue = parseInt(document.getElementById('sch-late-penalty').value) || 10;
+    const lateMaxCap = parseInt(document.getElementById('sch-late-cap').value) || 30;
+    const submissionsOpen = document.getElementById('sch-open').checked;
+    const gradesReleased = document.getElementById('sch-grades').checked;
+
+    if (new Date(deadline) <= new Date(publishDate)) {
+      app.showToast('Deadline must be after the publish date', 'danger');
+      return;
+    }
+
+    const newSchedule = {
+      id: 'sch-' + Date.now(),
+      scopeType: scopeType,
+      scopeValue: scopeValue,
+      publishDate: publishDate,
+      deadline: deadline,
+      submissionsOpen: submissionsOpen,
+      gradesReleased: gradesReleased,
+      latePenaltyValue: latePenaltyValue,
+      lateMaxCap: lateMaxCap
+    };
+
+    if (!asg.schedules) asg.schedules = [];
+    asg.schedules.push(newSchedule);
+    app.saveState();
+
+    // Sync to Supabase
+    app.syncAssignmentToSupabase(asg);
+
+    app.closeModal();
+    app.showToast(`Added schedule for ${scopeType === 'all' ? 'All Students' : scopeValue} — deadline ${new Date(deadline).toLocaleString()}`, 'success');
+    this.renderScheduleManager(document.getElementById('main-content'));
+  },
+
+  deleteSchedule(asgId, scheduleId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const sch = asg.schedules.find(s => s.id === scheduleId);
+    if (!sch) return;
+
+    if (!confirm(`Delete schedule for "${sch.scopeType === 'all' ? 'All Students' : sch.scopeValue}"? Students in this scope will lose their deadline configuration.`)) return;
+
+    asg.schedules = asg.schedules.filter(s => s.id !== scheduleId);
+    app.saveState();
+
+    // Sync updated assignment (with removed schedule) to Supabase
+    app.syncAssignmentToSupabase(asg);
+
+    app.showToast(`Deleted schedule for ${sch.scopeValue || 'All Students'}`, 'info');
     this.renderScheduleManager(document.getElementById('main-content'));
   },
 
@@ -1718,6 +1967,7 @@ const facultyView = {
 
   selectCSVAssignment(asgId) {
     this.activeCSVAssignmentId = asgId;
+    app.activeAssignmentId = asgId;
     app.showToast('Selected assignment for CSV Pipeline', 'info');
     this.renderCSVPipeline(document.getElementById('main-content'));
   },
@@ -1741,17 +1991,96 @@ const facultyView = {
     app.showToast(`Downloaded Question CSV Template for ${selectedAsg.code}`, "success");
   },
 
+  deleteQuestion(asgId, questionId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const q = asg.questions.find(q => q.id === questionId);
+    if (!q) return;
+
+    if (!confirm(`Delete question "${q.sectionLabel}"? This will also remove all student submissions for this question's parameters. This cannot be undone.`)) return;
+
+    // Collect parameter IDs for this question
+    const paramIds = (q.parameters || []).map(p => p.id);
+
+    // Remove the question
+    asg.questions = asg.questions.filter(q => q.id !== questionId);
+
+    // Remove related submissions locally
+    app.data.submissions = app.data.submissions.filter(s => !paramIds.includes(s.parameterId));
+
+    // Remove related student answers locally
+    app.data.studentAnswers = app.data.studentAnswers.filter(a => !paramIds.includes(a.parameterId));
+
+    app.saveState();
+
+    // Sync updated assignment to Supabase
+    app.syncAssignmentToSupabase(asg);
+
+    // Delete related submissions from Supabase
+    if (window.supabaseClient) {
+      paramIds.forEach(pid => {
+        supabaseClient.from('submissions').delete().eq('parameter_id', pid)
+          .then(({ error }) => { if (error) console.warn('Supabase delete submissions for param:', error); });
+        supabaseClient.from('student_answers').delete().eq('parameter_id', pid)
+          .then(({ error }) => { if (error) console.warn('Supabase delete student_answers for param:', error); });
+      });
+    }
+
+    app.showToast(`Deleted question ${q.sectionLabel} and ${paramIds.length} related parameter records`, 'info');
+    this.renderAssignmentBuilder(document.getElementById('main-content'));
+  },
+
   downloadSolutionCSVTemplate() {
     const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId) || app.data.assignments[0];
-    const csvContent = "data:text/csv;charset=utf-8,parameter_label,Natural Frequency (rad/s),Static Deflection (mm),Damping Ratio\nans_header,ans_Q001_P01,ans_Q001_P02,ans_Q002_P01\n24051001,189.74,0.272,0.0017\n24051002,164.75,0.361,0.0014";
+    if (!selectedAsg) {
+      app.showToast('No assignment selected for template download', 'warning');
+      return;
+    }
+
+    if (!selectedAsg.questions || selectedAsg.questions.length === 0) {
+      app.showToast('This assignment has no questions yet. Build questions first before downloading the solution template.', 'warning');
+      return;
+    }
+
+    // Build header rows from actual parameters
+    const humanLabels = ['parameter_label'];
+    const machineCodes = ['ans_header'];
+
+    selectedAsg.questions.forEach(q => {
+      (q.parameters || []).forEach(p => {
+        humanLabels.push(p.label);
+        machineCodes.push(`ans_${p.code}`);
+      });
+    });
+
+    // Build example data rows for enrolled students
+    const students = app.data.students.slice(0, 3); // show up to 3 example rows
+    const exampleRows = students.length > 0
+      ? students.map(st => {
+          const values = [st.uin];
+          selectedAsg.questions.forEach(q => {
+            (q.parameters || []).forEach(() => values.push('0.000'));
+          });
+          return values.join(',');
+        })
+      : [`24051001,${selectedAsg.questions.flatMap(q => q.parameters || []).map(() => '0.000').join(',')}`];
+
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + humanLabels.join(',') + '\n'
+      + machineCodes.join(',') + '\n'
+      + exampleRows.join('\n');
+
     const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Solution_Key_2Row_${selectedAsg.code ? selectedAsg.code.replace(/[\/]/g, '_') : 'Template'}.csv`);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Solution_Key_${selectedAsg.code.replace(/[\/]/g, '_')}_Template.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
-    app.showToast(`Downloaded 2-Row Solution CSV Key Template for ${selectedAsg.code}`, "success");
+
+    const paramCount = selectedAsg.questions.flatMap(q => q.parameters || []).length;
+    app.showToast(`Downloaded solution template for ${selectedAsg.code} — ${paramCount} parameter column${paramCount !== 1 ? 's' : ''} from actual assignment`, 'success');
   },
 
   handleQuestionCSVUpload(e) {
@@ -1777,6 +2106,7 @@ const facultyView = {
 
       let updatedCount = 0;
       let matchedStudentCount = 0;
+      const matchedStudents = [];
 
       for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(',').map(p => p.trim());
@@ -1787,6 +2117,7 @@ const facultyView = {
         if (!student) continue;
 
         matchedStudentCount++;
+        matchedStudents.push(student);
 
         variableKeys.forEach((key, idx) => {
           const val = parts[idx + 1];
@@ -1814,6 +2145,9 @@ const facultyView = {
       }
 
       app.saveState();
+      matchedStudents.forEach(student => {
+        app.syncStudentVariablesToSupabase(student.id, this.activeCSVAssignmentId);
+      });
       app.showToast(`Loaded question variables for ${matchedStudentCount} students (${updatedCount} variable entries updated)`, 'success');
       this.renderCSVPipeline(document.getElementById('main-content'));
     };
@@ -1833,6 +2167,21 @@ const facultyView = {
         return;
       }
 
+      const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId);
+      if (!selectedAsg || !selectedAsg.questions || selectedAsg.questions.length === 0) {
+        app.showToast('Please select an assignment with questions before uploading the solution CSV', 'warning');
+        return;
+      }
+
+      const paramCodeToId = {};
+      selectedAsg.questions.forEach(q => {
+        (q.parameters || []).forEach(p => {
+          if (p.code) {
+            paramCodeToId[p.code] = p.id;
+          }
+        });
+      });
+
       const paramCodes = lines[1].split(',').map(c => c.trim().replace('ans_', ''));
       let updatedCount = 0;
 
@@ -1847,21 +2196,27 @@ const facultyView = {
           const val = parts[idx];
           if (!val) return;
 
-          let parameterId = 'param-q1-p1';
-          if (code === 'Q001_P01') parameterId = 'param-q1-p1';
-          else if (code === 'Q001_P02') parameterId = 'param-q1-p2';
-          else if (code === 'Q002_P01') parameterId = 'param-q2-p1';
+          const parameterId = paramCodeToId[code];
+          if (!parameterId) return;
+
+          const paramObj = selectedAsg.questions
+            .flatMap(q => q.parameters || [])
+            .find(p => p.id === parameterId);
+          const correctUnit = paramObj && paramObj.acceptedUnits && paramObj.acceptedUnits.length > 0
+            ? paramObj.acceptedUnits[0]
+            : '';
 
           let existingAns = app.data.studentAnswers.find(a => a.studentId === student.id && a.parameterId === parameterId);
           if (existingAns) {
             existingAns.correctValue = val;
+            existingAns.correctUnit = correctUnit;
           } else {
             app.data.studentAnswers.push({
               assignmentId: this.activeCSVAssignmentId,
               studentId: student.id,
               parameterId: parameterId,
               correctValue: val,
-              correctUnit: parameterId === 'param-q1-p2' ? 'mm' : parameterId === 'param-q2-p1' ? 'ratio' : 'rad/s'
+              correctUnit: correctUnit
             });
           }
           updatedCount++;
@@ -1869,6 +2224,14 @@ const facultyView = {
       }
 
       app.saveState();
+      const processedStudentIds = [...new Set(
+        app.data.studentAnswers
+          .filter(a => a.assignmentId === this.activeCSVAssignmentId)
+          .map(a => a.studentId)
+      )];
+      processedStudentIds.forEach(sid => {
+        app.syncStudentAnswersToSupabase(sid, this.activeCSVAssignmentId);
+      });
       app.showToast(`Parsed Solution CSV Key: Updated ${updatedCount} ground truth answers`, 'success');
       this.triggerRetroactiveGrading(this.activeCSVAssignmentId);
     };
@@ -1887,12 +2250,39 @@ const facultyView = {
           
           subm.isCorrectValue = diffPct <= 5.0;
           subm.isCorrectUnit = (subm.submittedUnit || '').toLowerCase() === (gt.correctUnit || '').toLowerCase();
-          subm.marksAwarded = subm.isCorrectValue ? 4 : (diffPct <= 10.0 ? 2 : 0);
+
+          // Base marks from correctness
+          const baseMarks = subm.isCorrectValue ? 4 : (diffPct <= 10.0 ? 2 : 0);
+
+          // Re-apply attempt deduction
+          const attemptDeductionPct = subm.attemptDeductionPct || subm.deductionPct || 0;
+          const afterAttemptDeduction = baseMarks * (1 - attemptDeductionPct / 100);
+
+          // Re-apply late penalty
+          const student = app.data.students.find(s => s.id === subm.studentId);
+          const studentBatch = student ? student.batch : 'A1';
+          const schedule = app.getAssignmentSchedule(subm.assignmentId, studentBatch);
+          let latePenaltyPct = 0;
+          if (schedule && schedule.deadline && subm.submittedAt) {
+            const deadlineMs = new Date(schedule.deadline).getTime();
+            const submittedMs = new Date(subm.submittedAt).getTime();
+            if (submittedMs > deadlineMs) {
+              const daysLate = Math.ceil((submittedMs - deadlineMs) / (1000 * 60 * 60 * 24));
+              latePenaltyPct = Math.min(daysLate * (schedule.latePenaltyValue || 10), schedule.lateMaxCap || 30);
+            }
+          }
+
+          subm.latePenaltyPct = latePenaltyPct;
+          subm.isLate = latePenaltyPct > 0;
+          subm.marksAwarded = Math.max(0, Math.round(afterAttemptDeduction * (1 - latePenaltyPct / 100)));
           reEvaluated++;
         }
       }
     });
     app.saveState();
+    app.data.submissions
+      .filter(s => s.assignmentId === asgId)
+      .forEach(s => app.syncSubmissionToSupabase(s));
     app.showToast(`Retroactive Auto-Grading Complete: ${reEvaluated} submissions re-evaluated against ground truth`, 'success');
   },
 
@@ -2076,6 +2466,7 @@ const facultyView = {
     };
     app.data.assignments.push(newAsg);
     app.saveState();
+    app.syncAssignmentToSupabase(newAsg);
     app.closeModal();
     app.showToast(`Created assignment ${newAsg.code}`, 'success');
     this.renderDashboard(document.getElementById('main-content'));
