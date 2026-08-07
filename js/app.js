@@ -214,7 +214,7 @@ class AppEngine {
       console.warn('Supabase cloud sync background notice:', e);
       this.showToast('Cloud sync failed — working in offline mode. Changes saved locally.', 'warning');
     }
-  },
+  }
 
   async syncAssignmentToSupabase(asg) {
     if (!supabaseClient || !asg) return;
@@ -242,7 +242,7 @@ class AppEngine {
     } catch(e) {
       console.warn('Supabase assignment sync error:', e);
     }
-  },
+  }
 
   async deleteAssignmentFromSupabase(asgId) {
     if (!supabaseClient || !asgId) return;
@@ -278,7 +278,7 @@ class AppEngine {
     } catch(e) {
       console.warn('Supabase delete assignment error:', e);
     }
-  },
+  }
 
   async syncSubmissionToSupabase(submission) {
     if (!supabaseClient || !submission) return;
@@ -304,7 +304,7 @@ class AppEngine {
     } catch(e) {
       console.warn('Supabase submission sync error:', e);
     }
-  },
+  }
 
   async syncStudentVariablesToSupabase(studentId, assignmentId) {
     if (!supabaseClient) return;
@@ -325,7 +325,7 @@ class AppEngine {
     } catch(e) {
       console.warn('Supabase student_variables sync error:', e);
     }
-  },
+  }
 
   async syncStudentAnswersToSupabase(studentId, assignmentId) {
     if (!supabaseClient) return;
@@ -348,7 +348,7 @@ class AppEngine {
     } catch(e) {
       console.warn('Supabase student_answers sync error:', e);
     }
-  },
+  }
 
   loadUserSession() {
     const saved = localStorage.getItem('rizvi_fe_portal_user');
