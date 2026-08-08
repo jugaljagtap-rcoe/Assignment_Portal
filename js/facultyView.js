@@ -33,6 +33,7 @@ const facultyView = {
   renderDashboard(container) {
     const uniqueEvaluatedStudents = new Set(app.data.submissions.map(s => s.studentId)).size;
     const totalStudents = app.data.students.length;
+    const scheduledBatchesCount = app.data.assignments.reduce((sum, a) => sum + (a.schedules ? a.schedules.length : 0), 0);
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -40,22 +41,6 @@ const facultyView = {
           <h1 class="page-title">Overview</h1>
           <p class="page-subtitle">Manage lab assignments, student variables, and solution CSV pipelines</p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
-      </div>
-
-      <div class="card" style="margin-bottom: 24px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <div>
-            <h3 class="card-title" style="font-size:15px; color:var(--accent-blue);">Inspect Student Question & Variable Set</h3>
-            <div style="font-size:12px; color:var(--text-secondary);">Type UIN or Name fragment to inspect personalized student sheets without leaving your session</div>
-          </div>
-          <span class="tag tag-co" style="font-size:11px;">Production Safe Inspection</span>
-        </div>
-        <div style="display:flex; gap:12px;">
-          <input type="text" id="faculty-student-search" class="form-input" placeholder="Search by UIN (e.g. 24051001) or Name..." style="flex:1; background:#FFF;" oninput="facultyView.searchStudentSheet()">
-          <button class="btn btn-primary btn-sm" onclick="facultyView.searchStudentSheet()">Inspect Sheet</button>
-        </div>
-        <div id="student-search-results" style="margin-top:12px;"></div>
       </div>
 
       <div class="kpi-grid">
@@ -66,8 +51,8 @@ const facultyView = {
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Scheduled Batches</span>
-          <span class="kpi-value">12</span>
-          <span class="kpi-trend neutral">Batches A1 to D3</span>
+          <span class="kpi-value">${scheduledBatchesCount}</span>
+          <span class="kpi-trend neutral">Batches Configured</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Submissions Evaluated</span>
@@ -75,9 +60,9 @@ const facultyView = {
           <span class="kpi-trend positive">Unique Students</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Class CO Attainment</span>
-          <span class="kpi-value">84%</span>
-          <span class="kpi-trend positive">≥ 70% Target Met</span>
+          <span class="kpi-label">Total Submissions</span>
+          <span class="kpi-value">${app.data.submissions.length}</span>
+          <span class="kpi-trend positive">Across All Assignments</span>
         </div>
       </div>
 
@@ -94,27 +79,20 @@ const facultyView = {
               <tr>
                 <th>Assignment Code</th>
                 <th>Title</th>
-                <th>Subject</th>
-                <th>Active Batches</th>
-                <th>Deadline Status</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               ${app.data.assignments.map(asg => {
-                const sub = app.data.subjects.find(s => s.id === asg.subjectId);
-                const activeSch = asg.schedules ? asg.schedules.length : 0;
+                const isOpen = asg.schedules && asg.schedules[0] && asg.schedules[0].submissionsOpen;
                 return `
                   <tr>
                     <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono); font-size:12px;">${asg.code || 'RCOE/2026-27/FE/FEL101_A001'}</td>
                     <td style="font-weight:600;">${asg.title}</td>
-                    <td><span class="tag tag-co">${sub ? sub.code : ''}</span></td>
-                    <td><span class="tag tag-bt">${activeSch} Scheduled</span></td>
-                    <td><span class="tag tag-success">Open for Submissions</span></td>
+                    <td><span class="tag ${isOpen ? 'tag-success' : 'tag-danger'}">${isOpen ? 'Open' : 'Closed'}</span></td>
                     <td>
-                      <button class="btn btn-secondary btn-sm" onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('assignments');">Edit Questions</button>
-                      <button class="btn btn-primary btn-sm" onclick="facultyView.activeCSVAssignmentId='${asg.id}'; app.switchNav('csv-pipeline');">Upload CSV Key</button>
-                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteAssignment('${asg.id}')">🗑️ Delete</button>
+                      <button class="btn btn-ghost btn-sm" onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('assignments');">View →</button>
                     </td>
                   </tr>
                 `;
@@ -145,7 +123,11 @@ const facultyView = {
     app.deleteAssignmentFromSupabase(asgId);
 
     app.showToast(`Deleted assignment ${asg.code} and all related data`, 'info');
-    this.renderDashboard(document.getElementById('main-content'));
+    if (app.activeNav === 'assignments') {
+      this.renderAssignmentBuilder(document.getElementById('main-content'));
+    } else {
+      this.renderDashboard(document.getElementById('main-content'));
+    }
   },
 
   searchStudentSheet() {
@@ -304,7 +286,7 @@ const facultyView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Course & Lab Outcomes (CO / LO) & Curricular Mapping</h1>
+          <h1 class="page-title">My Course</h1>
           <p class="page-subtitle">Manage Syllabus Modules, COs/LOs, and comprehensive Net Mapping Matrix across POs, PSOs, Modules & Labs</p>
         </div>
         <div style="display:flex; gap:10px;">
@@ -331,7 +313,11 @@ const facultyView = {
 
   toggleSubjectGroup(groupKey) {
     this.collapsedSubjectIds[groupKey] = !this.collapsedSubjectIds[groupKey];
-    this.renderCOAndModulesManager(document.getElementById('main-content'));
+    if (app.activeNav === 'assignments') {
+      this.renderAssignmentBuilder(document.getElementById('main-content'));
+    } else {
+      this.renderCOAndModulesManager(document.getElementById('main-content'));
+    }
   },
 
   renderOutcomesListHTML() {
@@ -982,99 +968,206 @@ const facultyView = {
   },
 
   renderAssignmentBuilder(container) {
-    const asg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0];
-    if (!asg) {
-      container.innerHTML = `
-        <div class="page-header-container">
-          <div>
-            <h1 class="page-title">Assignment Question Builder</h1>
-            <p class="page-subtitle">No active lab assignments found</p>
-          </div>
-          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
-        </div>
-        <div class="card" style="text-align:center; padding:48px 24px;">
-          <div style="font-size:48px; margin-bottom:12px;">📑</div>
-          <h3 style="font-size:18px; font-weight:700; margin-bottom:8px;">No Assignments Created Yet</h3>
-          <p style="color:var(--text-secondary); max-width:480px; margin:0 auto 20px auto; font-size:13px;">
-            Create your first lab sheet assignment to start adding questions, dynamic parameter placeholders, and evaluation rules.
-          </p>
-          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
-        </div>
-      `;
-      return;
-    }
+    const assignments = app.data.assignments || [];
+    const subjects = app.data.subjects || [];
 
-    container.innerHTML = `
+    // Ensure active assignment ID is valid if assignments exist
+    if (assignments.length > 0 && !assignments.some(a => a.id === app.activeAssignmentId)) {
+      app.activeAssignmentId = assignments[0].id;
+    }
+    const selectedAsg = assignments.find(a => a.id === app.activeAssignmentId) || assignments[0] || null;
+
+    // Group assignments by subjectId
+    const subjectGroupMap = new Map();
+    assignments.forEach(asg => {
+      const subId = asg.subjectId || 'unassigned';
+      if (!subjectGroupMap.has(subId)) subjectGroupMap.set(subId, []);
+      subjectGroupMap.get(subId).push(asg);
+    });
+
+    // Section 1: Page Header
+    let html = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Assignment Question Builder</h1>
-          <p class="page-subtitle">${asg.code || 'RCOE/2026-27/FE/FEL101_A001'} — ${asg.title}</p>
+          <h1 class="page-title">Assignments</h1>
+          <p class="page-subtitle">Manage lab assignments, questions, and student sheet inspection</p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openAddQuestionModal('${asg.id}')">+ Add Question</button>
+        <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">
+          + Create New Assignment
+        </button>
       </div>
-
-      ${app.data.assignments.length > 1 ? `
-        <div class="card" style="margin-bottom:16px; padding:14px 20px;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <label style="font-size:13px; font-weight:600; white-space:nowrap;">Editing Assignment:</label>
-            <select class="form-select" style="flex:1; background:#FFF;"
-              onchange="app.activeAssignmentId=this.value; facultyView.renderAssignmentBuilder(document.getElementById('main-content'));">
-              ${app.data.assignments.map(a => `
-                <option value="${a.id}" ${a.id === asg.id ? 'selected' : ''}>
-                  ${a.code} — ${a.title} (${a.questions.length} question${a.questions.length !== 1 ? 's' : ''})
-                </option>
-              `).join('')}
-            </select>
-          </div>
-        </div>
-      ` : ''}
-
-      <div class="card" style="margin-bottom: 20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
-        <div style="display:flex; gap:12px; align-items:center;">
-          <span style="font-size:20px;">💡</span>
-          <div style="font-size:13px; color:var(--accent-blue);">
-            <strong>Dynamic Student Variables Syntax:</strong> Write placeholders like <code class="code-font">{{var_m_kg}}</code> in question text. You can add multiple evaluation parameters per question and paste Google Drive diagram URLs!
-          </div>
-        </div>
-      </div>
-
-      ${asg.questions.map((q, idx) => `
-        <div class="question-block">
-          <div class="question-header">
-            <div style="display:flex; gap:12px; align-items:center;">
-              <span class="question-number">${q.sectionLabel}</span>
-              <span class="tag tag-co">${q.coId}</span>
-              <span class="tag tag-bt">${q.btLevel}</span>
-            </div>
-            <button class="btn btn-destructive btn-sm" 
-              onclick="facultyView.deleteQuestion('${asg.id}', '${q.id}')">
-              🗑️ Delete Question
-            </button>
-          </div>
-          <div class="question-text">${q.text.replace(/\{\{(.*?)\}\}/g, '<span class="var-chip">{{$1}}</span>')}</div>
-
-          ${q.imageUrl ? `<img src="${q.imageUrl}" class="question-diagram" alt="Experiment Diagram">` : ''}
-
-          <div style="margin-top:16px;">
-            <div style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Evaluation Parameters (${q.parameters.length}):</div>
-            ${q.parameters.map(p => `
-              <div class="parameter-input-row">
-                <span class="param-label">${p.label} <code class="code-font" style="font-size:11px; color:var(--accent-blue);">(${p.code})</code></span>
-                <span style="font-size:12px; color:var(--text-secondary);">Marks: ${p.valueMarks}v + ${p.unitMarks}u</span>
-                <span style="font-size:12px; color:var(--text-secondary);">Tol: ±${p.tolerancePct}%</span>
-                <span style="font-size:12px; color:var(--text-secondary);">Accepted: [${p.acceptedUnits.join(', ')}]</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `).join('')}
-
-      <div class="page-separator" style="margin: 32px 0 20px 0; border-top: 1px dashed var(--border-default); text-align: center; position: relative;">
-        <span class="page-separator__text" style="background: var(--bg-primary); padding: 0 12px; font-weight: 700; color: var(--text-secondary); font-size: 13px;">📐 Rubric Presets</span>
-      </div>
-
-      ${this.getRubricBuilderHTML()}
     `;
+
+    // Section 2: Assignment List (collapsible, subject-wise grouping)
+    if (assignments.length === 0) {
+      html += `
+        <div class="card" style="text-align:center; padding:48px 24px;">
+          <div style="font-size:48px; margin-bottom:12px;">📑</div>
+          <h3 style="font-size:18px; font-weight:700; margin-bottom:8px;">No Assignments Yet</h3>
+          <p style="color:var(--text-secondary); max-width:480px; margin:0 auto 20px auto; font-size:13px;">
+            Create your first assignment to start adding questions and scheduling batches.
+          </p>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Assignment</button>
+        </div>
+      `;
+    } else {
+      subjectGroupMap.forEach((subAsgs, subId) => {
+        const sub = subjects.find(s => s.id === subId) || { id: subId, code: 'FE-LAB', fullName: 'General Engineering Laboratory' };
+        const groupKey = 'asg-' + subId;
+        const isCollapsed = !!this.collapsedSubjectIds[groupKey];
+
+        html += `
+          <div class="subject-group-card" style="margin-bottom:16px;">
+            <div class="subject-group-header" onclick="facultyView.toggleSubjectGroup('${groupKey}')">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span class="subject-group-toggle-icon">${isCollapsed ? '►' : '▼'}</span>
+                <span class="subject-code-badge">${sub.code || 'FE'}</span>
+                <h4 class="subject-title-text">${sub.fullName || sub.name || sub.code}</h4>
+              </div>
+              <div>
+                <span class="tag tag-bt" style="font-weight:600;">${subAsgs.length} Assignment${subAsgs.length > 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            ${!isCollapsed ? `
+              <div class="table-container">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Assignment Code</th>
+                      <th>Title</th>
+                      <th>Semester</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${subAsgs.map(asg => {
+                      const isOpen = asg.schedules && asg.schedules[0] && asg.schedules[0].submissionsOpen;
+                      const isSelected = selectedAsg && asg.id === selectedAsg.id;
+                      return `
+                        <tr style="${isSelected ? 'background:var(--accent-blue-subtle);' : ''}">
+                          <td style="font-family:var(--font-mono); font-weight:600; color:var(--accent-blue); font-size:12px;">${asg.code}</td>
+                          <td style="font-weight:600;">${asg.title}</td>
+                          <td><span class="tag tag-co">${asg.semester || 'Sem 1'}</span></td>
+                          <td><span class="tag ${isOpen ? 'tag-success' : 'tag-danger'}">${isOpen ? 'Open' : 'Closed'}</span></td>
+                          <td style="display:flex; gap:6px;">
+                            <button class="btn btn-secondary btn-sm" onclick="app.activeAssignmentId='${asg.id}'; facultyView.renderAssignmentBuilder(document.getElementById('main-content'));">✏️ Edit Questions</button>
+                            <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteAssignment('${asg.id}')">🗑️ Delete</button>
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+    }
+
+    // Section 3: Student Sheet Inspection
+    html += `
+      <div class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
+        <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">🔍 Student Sheet Inspection</span>
+      </div>
+
+      <div class="card" style="background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div>
+            <h3 class="card-title" style="font-size:15px; color:var(--accent-blue);">Inspect Student Question & Variable Set</h3>
+            <div style="font-size:12px; color:var(--text-secondary);">Type UIN or Name to inspect a student's personalized sheet for the selected assignment</div>
+          </div>
+          <span class="tag tag-co" style="font-size:11px;">Read-Only · Session Safe</span>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <input type="text" id="faculty-student-search" class="form-input" placeholder="Search by UIN or Name..." style="flex:1; background:#FFF;" oninput="facultyView.searchStudentSheet()">
+          <button class="btn btn-primary btn-sm" onclick="facultyView.searchStudentSheet()">Inspect Sheet</button>
+        </div>
+        <div id="student-search-results" style="margin-top:12px;"></div>
+      </div>
+    `;
+
+    // Section 4: Question Builder
+    html += `
+      <div class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
+        <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">📝 Question Builder</span>
+      </div>
+    `;
+
+    if (selectedAsg) {
+      html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <div style="font-size:15px; font-weight:700; color:var(--text-primary);">${selectedAsg.code}</div>
+            <div style="font-size:13px; color:var(--text-secondary);">${selectedAsg.title}</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="facultyView.openAddQuestionModal('${selectedAsg.id}')">
+            + Add Question
+          </button>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
+          <div style="display:flex; gap:12px; align-items:center;">
+            <span style="font-size:20px;">💡</span>
+            <div style="font-size:13px; color:var(--accent-blue);">
+              <strong>Dynamic Student Variables Syntax:</strong> Write placeholders like <code class="code-font">{{var_m_kg}}</code> in question text. You can add multiple evaluation parameters per question and paste Google Drive diagram URLs!
+            </div>
+          </div>
+        </div>
+
+        ${selectedAsg.questions.length === 0 ? `
+          <div class="card" style="text-align:center; padding:24px; color:var(--text-muted);">
+            No questions added to this assignment yet. Click "+ Add Question" above to start building.
+          </div>
+        ` : selectedAsg.questions.map((q, idx) => `
+          <div class="question-block">
+            <div class="question-header">
+              <div style="display:flex; gap:12px; align-items:center;">
+                <span class="question-number">${q.sectionLabel}</span>
+                <span class="tag tag-co">${q.coId}</span>
+                <span class="tag tag-bt">${q.btLevel}</span>
+              </div>
+              <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteQuestion('${selectedAsg.id}', '${q.id}')">
+                🗑️ Delete Question
+              </button>
+            </div>
+            <div class="question-text">${q.text.replace(/\{\{(.*?)\}\}/g, '<span class="var-chip">{{$1}}</span>')}</div>
+
+            ${q.imageUrl ? `<img src="${q.imageUrl}" class="question-diagram" alt="Experiment Diagram">` : ''}
+
+            <div style="margin-top:16px;">
+              <div style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Evaluation Parameters (${q.parameters.length}):</div>
+              ${q.parameters.map(p => `
+                <div class="parameter-input-row">
+                  <span class="param-label">${p.label} <code class="code-font" style="font-size:11px; color:var(--accent-blue);">(${p.code})</code></span>
+                  <span style="font-size:12px; color:var(--text-secondary);">Marks: ${p.valueMarks}v + ${p.unitMarks}u</span>
+                  <span style="font-size:12px; color:var(--text-secondary);">Tol: ±${p.tolerancePct}%</span>
+                  <span style="font-size:12px; color:var(--text-secondary);">Accepted: [${p.acceptedUnits.join(', ')}]</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    // Section 5: Rubric Presets
+    html += `
+      <div class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
+        <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">📐 Rubric Presets</span>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+        <button class="btn btn-primary btn-sm" onclick="facultyView.openAddRubricModal()">
+          + Create Rubric Preset
+        </button>
+      </div>
+
+      ${this.getRubricCardsHTML()}
+    `;
+
+    container.innerHTML = html;
   },
 
   openAddQuestionModal(asgId) {
@@ -1589,7 +1682,7 @@ const facultyView = {
       container.innerHTML = `
         <div class="page-header-container">
           <div>
-            <h1 class="page-title">Multi-Batch Schedule & Deduction Manager</h1>
+            <h1 class="page-title">Schedule & Access</h1>
             <p class="page-subtitle">No active lab assignments found</p>
           </div>
           <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
@@ -1612,7 +1705,7 @@ const facultyView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Multi-Batch Schedule & Deduction Manager</h1>
+          <h1 class="page-title">Schedule & Access</h1>
           <p class="page-subtitle">Configure Publish Dates, Deadlines, Attempt Deductions, & Late Penalties</p>
         </div>
         <button class="btn btn-primary" onclick="facultyView.openAddScheduleModal('${asg.id}')">
@@ -1906,11 +1999,12 @@ const facultyView = {
 
   renderCSVPipeline(container) {
     const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId) || app.data.assignments[0];
+
     if (!selectedAsg) {
       container.innerHTML = `
         <div class="page-header-container">
           <div>
-            <h1 class="page-title">Double CSV Upload & Solution Pipeline</h1>
+            <h1 class="page-title">Grade & Evaluate</h1>
             <p class="page-subtitle">No active lab assignments found</p>
           </div>
           <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Lab Sheet</button>
@@ -1930,7 +2024,7 @@ const facultyView = {
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Double CSV Upload & Solution Pipeline</h1>
+          <h1 class="page-title">Grade & Evaluate</h1>
           <p class="page-subtitle">Upload question variables & 2-row solution keys with retroactive grading</p>
         </div>
         <button class="btn btn-primary" onclick="facultyView.triggerRetroactiveGrading('${selectedAsg.id}')">⚡ Trigger Retroactive Re-Grading</button>
