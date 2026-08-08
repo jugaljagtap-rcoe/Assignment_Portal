@@ -1097,10 +1097,17 @@ const facultyView = {
 
     if (selectedAsg) {
       html += `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <div>
-            <div style="font-size:15px; font-weight:700; color:var(--text-primary);">${selectedAsg.code}</div>
-            <div style="font-size:13px; color:var(--text-secondary);">${selectedAsg.title}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; background:var(--bg-secondary); padding:10px 16px; border-radius:8px; border:1px solid var(--border-default);">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:280px;">
+            <span style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Editing Assignment:</span>
+            <select class="form-select" style="flex:1; max-width:480px; font-size:13px; font-weight:600; color:var(--accent-blue); background:var(--bg-primary); border:1px solid var(--border-default); border-radius:6px; padding:6px 12px; cursor:pointer;"
+              onchange="app.activeAssignmentId=this.value; localStorage.setItem('rizvi_fe_active_asg_id', this.value); facultyView.renderAssignmentBuilder(document.getElementById('main-content'));">
+              ${assignments.map(a => `
+                <option value="${a.id}" ${a.id === selectedAsg.id ? 'selected' : ''}>
+                  ${a.code} — ${a.title}
+                </option>
+              `).join('')}
+            </select>
           </div>
           <button class="btn btn-primary btn-sm" onclick="facultyView.openAddQuestionModal('${selectedAsg.id}')">
             + Add Question
