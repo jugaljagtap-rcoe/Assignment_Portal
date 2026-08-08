@@ -770,7 +770,7 @@ class AppEngine {
     if (!this.currentUser) {
       switcher.innerHTML = `
         <button class="btn btn-primary btn-sm" onclick="app.showLoginModal(false)" style="font-size:12px; font-weight:600;">
-          🔑 Google Sign-In (@eng.rizvi.edu.in)
+          Sign In with Google
         </button>
       `;
     } else if (this.currentUser.email === 'jugaljagtap@eng.rizvi.edu.in' || HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email)) {
@@ -779,9 +779,9 @@ class AppEngine {
         <div style="display:flex; align-items:center; gap:12px;">
           <div style="display:flex; align-items:center; gap:6px; background:var(--accent-blue-subtle); padding:4px 10px; border-radius:var(--radius-md); border:1px solid rgba(0,102,204,0.2);">
             <span style="font-size:11px; font-weight:700; color:var(--accent-blue);">PROFILER TOGGLE:</span>
-            <button class="btn ${this.currentRole === 'admin' ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('admin')" style="padding:2px 8px; font-size:11px;">⚡ Admin View</button>
-            <button class="btn ${this.currentRole === 'faculty' ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('faculty')" style="padding:2px 8px; font-size:11px;">👨‍🏫 Faculty View</button>
-            <button class="btn ${this.currentRole === 'student' ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('student')" style="padding:2px 8px; font-size:11px;">🎓 Student Preview</button>
+            <button class="btn ${this.currentRole === 'admin' ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('admin')" style="padding:2px 8px; font-size:11px;">Admin View</button>
+            <button class="btn ${this.currentRole === 'faculty' ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('faculty')" style="padding:2px 8px; font-size:11px;">Faculty View</button>
+            <button class="btn ${this.currentRole === 'student' ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('student')" style="padding:2px 8px; font-size:11px;">Student Preview</button>
           </div>
         </div>
       `;
@@ -804,7 +804,7 @@ class AppEngine {
             <span class="avatar-dot"></span>
             <span style="font-size:13px; font-weight:600; color:var(--text-primary);">${student ? student.name : 'Student'} (${student ? student.uin || '' : ''})</span>
             <button class="btn btn-ghost btn-sm" onclick="app.logout()" style="color:var(--danger); font-weight:600; padding:3px 8px; font-size:11px; margin-left:6px; border:1px solid rgba(255,59,48,0.2); background:var(--danger-subtle);">
-              🚪 Log Out
+              Log Out
             </button>
           </div>
         `;
@@ -814,7 +814,7 @@ class AppEngine {
             <span class="avatar-dot"></span>
             <span style="font-size:13px; font-weight:600; color:var(--text-primary);">${this.currentUser.name} (${this.currentUser.role.toUpperCase()})</span>
             <button class="btn btn-ghost btn-sm" onclick="app.logout()" style="color:var(--danger); font-weight:600; padding:3px 8px; font-size:11px; margin-left:6px; border:1px solid rgba(255,59,48,0.2); background:var(--danger-subtle);">
-              🚪 Log Out
+              Log Out
             </button>
           </div>
         `;
@@ -832,40 +832,67 @@ class AppEngine {
     const sidebar = document.getElementById('sidebar-nav');
     if (!sidebar) return;
 
+    const iconMap = {
+      'dashboard': 'layout-dashboard',
+      'students': 'users',
+      'faculty': 'graduation-cap',
+      'departments': 'building-2',
+      'google-auth': 'shield-check',
+      'pos': 'target',
+      'analytics': 'bar-chart-2',
+      'course': 'book-open',
+      'assignments': 'file-text',
+      'schedules': 'calendar',
+      'csv-pipeline': 'zap',
+      'reports': 'bar-chart-2',
+      'solver': 'pencil',
+      'grades': 'trophy',
+    };
+
     let items = [];
     if (this.currentRole === 'admin') {
       items = [
-        { id: 'dashboard', label: 'Overview', icon: '⚡' },
-        { id: 'students', label: 'Students', icon: '🎓' },
-        { id: 'faculty', label: 'Faculty', icon: '👨‍🏫' },
-        { id: 'departments', label: 'Institution', icon: '🏛️' },
-        { id: 'google-auth', label: 'Access Control', icon: '🔑' },
-        { id: 'pos', label: 'Program Outcomes', icon: '🎯' },
-        { id: 'analytics', label: 'Reports', icon: '📊' }
+        { id: 'dashboard', label: 'Overview' },
+        { id: 'students', label: 'Students' },
+        { id: 'faculty', label: 'Faculty' },
+        { id: 'departments', label: 'Institution' },
+        { id: 'google-auth', label: 'Access Control' },
+        { id: 'pos', label: 'Program Outcomes' },
+        { id: 'analytics', label: 'Reports' }
       ];
     } else if (this.currentRole === 'faculty') {
       items = [
-        { id: 'dashboard', label: 'Overview', icon: '📋' },
-        { id: 'course', label: 'My Course', icon: '📚' },
-        { id: 'assignments', label: 'Assignments', icon: '📝' },
-        { id: 'schedules', label: 'Schedule & Access', icon: '📅' },
-        { id: 'csv-pipeline', label: 'Grade & Evaluate', icon: '⚡' },
-        { id: 'reports', label: 'Reports', icon: '📊' }
+        { id: 'dashboard', label: 'Overview' },
+        { id: 'course', label: 'My Course' },
+        { id: 'assignments', label: 'Assignments' },
+        { id: 'schedules', label: 'Schedule & Access' },
+        { id: 'csv-pipeline', label: 'Grade & Evaluate' },
+        { id: 'reports', label: 'Reports' }
       ];
     } else {
       items = [
-        { id: 'dashboard', label: 'Home', icon: '🏠' },
-        { id: 'solver', label: 'Solve Assignment', icon: '✏️' },
-        { id: 'grades', label: 'My Results', icon: '🏆' }
+        { id: 'dashboard', label: 'Home' },
+        { id: 'solver', label: 'Solve Assignment' },
+        { id: 'grades', label: 'My Results' }
       ];
     }
 
-    sidebar.innerHTML = items.map(item => `
-      <div class="nav-item ${this.activeNav === item.id ? 'active' : ''}" onclick="app.switchNav('${item.id}')">
-        <span>${item.icon}</span>
-        <span>${item.label}</span>
-      </div>
-    `).join('');
+    sidebar.innerHTML = items.map(item => {
+      const icon = iconMap[item.id] || 'circle';
+      const isActive = this.activeNav === item.id;
+      return `
+        <div class="nav-item ${isActive ? 'active' : ''}"
+          onclick="app.switchNav('${item.id}')"
+          role="button"
+          tabindex="0"
+          aria-label="${item.label}">
+          <i data-lucide="${icon}"></i>
+          <span>${item.label}</span>
+        </div>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
   }
 
   renderCurrentView() {
