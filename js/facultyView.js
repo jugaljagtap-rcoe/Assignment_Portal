@@ -1346,8 +1346,67 @@ const facultyView = {
     container.innerHTML = this.getRubricBuilderHTML();
   },
 
-  getRubricBuilderHTML() {
+  getRubricCardsHTML() {
     const rubrics = app.data.rubricPresets || [];
+    if (rubrics.length === 0) {
+      return `<div class="card"><p>No rubric presets found. Click "+ Create Rubric Preset" to create one.</p></div>`;
+    }
+
+    return rubrics.map(rub => `
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 class="card-title">${rub.name}</h3>
+            <span style="font-size:12px; color:var(--text-secondary);">Criteria Count: <strong>${(rub.criteria || []).length} Criteria</strong> | Total Rubric Marks: <strong>${rub.totalMarks || 10} Marks</strong></span>
+          </div>
+          <div>
+            <span class="tag tag-co" style="margin-right:8px;">${rub.isShared ? 'Shared College Preset' : 'Private'}</span>
+            <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditRubricModal('${rub.id}')">✏️ Edit Criteria & Levels</button>
+            <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteRubric('${rub.id}')">🗑️ Delete</button>
+          </div>
+        </div>
+
+        <div class="rubric-card">
+          <table class="custom-table" style="font-size:13px;">
+            <thead>
+              <tr>
+                <th>Criteria Title</th>
+                <th>Auto-Grader Mode</th>
+                <th>Level 03 (≥ 90%)</th>
+                <th>Level 02 (≥ 50%)</th>
+                <th>Level 01 (< 50%)</th>
+                <th>Level 00 (0%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(rub.criteria || []).map(c => {
+                const l0 = this.getRubricLevelData(c, 0);
+                const l1 = this.getRubricLevelData(c, 1);
+                const l2 = this.getRubricLevelData(c, 2);
+                const l3 = this.getRubricLevelData(c, 3);
+                return `
+                  <tr>
+                    <td style="font-weight:600; color:var(--accent-blue);">${c.title}</td>
+                    <td>
+                      <span class="tag ${c.type === 'auto_numerical' ? 'tag-success' : c.type === 'auto_units' ? 'tag-co' : 'tag-bt'}">
+                        ${c.type === 'auto_numerical' ? '🤖 Auto (Tolerance ±5%)' : c.type === 'auto_units' ? '🤖 Auto (Units)' : '✋ Manual Grading'}
+                      </span>
+                    </td>
+                    <td><strong style="color:var(--success);">${l0.marks}m</strong> (${l0.description})</td>
+                    <td><strong style="color:var(--accent-blue);">${l1.marks}m</strong> (${l1.description})</td>
+                    <td><strong style="color:var(--warning);">${l2.marks}m</strong> (${l2.description})</td>
+                    <td><strong style="color:var(--danger);">${l3.marks}m</strong> (${l3.description})</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  getRubricBuilderHTML() {
     return `
       <div class="page-header-container">
         <div>
@@ -1357,60 +1416,7 @@ const facultyView = {
         <button class="btn btn-primary btn-sm" onclick="facultyView.openAddRubricModal()">+ Create Rubric Preset</button>
       </div>
 
-      ${rubrics.length === 0 ? `<div class="card"><p>No rubric presets found. Click "+ Create Rubric Preset" to create one.</p></div>` :
-        rubrics.map(rub => `
-          <div class="card" style="margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <div>
-                <h3 class="card-title">${rub.name}</h3>
-                <span style="font-size:12px; color:var(--text-secondary);">Criteria Count: <strong>${(rub.criteria || []).length} Criteria</strong> | Total Rubric Marks: <strong>${rub.totalMarks || 10} Marks</strong></span>
-              </div>
-              <div>
-                <span class="tag tag-co" style="margin-right:8px;">${rub.isShared ? 'Shared College Preset' : 'Private'}</span>
-                <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditRubricModal('${rub.id}')">✏️ Edit Criteria & Levels</button>
-                <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteRubric('${rub.id}')">🗑️ Delete</button>
-              </div>
-            </div>
-
-            <div class="rubric-card">
-              <table class="custom-table" style="font-size:13px;">
-                <thead>
-                  <tr>
-                    <th>Criteria Title</th>
-                    <th>Auto-Grader Mode</th>
-                    <th>Level 03 (≥ 90%)</th>
-                    <th>Level 02 (≥ 50%)</th>
-                    <th>Level 01 (< 50%)</th>
-                    <th>Level 00 (0%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${(rub.criteria || []).map(c => {
-                    const l0 = this.getRubricLevelData(c, 0);
-                    const l1 = this.getRubricLevelData(c, 1);
-                    const l2 = this.getRubricLevelData(c, 2);
-                    const l3 = this.getRubricLevelData(c, 3);
-                    return `
-                      <tr>
-                        <td style="font-weight:600; color:var(--accent-blue);">${c.title}</td>
-                        <td>
-                          <span class="tag ${c.type === 'auto_numerical' ? 'tag-success' : c.type === 'auto_units' ? 'tag-co' : 'tag-bt'}">
-                            ${c.type === 'auto_numerical' ? '🤖 Auto (Tolerance ±5%)' : c.type === 'auto_units' ? '🤖 Auto (Units)' : '✋ Manual Grading'}
-                          </span>
-                        </td>
-                        <td><strong style="color:var(--success);">${l0.marks}m</strong> (${l0.description})</td>
-                        <td><strong style="color:var(--accent-blue);">${l1.marks}m</strong> (${l1.description})</td>
-                        <td><strong style="color:var(--warning);">${l2.marks}m</strong> (${l2.description})</td>
-                        <td><strong style="color:var(--danger);">${l3.marks}m</strong> (${l3.description})</td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        `).join('')
-      }
+      ${this.getRubricCardsHTML()}
     `;
   },
 
