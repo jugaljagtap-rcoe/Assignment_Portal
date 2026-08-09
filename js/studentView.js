@@ -519,14 +519,14 @@ const studentView = {
         <div class="questions-section-printable" style="border-top:2px solid #000; padding-top:14px;">
           <h3 style="font-size:14px; margin-bottom:12px; text-transform:uppercase;">Experiment Questions & Evaluation Parameters</h3>
           
-          ${asg.questions.map(q => {
-            const substitutedText = app.formatQuestionText(q.text, studentVars);
+          ${(asg.questions || []).map(q => {
+            const substitutedText = app.formatQuestionText(q.text || '', studentVars);
 
             return `
               <div style="margin-bottom:20px; border-bottom:1px dashed #CCC; padding-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; font-weight:700; font-size:13px; margin-bottom:6px;">
-                  <span>${q.sectionLabel} (${q.coId})</span>
-                  <span>[Bloom's Level: ${q.btLevel}]</span>
+                  <span>${q.sectionLabel || 'Question'} (${q.coId || 'CO1'})</span>
+                  <span>[Bloom's Level: ${q.btLevel || 'BT3'}]</span>
                 </div>
 
                 <div style="font-size:13px; line-height:1.6; margin-bottom:10px;">${substitutedText}</div>
@@ -535,15 +535,14 @@ const studentView = {
                   <div class="question-diagram-container" style="margin:10px 0;">
                     <img src="${app.getEmbeddableImageUrl(q.imageUrl)}" 
                          style="max-height:220px; width:auto; border:1px solid #CCC; border-radius:6px; display:block; max-width:100%; margin:8px 0;" 
-                         alt="Diagram"
-                         onerror="app.handleImageError(this, ${JSON.stringify(q.imageUrl || '')})">
+                         alt="Diagram">
                   </div>
                 ` : ''}
 
                 <!-- Answer Form Inputs (Portal Online Entry Only - Hidden on Printed Canvas) -->
                 <div class="print-hide" style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">
                   <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Enter Your Measured Answers:</div>
-                  ${q.parameters.map(p => this.buildParameterSubmissionRow(asg.id, student.id, p)).join('')}
+                  ${(q.parameters || []).map(p => this.buildParameterSubmissionRow(asg.id, student.id, p)).join('')}
                 </div>
               </div>
             `;
