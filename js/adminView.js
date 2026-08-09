@@ -541,14 +541,26 @@ const adminView = {
     const st = app.data.students.find(s => s.id === id);
     const nameStr = st ? `${st.name} (${st.uin})` : 'Student';
     if (confirm(`Are you sure you want to delete ${nameStr}?`)) {
-      app.data.students = app.data.students.filter(s => s.id !== id);
+      const uinToDelete = st ? st.uin : null;
+      const emailToDelete = st ? st.email : null;
+
+      app.data.students = app.data.students.filter(s =>
+        s.id !== id &&
+        (!uinToDelete || (s.uin || '').toLowerCase() !== uinToDelete.toLowerCase()) &&
+        (!emailToDelete || (s.email || '').toLowerCase() !== emailToDelete.toLowerCase())
+      );
       app.saveState();
 
       if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         supabaseClient.from('students').delete().eq('id', id).then(({ error }) => {
           if (error) console.warn('Supabase delete student notice:', error);
-          else console.log('Deleted student from Supabase Cloud:', id);
         });
+        if (uinToDelete) {
+          supabaseClient.from('students').delete().eq('uin', uinToDelete).then(() => {});
+        }
+        if (emailToDelete) {
+          supabaseClient.from('students').delete().eq('email', emailToDelete).then(() => {});
+        }
       }
 
       app.showToast(`Deleted ${nameStr}`, 'info');

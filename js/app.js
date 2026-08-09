@@ -64,14 +64,20 @@ class AppEngine {
       const { data: stData, error: stErr } = await supabaseClient.from('students').select('*');
       if (!stErr && stData && Array.isArray(stData) && stData.length > 0) {
         stData.forEach(st => {
-          const existingIdx = this.data.students.findIndex(x => x.id === st.id);
+          const stUin = (st.uin || '').trim().toLowerCase();
+          const stEmail = (st.email || '').trim().toLowerCase();
+          const existingIdx = this.data.students.findIndex(x =>
+            x.id === st.id ||
+            (stUin && x.uin && x.uin.trim().toLowerCase() === stUin) ||
+            (stEmail && x.email && x.email.trim().toLowerCase() === stEmail)
+          );
           const formatted = {
             id: st.id,
             uin: st.uin,
             name: st.name,
             email: st.email,
-            academicYear: st.academic_year,
-            yearOfStudy: st.year_of_study || (existingIdx >= 0 ? this.data.students[existingIdx].yearOfStudy : 'FE'),
+            academicYear: st.academic_year || '2026-27',
+            yearOfStudy: st.year_of_study || (existingIdx >= 0 ? this.data.students[existingIdx].yearOfStudy : 'TE'),
             branch: st.branch,
             division: st.division,
             batch: st.batch
@@ -82,6 +88,14 @@ class AppEngine {
             this.data.students.push(formatted);
           }
         });
+
+        // Deduplicate local student roster by UIN/Email to prevent orphan records
+        const uniqueStudentsMap = new Map();
+        this.data.students.forEach(s => {
+          const key = (s.uin || s.email || s.id).trim().toLowerCase();
+          uniqueStudentsMap.set(key, s);
+        });
+        this.data.students = Array.from(uniqueStudentsMap.values());
       }
 
       // Fetch faculty from Supabase
