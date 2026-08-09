@@ -229,6 +229,17 @@ const INITIAL_DATA = {
 
   students: [
     {
+      id: "st-hod-humanities",
+      uin: "F201506",
+      name: "HoD Humanities",
+      email: "hod.humanities@eng.rizvi.edu.in",
+      academicYear: "2026-27",
+      yearOfStudy: "TE",
+      branch: "Mechanical Engineering",
+      division: "A",
+      batch: "A1"
+    },
+    {
       id: "st-test-student",
       uin: "test_student",
       name: "Test Student",
