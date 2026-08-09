@@ -316,7 +316,7 @@ const studentView = {
     const currentDateFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
     container.innerHTML = `
-      <div class="page-header-container">
+      <div class="page-header-container print-hide">
         <div>
           <h1 class="page-title">Solve Assignment</h1>
           <p class="page-subtitle">${asg.code} — ${asg.title}</p>
@@ -325,7 +325,7 @@ const studentView = {
       </div>
 
       <!-- Dynamic Batch Deadline & Policy Banner -->
-      <div class="card" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
+      <div class="card print-hide" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
             <strong style="color:var(--accent-blue);">📅 Batch ${student.batch} Deadline:</strong> ${new Date(schedule.deadline).toLocaleString()}
@@ -343,7 +343,7 @@ const studentView = {
       </div>
 
       ${!hasVariables && variablePlaceholders.size > 0 ? `
-        <div class="card" style="margin-bottom:20px; background:var(--danger-subtle); border-color:var(--danger);">
+        <div class="card print-hide" style="margin-bottom:20px; background:var(--danger-subtle); border-color:var(--danger);">
           <div style="display:flex; align-items:center; gap:12px;">
             <span style="font-size:24px;">⚠️</span>
             <div>
@@ -358,7 +358,7 @@ const studentView = {
           </div>
         </div>
       ` : !allVariablesLoaded ? `
-        <div class="card" style="margin-bottom:20px; background:var(--warning-subtle); border-color:var(--warning);">
+        <div class="card print-hide" style="margin-bottom:20px; background:var(--warning-subtle); border-color:var(--warning);">
           <div style="display:flex; align-items:center; gap:12px;">
             <span style="font-size:24px;">ℹ️</span>
             <div>
@@ -372,7 +372,7 @@ const studentView = {
           </div>
         </div>
       ` : `
-        <div class="card" style="margin-bottom:20px; background:var(--success-subtle); border-color:rgba(16,185,129,0.3);">
+        <div class="card print-hide" style="margin-bottom:20px; background:var(--success-subtle); border-color:rgba(16,185,129,0.3);">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:16px;">✅</span>
             <span style="font-size:13px; font-weight:600; color:var(--success);">
@@ -383,7 +383,7 @@ const studentView = {
       `}
 
       <!-- Printable Assignment Sheet Canvas -->
-      <div style="background:#FFF; padding:28px; border:1px solid #000; font-family:sans-serif; color:#000;">
+      <div class="printable-assignment-sheet" style="background:#FFF; padding:28px; border:1px solid #000; font-family:sans-serif; color:#000;">
         <!-- Top Institutional Header -->
         <div style="display:flex; align-items:center; gap:20px; border-bottom:2px solid #000; padding-bottom:12px; margin-bottom:12px;">
           <img src="assets/rizvi_logo.png" style="height:80px;" alt="Rizvi Emblem">
@@ -504,14 +504,30 @@ const studentView = {
                   </div>
                 ` : ''}
 
-                <!-- Answer Form Inputs -->
-                <div style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">
+                <!-- Answer Form Inputs (Portal Online Entry Only - Hidden on Printed Canvas) -->
+                <div class="print-hide" style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">
                   <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Enter Your Measured Answers:</div>
                   ${q.parameters.map(p => this.buildParameterSubmissionRow(asg.id, student.id, p)).join('')}
                 </div>
               </div>
             `;
           }).join('')}
+        </div>
+
+        <!-- Printable Footer Signatures Block (Visible on Printed Canvas) -->
+        <div class="printable-footer" style="margin-top:36px; padding-top:20px; border-top:1px dashed #000; display:flex; justify-content:space-between; font-size:11px;">
+          <div style="text-align:center; width:180px;">
+            <div style="border-bottom:1px solid #000; height:35px; margin-bottom:4px;"></div>
+            <strong>Student Signature</strong>
+          </div>
+          <div style="text-align:center; width:180px;">
+            <div style="border-bottom:1px solid #000; height:35px; margin-bottom:4px;"></div>
+            <strong>Course Instructor Signature</strong>
+          </div>
+          <div style="text-align:center; width:180px;">
+            <div style="border-bottom:1px solid #000; height:35px; margin-bottom:4px;"></div>
+            <strong>Head of Department (FE)</strong>
+          </div>
         </div>
       </div>
     `;

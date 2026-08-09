@@ -1088,6 +1088,7 @@ sub {
 
 /* Printable Stylesheet */
 @media print {
+  /* Hide all web application scaffolding, headers, sidebars, buttons, web cards, toasts, and modals */
   .app-header,
   .sidebar-nav,
   .role-switcher,
@@ -1101,28 +1102,55 @@ sub {
   .toast-container,
   .modal-overlay,
   select,
-  .page-header-container > *:last-child,
+  .page-header-container,
+  .card,
   .kpi-grid,
-  .sub-tabs-container {
+  .sub-tabs-container,
+  .student-notice-box,
+  .diagram-fallback-card,
+  .skip-link,
+  #sidebar-nav,
+  header,
+  nav {
     display: none !important;
   }
 
-  body {
+  body, html {
     background: #FFF !important;
     font-size: 11pt !important;
     color: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
   }
 
   .app-container {
     padding: 0 !important;
+    margin: 0 !important;
     max-width: 100% !important;
+    width: 100% !important;
     display: block !important;
+    background: #FFF !important;
   }
 
   .main-content {
     width: 100% !important;
     max-width: 100% !important;
     padding: 0 !important;
+    margin: 0 !important;
+    background: #FFF !important;
+  }
+
+  .printable-assignment-sheet,
+  .assignment-canvas {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    display: block !important;
+    background: #FFF !important;
   }
 
   .printable-header {
@@ -1133,36 +1161,21 @@ sub {
     display: flex !important;
   }
 
-  .assignment-canvas {
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    max-width: 100% !important;
-  }
-
-  .var-chip {
+  .var-chip,
+  .var-placeholder {
     background: transparent !important;
     color: #000 !important;
     border: none !important;
-    font-weight: 900 !important;
+    font-weight: normal !important;
+    padding: 0 !important;
   }
 
-  .form-input,
-  input[type="number"],
-  input[type="text"] {
-    border: none !important;
-    border-bottom: 1px solid #000 !important;
-    background: transparent !important;
-    box-shadow: none !important;
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
   }
 
-  .card {
-    box-shadow: none !important;
-    border: 1px solid #DDD !important;
-    break-inside: avoid;
-  }
-
-  .question-block {
+  table, tr, .question-block {
     break-inside: avoid;
     page-break-inside: avoid;
   }
