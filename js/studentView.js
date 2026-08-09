@@ -24,44 +24,38 @@ const studentView = {
     if (allAssignments.length === 0) return [];
     if (!student) return allAssignments;
 
-    const studentYear = (student.yearOfStudy || 'FE').trim().toUpperCase();
+    const studentYear = (student.yearOfStudy || 'FE').toUpperCase().trim();
+
+    // If year is not set or is FE, show everything (don't filter out)
+    if (!studentYear || studentYear === 'FE') return allAssignments;
+
+    const FE_SEMESTERS = ['SEMESTER I', 'SEMESTER II', 'SEM I', 'SEM II', 'SEM 1', 'SEM 2'];
+    const SE_SEMESTERS = ['SEMESTER III', 'SEMESTER IV', 'SEM III', 'SEM IV', 'SEM 3', 'SEM 4'];
+    const TE_SEMESTERS = ['SEMESTER V', 'SEMESTER VI', 'SEM V', 'SEM VI', 'SEM 5', 'SEM 6'];
+    const BE_SEMESTERS = ['SEMESTER VII', 'SEMESTER VIII', 'SEM VII', 'SEM VIII', 'SEM 7', 'SEM 8'];
+
+    const allowedSemesters = {
+      'SE': SE_SEMESTERS,
+      'TE': TE_SEMESTERS,
+      'BE': BE_SEMESTERS,
+    }[studentYear] || null;
 
     const filtered = allAssignments.filter(asg => {
-      const className = (asg.className || '').trim().toUpperCase();
-      const semester = (asg.semester || '').trim().toUpperCase();
+      const sub = (app.data.subjects || []).find(s => s.id === asg.subjectId || s.code === asg.subjectId);
+      const semRaw = (asg.semester || sub?.semester || '').toUpperCase().trim();
 
-      // Check explicit class/semester target if specified
-      if (studentYear === 'FE') {
-        if (className.startsWith('SE') || className.startsWith('TE') || className.startsWith('BE')) return false;
-        if (semester.includes('SEMESTER III') || semester.includes('SEMESTER IV') || semester.includes('SEMESTER V') || semester.includes('SEMESTER VI') || semester.includes('SEMESTER VII') || semester.includes('SEMESTER VIII')) return false;
-        return true;
-      }
+      // If no semester set on the assignment, show it to everyone
+      if (!semRaw) return true;
 
-      // Upper year students (SE, TE, BE): hide explicit FE (Semester I / II) labs
-      const isSem1Or2 = className === 'FE' || semester === 'SEM I' || semester === 'SEM II' || semester === 'SEMESTER I' || semester === 'SEMESTER II' || semester === 'SEM 1' || semester === 'SEM 2';
-      if (isSem1Or2) {
-        return false;
-      }
+      // FE semesters: only show to FE students
+      if (FE_SEMESTERS.includes(semRaw)) return false;
 
-      if (studentYear === 'SE') {
-        if (className.startsWith('TE') || className.startsWith('BE')) return false;
-        if (semester.includes('SEM V') || semester.includes('SEM VI') || semester.includes('SEM VII') || semester.includes('SEM VIII') || semester.includes('SEMESTER V') || semester.includes('SEMESTER VI') || semester.includes('SEMESTER VII') || semester.includes('SEMESTER VIII')) return false;
-      }
-
-      if (studentYear === 'TE') {
-        if (className.startsWith('SE') || className.startsWith('BE')) return false;
-        if (semester.includes('SEM III') || semester.includes('SEM IV') || semester.includes('SEM VII') || semester.includes('SEM VIII') || semester.includes('SEMESTER III') || semester.includes('SEMESTER IV') || semester.includes('SEMESTER VII') || semester.includes('SEMESTER VIII')) return false;
-      }
-
-      if (studentYear === 'BE') {
-        if (className.startsWith('SE') || className.startsWith('TE')) return false;
-        if (semester.includes('SEM III') || semester.includes('SEM IV') || semester.includes('SEM V') || semester.includes('SEM VI') || semester.includes('SEMESTER III') || semester.includes('SEMESTER IV') || semester.includes('SEMESTER V') || semester.includes('SEMESTER VI')) return false;
-      }
+      // If student has a known year, only show matching semesters
+      if (allowedSemesters) return allowedSemesters.includes(semRaw);
 
       return true;
     });
 
-    // Fallback: if filtering yields no assignments but there are published assignments in the system, return all published assignments so student is not stranded
     return filtered.length > 0 ? filtered : allAssignments;
   },
 

@@ -1120,9 +1120,14 @@ const facultyView = {
               `).join('')}
             </select>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="facultyView.openAddQuestionModal('${selectedAsg.id}')">
-            + Add Question
-          </button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditAssignmentModal('${selectedAsg.id}')">
+              ✏️ Edit Details
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="facultyView.openAddQuestionModal('${selectedAsg.id}')">
+              + Add Question
+            </button>
+          </div>
         </div>
 
         <div class="card" style="margin-bottom: 14px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2); padding:14px 18px;">
@@ -2867,5 +2872,121 @@ const facultyView = {
     app.closeModal();
     app.showToast(`Saved assignment ${newAsg.code}`, 'success');
     this.renderDashboard(document.getElementById('main-content'));
+  },
+
+  openEditAssignmentModal(asgId) {
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) {
+      app.showToast('Please select an assignment to edit', 'warning');
+      return;
+    }
+
+    const subjects = app.data.subjects || [];
+    const rubrics = app.data.rubricPresets || [];
+
+    app.showModal('Edit Assignment Details', `
+      <form onsubmit="facultyView.saveEditAssignment(event, '${asg.id}')">
+        <div class="form-group">
+          <label class="form-label">Subject Course</label>
+          <select id="edit-asg-subject" class="form-select" required>
+            ${subjects.map(s => `
+              <option value="${s.id}" ${s.id === asg.subjectId ? 'selected' : ''}>
+                ${s.code} — ${s.fullName}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Assignment Code Key</label>
+          <input type="text" id="edit-asg-code" class="form-input code-font" value="${asg.code || ''}" required readonly style="background:var(--bg-subtle);">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Assignment Title</label>
+          <input type="text" id="edit-asg-title" class="form-input" value="${asg.title || ''}" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Class Target</label>
+            <input type="text" id="edit-asg-class" class="form-input" value="${asg.className || 'FE Mech'}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Semester</label>
+            <select id="edit-asg-sem" class="form-select" required>
+              <option value="Semester I" ${(asg.semester || '') === 'Semester I' ? 'selected' : ''}>Semester I</option>
+              <option value="Semester II" ${(asg.semester || '') === 'Semester II' ? 'selected' : ''}>Semester II</option>
+              <option value="Semester III" ${(asg.semester || '') === 'Semester III' ? 'selected' : ''}>Semester III</option>
+              <option value="Semester IV" ${(asg.semester || '') === 'Semester IV' ? 'selected' : ''}>Semester IV</option>
+              <option value="Semester V" ${(asg.semester || '') === 'Semester V' ? 'selected' : ''}>Semester V</option>
+              <option value="Semester VI" ${(asg.semester || '') === 'Semester VI' ? 'selected' : ''}>Semester VI</option>
+              <option value="Semester VII" ${(asg.semester || '') === 'Semester VII' ? 'selected' : ''}>Semester VII</option>
+              <option value="Semester VIII" ${(asg.semester || '') === 'Semester VIII' ? 'selected' : ''}>Semester VIII</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Modules Covered</label>
+            <input type="text" id="edit-asg-module" class="form-input" value="${asg.modulesCovered || 'Module 1-2'}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Outcome Covered (CO)</label>
+            <input type="text" id="edit-asg-co" class="form-input" value="${asg.outcomeCovered || 'CO1'}" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Publish Date & Time</label>
+            <input type="datetime-local" id="edit-asg-pub" class="form-input" value="${asg.publishDate || '2026-08-01T09:00'}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Submission Deadline</label>
+            <input type="datetime-local" id="edit-asg-dead" class="form-input" value="${asg.deadline || '2026-08-10T23:59'}" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Attach Rubric Preset</label>
+          <select id="edit-asg-rub" class="form-select" required>
+            ${rubrics.map(r => `
+              <option value="${r.id}" ${r.id === asg.rubricPresetId ? 'selected' : ''}>
+                ${r.name || r.title} (${r.maxMarks || 10} Marks)
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Assignment Details</button>
+        </div>
+      </form>
+    `);
+  },
+
+  saveEditAssignment(e, asgId) {
+    e.preventDefault();
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+
+    asg.subjectId = document.getElementById('edit-asg-subject').value;
+    asg.title = document.getElementById('edit-asg-title').value;
+    asg.className = document.getElementById('edit-asg-class').value;
+    asg.semester = document.getElementById('edit-asg-sem').value;
+    asg.modulesCovered = document.getElementById('edit-asg-module').value;
+    asg.outcomeCovered = document.getElementById('edit-asg-co').value;
+    asg.publishDate = document.getElementById('edit-asg-pub').value;
+    asg.deadline = document.getElementById('edit-asg-dead').value;
+    asg.rubricPresetId = document.getElementById('edit-asg-rub').value;
+
+    app.saveState();
+    app.syncAssignmentToSupabase(asg);
+    app.closeModal();
+    app.showToast(`Updated assignment details for ${asg.code}`, 'success');
+    this.renderAssignmentBuilder(document.getElementById('main-content'));
   }
 };

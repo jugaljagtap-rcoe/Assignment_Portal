@@ -224,9 +224,6 @@ class AppEngine {
         }
       });
 
-      // Purge ghost assignments from Supabase Cloud DB
-      this.purgeGhostAssignmentsFromSupabase();
-
       // Fetch submissions from Supabase
       const { data: submData, error: submErr } = await supabaseClient.from('submissions').select('*');
       if (!submErr && submData && Array.isArray(submData) && submData.length > 0) {
@@ -301,6 +298,7 @@ class AppEngine {
 
       // Only push local assignments to Supabase Cloud if current user is faculty or admin
       if (this.currentUser && (this.currentRole === 'faculty' || this.currentRole === 'admin')) {
+        this.purgeGhostAssignmentsFromSupabase();
         await this.syncAllAssignmentsToSupabase();
       }
 
@@ -998,29 +996,15 @@ class AppEngine {
   }
 
   ensureActiveAssignment() {
-    let pool = (this.data.assignments || []);
+    let pool = this.data.assignments || [];
     if (this.currentRole === 'student' && typeof studentView !== 'undefined') {
-      const student = studentView.getResolvedStudent();
-      const studentAsgs = studentView.getAssignmentsForStudent(student);
-      if (studentAsgs && studentAsgs.length > 0) {
-        pool = studentAsgs;
-      }
+      const student = (this.data.students || []).find(s => s.id === this.activeStudentId);
+      const filtered = studentView.getAssignmentsForStudent(student);
+      if (filtered && filtered.length > 0) pool = filtered;
     }
-
-    let match = pool.find(a =>
-      a.id === this.activeAssignmentId ||
-      a.code === this.activeAssignmentId ||
-      (a.originalId && a.originalId === this.activeAssignmentId)
-    );
-
-    if (!match && pool.length > 0) {
-      match = pool[0];
-    }
-
-    if (!match && this.data.assignments && this.data.assignments.length > 0) {
-      match = this.data.assignments[0];
-    }
-
+    let match = pool.find(a => a.id === this.activeAssignmentId || a.code === this.activeAssignmentId || (a.originalId && a.originalId === this.activeAssignmentId));
+    if (!match && pool.length > 0) match = pool[0];
+    if (!match && this.data.assignments && this.data.assignments.length > 0) match = this.data.assignments[0];
     if (match) {
       this.activeAssignmentId = match.id;
       localStorage.setItem('rizvi_fe_active_asg_id', match.id);
