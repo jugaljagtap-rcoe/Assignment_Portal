@@ -529,6 +529,7 @@ const adminView = {
         <td><span class="tag tag-bt">Div ${s.division}</span></td>
         <td><span class="tag tag-bt">Batch ${s.batch}</span></td>
         <td style="display:flex; gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="adminView.openEditStudentModal('${s.id}')">✏️ Edit</button>
           <button class="btn btn-ghost btn-sm" onclick="app.setActiveStudent('${s.id}'); app.switchRole('student');">Preview Canvas</button>
           <button class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:11px; color:var(--danger);" onclick="adminView.deleteStudent('${s.id}')">🗑️ Delete</button>
         </td>
@@ -659,6 +660,7 @@ const adminView = {
             name: studentRecord.name,
             email: studentRecord.email,
             academic_year: studentRecord.academicYear,
+            year_of_study: studentRecord.yearOfStudy,
             branch: studentRecord.branch,
             division: studentRecord.division,
             batch: studentRecord.batch
@@ -795,6 +797,7 @@ const adminView = {
                 name: s.name,
                 email: s.email,
                 academic_year: s.academicYear || '2026-27',
+                year_of_study: s.yearOfStudy,
                 branch: s.branch,
                 division: s.division,
                 batch: s.batch
@@ -911,6 +914,126 @@ const adminView = {
 
     app.closeModal();
     app.showToast(`Enrolled student ${newSt.name} (${newSt.uin}) for ${newSt.yearOfStudy} (AY ${newSt.academicYear})`, 'success');
+    this.renderStudentsMaster(document.getElementById('main-content'));
+  },
+
+  openEditStudentModal(id) {
+    const st = app.data.students.find(s => s.id === id);
+    if (!st) return;
+
+    const ayOptions = (app.data.academicYears || []).map(ay =>
+      `<option value="${ay.label}" ${st.academicYear === ay.label ? 'selected' : ''}>Academic Year ${ay.label}</option>`
+    ).join('');
+
+    const yearOptions = ['FE', 'SE', 'TE', 'BE'].map(y =>
+      `<option value="${y}" ${(st.yearOfStudy || 'FE') === y ? 'selected' : ''}>${y}</option>`
+    ).join('');
+
+    const branchOptions = HARDCODED_BRANCHES.map(b =>
+      `<option value="${b}" ${st.branch === b ? 'selected' : ''}>${b}</option>`
+    ).join('');
+
+    const divOptions = ['A', 'B', 'C', 'D'].map(d =>
+      `<option value="${d}" ${st.division === d ? 'selected' : ''}>Division ${d}</option>`
+    ).join('');
+
+    app.showModal(`✏️ Edit Student Profile (${st.uin})`, `
+      <form onsubmit="adminView.saveEditStudent(event, '${st.id}')">
+        <div style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">UIN / Roll Number</label>
+            <input type="text" id="edit-st-uin" class="form-input code-font" value="${st.uin}" required>
+          </div>
+          <div class="form-group" style="flex:1.5;">
+            <label class="form-label">Full Name</label>
+            <input type="text" id="edit-st-name" class="form-input" value="${st.name}" required>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1.5;">
+            <label class="form-label">Institutional Email</label>
+            <input type="email" id="edit-st-email" class="form-input code-font" value="${st.email || ''}" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Academic Year</label>
+            <select id="edit-st-ay" class="form-select">${ayOptions}</select>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Year of Study</label>
+            <select id="edit-st-year" class="form-select">${yearOptions}</select>
+          </div>
+          <div class="form-group" style="flex:1.5;">
+            <label class="form-label">Engineering Branch</label>
+            <select id="edit-st-branch" class="form-select">${branchOptions}</select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Division</label>
+            <select id="edit-st-div" class="form-select">${divOptions}</select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Lab Batch</label>
+            <input type="text" id="edit-st-batch" class="form-input code-font" value="${st.batch || 'A1'}" required>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Student Profile</button>
+        </div>
+      </form>
+    `);
+  },
+
+  saveEditStudent(e, id) {
+    e.preventDefault();
+    const idx = app.data.students.findIndex(s => s.id === id);
+    if (idx === -1) return;
+
+    const updated = {
+      ...app.data.students[idx],
+      uin: (document.getElementById('edit-st-uin').value || '').trim(),
+      name: (document.getElementById('edit-st-name').value || '').trim(),
+      email: (document.getElementById('edit-st-email').value || '').trim().toLowerCase(),
+      academicYear: document.getElementById('edit-st-ay').value,
+      yearOfStudy: document.getElementById('edit-st-year').value,
+      branch: document.getElementById('edit-st-branch').value,
+      division: document.getElementById('edit-st-div').value,
+      batch: (document.getElementById('edit-st-batch').value || '').trim()
+    };
+
+    app.data.students[idx] = updated;
+    app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('students').upsert({
+        id: updated.id,
+        uin: updated.uin,
+        name: updated.name,
+        email: updated.email,
+        academic_year: updated.academicYear,
+        year_of_study: updated.yearOfStudy,
+        branch: updated.branch,
+        division: updated.division,
+        batch: updated.batch
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase cloud sync notice:', error);
+        else console.log('Updated student synced to Supabase:', updated.name);
+      });
+    }
+
+    if (app.currentUser && app.currentUser.studentId === id) {
+      app.currentUser.branch = updated.branch;
+      app.currentUser.batch = updated.batch;
+      app.currentUser.uin = updated.uin;
+      app.saveUserSession(app.currentUser);
+    }
+
+    app.closeModal();
+    app.showToast(`Updated student profile for ${updated.name} (${updated.uin}) - ${updated.yearOfStudy} ${updated.branch} Div ${updated.division}/Batch ${updated.batch}`, 'success');
     this.renderStudentsMaster(document.getElementById('main-content'));
   },
 

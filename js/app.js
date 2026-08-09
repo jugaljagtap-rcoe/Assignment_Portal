@@ -70,7 +70,7 @@ class AppEngine {
             name: st.name,
             email: st.email,
             academicYear: st.academic_year,
-            yearOfStudy: st.year_of_study || 'FE',
+            yearOfStudy: st.year_of_study || (existingIdx >= 0 ? this.data.students[existingIdx].yearOfStudy : 'FE'),
             branch: st.branch,
             division: st.division,
             batch: st.batch
@@ -525,9 +525,14 @@ class AppEngine {
               ⚙️ Local Testing / Roster Quick-Select (Dev Bypass)
             </summary>
             <div style="margin-top:12px; padding-top:8px;">
-              <button class="btn btn-primary" onclick="app.login('jugaljagtap@eng.rizvi.edu.in')" style="width:100%; justify-content:center; padding:9px; font-weight:600; margin-bottom:10px; font-size:12px;">
-                ⚡ Sign In as Dual Admin & Faculty (Prof. Jugal Jagtap)
-              </button>
+              <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <button class="btn btn-primary" onclick="app.login('jugaljagtap@eng.rizvi.edu.in')" style="flex:1; justify-content:center; padding:9px; font-weight:600; font-size:12px;">
+                  ⚡ Sign In as Admin & Faculty
+                </button>
+                <button class="btn btn-secondary" onclick="app.login('test_student')" style="flex:1; justify-content:center; padding:9px; font-weight:600; font-size:12px; border-color:var(--accent-blue); color:var(--accent-blue);">
+                  🎓 Sign In as Test Student
+                </button>
+              </div>
 
               <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
                 <div>
