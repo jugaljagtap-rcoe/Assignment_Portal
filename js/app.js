@@ -202,27 +202,8 @@ class AppEngine {
         });
       }
 
-      // Purge legacy sample question from all assignment objects
-      if (this.data.assignments && Array.isArray(this.data.assignments)) {
-        this.data.assignments.forEach(asg => {
-          if (asg.questions && Array.isArray(asg.questions)) {
-            asg.questions = asg.questions.filter(q =>
-              q.id !== 'q-vmd-custom-01' &&
-              !(q.text || '').includes('Determine the natural frequency of the single degree of freedom system given')
-            );
-          }
-        });
-      }
-
       // Purge ghost dummy assignments from local array
       this.data.assignments = (this.data.assignments || []).filter(a => a.id !== 'asg-vmd-001' && a.code !== 'VMD-EXP-01' && a.id !== 'asg-em-001' && a.code !== 'EM-EXP-01');
-
-      // Guarantee seed assignments exist in assignments array
-      (INITIAL_DATA.assignments || []).forEach(seedAsg => {
-        if (!this.data.assignments.some(a => a.id === seedAsg.id || a.code === seedAsg.code)) {
-          this.data.assignments.push(seedAsg);
-        }
-      });
 
       // Fetch submissions from Supabase
       const { data: submData, error: submErr } = await supabaseClient.from('submissions').select('*');
@@ -811,34 +792,7 @@ class AppEngine {
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
     state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
-    // Standardize all assignment IDs to deterministic format (asg-{code})
-    (state.assignments || []).forEach(asg => {
-      if (asg.code) {
-        asg.id = 'asg-' + asg.code.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-      }
-    });
-
-    // Purge legacy sample question from local state
-    if (state.assignments && Array.isArray(state.assignments)) {
-      state.assignments.forEach(asg => {
-        if (asg.questions && Array.isArray(asg.questions)) {
-          asg.questions = asg.questions.filter(q =>
-            q.id !== 'q-vmd-custom-01' &&
-            !(q.text || '').includes('Determine the natural frequency of the single degree of freedom system given')
-          );
-        }
-      });
-    }
-
-    if (!state.assignments || state.assignments.length === 0) {
-      state.assignments = JSON.parse(JSON.stringify(INITIAL_DATA.assignments));
-    } else {
-      (INITIAL_DATA.assignments || []).forEach(seedAsg => {
-        if (!state.assignments.some(a => a.id === seedAsg.id || (a.code && seedAsg.code && a.code.toLowerCase() === seedAsg.code.toLowerCase()))) {
-          state.assignments.push(seedAsg);
-        }
-      });
-    }
+    if (!state.assignments) state.assignments = [];
     if (!state.submissions) state.submissions = [];
     if (!state.studentVariables) state.studentVariables = [];
     if (!state.studentAnswers) state.studentAnswers = [];
