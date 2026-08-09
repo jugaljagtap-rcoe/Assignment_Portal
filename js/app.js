@@ -147,6 +147,7 @@ class AppEngine {
       const { data: asgData, error: asgErr } = await supabaseClient.from('assignments').select('*');
       if (!asgErr && asgData && Array.isArray(asgData) && asgData.length > 0) {
         asgData.forEach(asg => {
+          if (asg.code === 'VMD-EXP-01' || asg.code === 'EM-EXP-01' || asg.id === 'asg-vmd-001' || asg.id === 'asg-em-001') return;
           const existingIdx = this.data.assignments.findIndex(x => x.id === asg.id || x.code === asg.code);
           const formatted = {
             id: asg.id,
@@ -165,9 +166,12 @@ class AppEngine {
             rubricPresetId: asg.rubric_preset_id,
             createdAt: asg.created_at,
             schedules: asg.schedules || [],
-            questions: asg.questions || []
+            questions: (asg.questions && asg.questions.length > 0) ? asg.questions : []
           };
           if (existingIdx >= 0) {
+            if (formatted.questions.length === 0 && this.data.assignments[existingIdx].questions && this.data.assignments[existingIdx].questions.length > 0) {
+              formatted.questions = this.data.assignments[existingIdx].questions;
+            }
             this.data.assignments[existingIdx] = formatted;
           } else {
             this.data.assignments.push(formatted);
@@ -175,12 +179,18 @@ class AppEngine {
         });
       }
 
+      // Purge ghost dummy assignments from local array
+      this.data.assignments = (this.data.assignments || []).filter(a => a.id !== 'asg-vmd-001' && a.code !== 'VMD-EXP-01' && a.id !== 'asg-em-001' && a.code !== 'EM-EXP-01');
+
       // Guarantee seed assignments exist in assignments array
       (INITIAL_DATA.assignments || []).forEach(seedAsg => {
         if (!this.data.assignments.some(a => a.id === seedAsg.id || a.code === seedAsg.code)) {
           this.data.assignments.push(seedAsg);
         }
       });
+
+      // Purge ghost assignments from Supabase Cloud DB
+      this.purgeGhostAssignmentsFromSupabase();
 
       // Push local assignments to Supabase Cloud to ensure cross-browser availability
       this.syncAllAssignmentsToSupabase();
@@ -264,6 +274,13 @@ class AppEngine {
       console.warn('Supabase cloud sync background notice:', e);
       this.showToast('Cloud sync failed — working in offline mode. Changes saved locally.', 'warning');
     }
+  }
+
+  async purgeGhostAssignmentsFromSupabase() {
+    if (!supabaseClient) return;
+    try {
+      await supabaseClient.from('assignments').delete().or('code.eq.VMD-EXP-01,code.eq.EM-EXP-01,id.eq.asg-vmd-001,id.eq.asg-em-001');
+    } catch(e) {}
   }
 
   async syncSubjectToSupabase(subId) {
@@ -758,6 +775,11 @@ class AppEngine {
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
     state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
+    // Purge ghost dummy assignments from local state
+    if (state.assignments && Array.isArray(state.assignments)) {
+      state.assignments = state.assignments.filter(a => a.id !== 'asg-vmd-001' && a.code !== 'VMD-EXP-01' && a.id !== 'asg-em-001' && a.code !== 'EM-EXP-01');
+    }
+
     if (!state.assignments || state.assignments.length === 0) {
       state.assignments = JSON.parse(JSON.stringify(INITIAL_DATA.assignments));
     } else {
@@ -767,6 +789,18 @@ class AppEngine {
         }
       });
     }
+
+    // Guarantee RCOE/Mech/2026-27/VMDLab_A001 has full questions populated
+    state.assignments.forEach(asg => {
+      if (asg.code === 'RCOE/Mech/2026-27/VMDLab_A001' || asg.id === 'asg-vmd-custom-001') {
+        if (!asg.questions || asg.questions.length === 0) {
+          const seed = INITIAL_DATA.assignments.find(a => a.code === 'RCOE/Mech/2026-27/VMDLab_A001');
+          if (seed && seed.questions && seed.questions.length > 0) {
+            asg.questions = JSON.parse(JSON.stringify(seed.questions));
+          }
+        }
+      }
+    });
     if (!state.submissions) state.submissions = [];
     if (!state.studentVariables) state.studentVariables = [];
     if (!state.studentAnswers) state.studentAnswers = [];
