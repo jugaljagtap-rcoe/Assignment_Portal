@@ -183,11 +183,26 @@ class AppEngine {
           };
           if (existingIdx >= 0) {
             if (formatted.questions.length === 0 && this.data.assignments[existingIdx].questions && this.data.assignments[existingIdx].questions.length > 0) {
-              formatted.questions = this.data.assignments[existingIdx].questions;
+              formatted.questions = this.data.assignments[existingIdx].questions.filter(q =>
+                q.id !== 'q-vmd-custom-01' &&
+                !(q.text || '').includes('Determine the natural frequency of the single degree of freedom system given')
+              );
             }
             this.data.assignments[existingIdx] = formatted;
           } else {
             this.data.assignments.push(formatted);
+          }
+        });
+      }
+
+      // Purge legacy sample question from all assignment objects
+      if (this.data.assignments && Array.isArray(this.data.assignments)) {
+        this.data.assignments.forEach(asg => {
+          if (asg.questions && Array.isArray(asg.questions)) {
+            asg.questions = asg.questions.filter(q =>
+              q.id !== 'q-vmd-custom-01' &&
+              !(q.text || '').includes('Determine the natural frequency of the single degree of freedom system given')
+            );
           }
         });
       }
@@ -795,6 +810,18 @@ class AppEngine {
         asg.id = 'asg-' + asg.code.toLowerCase().replace(/[^a-z0-9_-]/g, '');
       }
     });
+
+    // Purge legacy sample question from local state
+    if (state.assignments && Array.isArray(state.assignments)) {
+      state.assignments.forEach(asg => {
+        if (asg.questions && Array.isArray(asg.questions)) {
+          asg.questions = asg.questions.filter(q =>
+            q.id !== 'q-vmd-custom-01' &&
+            !(q.text || '').includes('Determine the natural frequency of the single degree of freedom system given')
+          );
+        }
+      });
+    }
 
     if (!state.assignments || state.assignments.length === 0) {
       state.assignments = JSON.parse(JSON.stringify(INITIAL_DATA.assignments));
