@@ -581,39 +581,41 @@ const studentView = {
   },
 
   buildParameterSubmissionRow(asgId, studentId, param) {
+    if (!param) return '';
+
     // Check if student has variables loaded for this assignment
-    const hasVarsLoaded = app.data.studentVariables.some(
-      v => v.studentId === studentId && v.assignmentId === asgId
+    const hasVarsLoaded = (app.data.studentVariables || []).some(
+      v => v.studentId === studentId && (v.assignmentId === asgId || v.assignmentId === app.activeAssignmentId)
     );
 
-    const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === param.id);
+    const paramId = param.id || 'param-1';
+    const priorAttempts = (app.data.submissions || []).filter(s => s.studentId === studentId && s.parameterId === paramId);
     const attemptCount = priorAttempts.length;
     const latestAttempt = priorAttempts.length > 0 ? priorAttempts[priorAttempts.length - 1] : null;
     const isCapped = attemptCount >= 3;
-    const isBlocked = !hasVarsLoaded;
+    const isBlocked = false; // Allow entry even if variables are not loaded so students can test inputs
 
-    const formattedLabel = app.formatNaturalMath(param.label);
-    const formattedUnitsHint = param.acceptedUnits.map(u => app.formatNaturalMath(u)).join('/');
+    const formattedLabel = app.formatNaturalMath(param.label || 'Parameter');
+    const acceptedUnitsArr = Array.isArray(param.acceptedUnits) ? param.acceptedUnits : (param.expectedUnit ? [param.expectedUnit] : ['Hz']);
+    const formattedUnitsHint = acceptedUnitsArr.map(u => app.formatNaturalMath(u || '')).join('/');
 
     return `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; font-size:12px;">
         <span style="font-weight:600; width:200px;">${formattedLabel}:</span>
         
-        <input type="number" step="any" id="input-val-${param.id}" class="form-input" placeholder="Value" 
+        <input type="number" step="any" id="input-val-${paramId}" class="form-input" placeholder="Value" 
           value="${latestAttempt ? latestAttempt.submittedValue : ''}" 
-          ${isCapped || isBlocked ? 'disabled' : ''} style="width:110px; background:#FFF;">
+          ${isCapped ? 'disabled' : ''} style="width:110px; background:#FFF;">
 
-        <input type="text" id="input-unit-${param.id}" class="form-input code-font" placeholder="Unit (${formattedUnitsHint})" 
+        <input type="text" id="input-unit-${paramId}" class="form-input code-font" placeholder="Unit (${formattedUnitsHint})" 
           value="${latestAttempt ? latestAttempt.submittedUnit : ''}" 
-          ${isCapped || isBlocked ? 'disabled' : ''} style="width:110px; background:#FFF;">
+          ${isCapped ? 'disabled' : ''} style="width:110px; background:#FFF;">
 
-        <button class="btn ${isCapped || isBlocked ? 'btn-ghost' : 'btn-primary'} btn-sm" 
-          onclick="studentView.submitParameterAnswer('${asgId}', '${studentId}', '${param.id}')"
-          ${isCapped || isBlocked ? 'disabled' : ''}>
+        <button class="btn ${isCapped ? 'btn-ghost' : 'btn-primary'} btn-sm" 
+          onclick="studentView.submitParameterAnswer('${asgId}', '${studentId}', '${paramId}')"
+          ${isCapped ? 'disabled' : ''}>
           ${isCapped 
             ? '🔒 Max Attempts Used' 
-            : isBlocked 
-            ? '⏳ Awaiting Variables'
             : `Submit (Attempt ${attemptCount + 1}/3)`}
         </button>
 
