@@ -41,6 +41,9 @@ const facultyView = {
           <h1 class="page-title">Overview</h1>
           <p class="page-subtitle">Manage lab assignments, student variables, and solution CSV pipelines</p>
         </div>
+        <div>
+          <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Assignment</button>
+        </div>
       </div>
 
       <div class="kpi-grid">
@@ -67,11 +70,12 @@ const facultyView = {
       </div>
 
       <div class="card" style="margin-top: 24px;">
-        <div class="card-header">
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <div>
             <h2 class="card-title">My Lab Assignments</h2>
             <p class="card-subtitle">Select an assignment to build questions, edit schedules, or upload CSV solution keys</p>
           </div>
+          <button class="btn btn-primary btn-sm" onclick="facultyView.openCreateAssignmentModal()">+ Create Assignment</button>
         </div>
         <div class="table-container">
           <table class="custom-table">
