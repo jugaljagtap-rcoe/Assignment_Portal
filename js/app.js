@@ -913,12 +913,24 @@ class AppEngine {
     this.renderCurrentView();
   }
 
+  startAssignment(asgId) {
+    if (!asgId) return;
+    const asg = (this.data.assignments || []).find(a => a.id === asgId || a.code === asgId);
+    if (asg) {
+      this.activeAssignmentId = asg.id;
+      localStorage.setItem('rizvi_fe_active_asg_id', asg.id);
+    }
+    this.switchNav('solver');
+  }
+
   ensureActiveAssignment() {
-    if (!this.activeAssignmentId || !this.data.assignments.find(a => a.id === this.activeAssignmentId)) {
-      this.activeAssignmentId = this.data.assignments.length > 0 ? this.data.assignments[0].id : null;
-      if (this.activeAssignmentId) {
-        localStorage.setItem('rizvi_fe_active_asg_id', this.activeAssignmentId);
-      }
+    let match = (this.data.assignments || []).find(a => a.id === this.activeAssignmentId || a.code === this.activeAssignmentId);
+    if (!match && this.data.assignments && this.data.assignments.length > 0) {
+      match = this.data.assignments[0];
+    }
+    if (match) {
+      this.activeAssignmentId = match.id;
+      localStorage.setItem('rizvi_fe_active_asg_id', match.id);
     }
   }
 

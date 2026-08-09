@@ -237,7 +237,7 @@ const studentView = {
                     <td><span class="tag ${sch && sch.submissionsOpen ? 'tag-success' : 'tag-danger'}">${sch && sch.submissionsOpen ? 'Open' : 'Closed'}</span></td>
                     <td>
                       <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" 
-                        onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('solver');">
+                        onclick="app.startAssignment('${asg.id}');">
                         ✏️ ${isActive ? 'Continue Experiment' : 'Start Experiment'}
                       </button>
                     </td>
