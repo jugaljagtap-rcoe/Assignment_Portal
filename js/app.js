@@ -70,6 +70,7 @@ class AppEngine {
             name: st.name,
             email: st.email,
             academicYear: st.academic_year,
+            yearOfStudy: st.year_of_study || 'FE',
             branch: st.branch,
             division: st.division,
             batch: st.batch

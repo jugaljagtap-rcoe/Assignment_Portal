@@ -460,6 +460,14 @@ const adminView = {
         <div style="display:flex; gap:12px; margin-bottom:16px;">
           <input type="text" id="student-search-input" class="form-input" placeholder="Search by UIN, Name, Email or Branch..." style="flex:1;" oninput="adminView.filterStudents()">
           
+          <select id="student-year-select" class="form-select" style="width:120px;" onchange="adminView.filterStudents()">
+            <option value="">All Years</option>
+            <option value="FE">FE</option>
+            <option value="SE">SE</option>
+            <option value="TE">TE</option>
+            <option value="BE">BE</option>
+          </select>
+
           <select id="student-branch-select" class="form-select" style="width:220px;" onchange="adminView.filterStudents()">
             <option value="">All Branches</option>
             ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
@@ -549,16 +557,18 @@ const adminView = {
 
   filterStudents() {
     const search = document.getElementById('student-search-input').value.toLowerCase();
+    const year = document.getElementById('student-year-select') ? document.getElementById('student-year-select').value : '';
     const branch = document.getElementById('student-branch-select').value;
     const div = document.getElementById('student-div-select').value;
     const batch = document.getElementById('student-batch-select').value;
 
     const filtered = app.data.students.filter(s => {
       const matchQuery = s.name.toLowerCase().includes(search) || s.uin.includes(search) || (s.email || '').toLowerCase().includes(search) || (s.branch || '').toLowerCase().includes(search);
+      const matchYear = year ? (s.yearOfStudy || 'FE') === year : true;
       const matchBranch = branch ? s.branch === branch : true;
       const matchDiv = div ? s.division === div : true;
       const matchBatch = batch ? s.batch === batch : true;
-      return matchQuery && matchBranch && matchDiv && matchBatch;
+      return matchQuery && matchYear && matchBranch && matchDiv && matchBatch;
     });
 
     document.getElementById('student-table-body').innerHTML = this.buildStudentRows(filtered);
@@ -829,11 +839,22 @@ const adminView = {
           <label class="form-label">Google Workspace Email (@eng.rizvi.edu.in)</label>
           <input type="email" id="new-email" class="form-input" placeholder="rohan.k@eng.rizvi.edu.in" required>
         </div>
-        <div class="form-group">
-          <label class="form-label">Engineering Branch</label>
-          <select id="new-branch" class="form-select">
-            ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
-          </select>
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:2;">
+            <label class="form-label">Engineering Branch</label>
+            <select id="new-branch" class="form-select">
+              ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Year of Study</label>
+            <select id="new-year" class="form-select">
+              <option value="FE">FE (First Year)</option>
+              <option value="SE">SE (Second Year)</option>
+              <option value="TE">TE (Third Year)</option>
+              <option value="BE">BE (Final Year)</option>
+            </select>
+          </div>
         </div>
         <div style="display:flex; gap:12px;">
           <div class="form-group" style="flex:1;">
@@ -863,6 +884,7 @@ const adminView = {
       name: (document.getElementById('new-name').value || '').trim(),
       email: (document.getElementById('new-email').value || '').trim().toLowerCase(),
       academicYear: document.getElementById('new-ay').value,
+      yearOfStudy: document.getElementById('new-year').value,
       branch: document.getElementById('new-branch').value,
       division: document.getElementById('new-div').value,
       batch: (document.getElementById('new-batch').value || '').trim()
@@ -877,6 +899,7 @@ const adminView = {
         name: newSt.name,
         email: newSt.email,
         academic_year: newSt.academicYear,
+        year_of_study: newSt.yearOfStudy,
         branch: newSt.branch,
         division: newSt.division,
         batch: newSt.batch
@@ -887,7 +910,7 @@ const adminView = {
     }
 
     app.closeModal();
-    app.showToast(`Enrolled student ${newSt.name} (${newSt.uin}) for AY ${newSt.academicYear}`, 'success');
+    app.showToast(`Enrolled student ${newSt.name} (${newSt.uin}) for ${newSt.yearOfStudy} (AY ${newSt.academicYear})`, 'success');
     this.renderStudentsMaster(document.getElementById('main-content'));
   },
 
