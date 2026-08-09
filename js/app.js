@@ -1004,6 +1004,79 @@ class AppEngine {
     `;
   }
 
+  formatNaturalMath(str) {
+    if (!str || typeof str !== 'string') return str || '';
+
+    let res = str;
+
+    // 1. LaTeX fractions \frac{num}{den} if not rendered by KaTeX
+    res = res.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, (match, num, den) => {
+      return `<span class="math-frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+    });
+
+    // 2. Complex ASCII fractions (num)/(den) where num or den contain operations/spaces
+    res = res.replace(/\(([^)]+[\+\-\*\/][^)]*)\)\s*\/\s*\(([^)]+)\)/g, (match, num, den) => {
+      return `<span class="math-frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+    });
+
+    // 3. Simple denominator parentheses around single terms/units e.g. N/(m^2) -> N/m^2, kg/(m^3) -> kg/m^3
+    res = res.replace(/\/\s*\(([a-zA-Z0-9\^\+\-\.\s]+)\)/g, '/$1');
+
+    // 4. Powers / Superscripts: e.g. ^2, ^3, ^-1, ^{x}, ^(1/2)
+    res = res.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+    res = res.replace(/\^\(([^)]+)\)/g, '<sup>$1</sup>');
+    res = res.replace(/\^([\-+]?[0-9a-zA-Z.]+)/g, '<sup>$1</sup>');
+
+    // 5. Subscripts: e.g. _1, _n, _{max}, _(min)
+    res = res.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
+    res = res.replace(/_\(([^)]+)\)/g, '<sub>$1</sub>');
+    res = res.replace(/_([0-9a-zA-Z]+)/g, '<sub>$1</sub>');
+
+    return res;
+  }
+
+  formatQuestionText(text, variablesMap = null) {
+    if (!text || typeof text !== 'string') return '';
+
+    let formatted = text;
+
+    // Step 1: Variable substitution (if variablesMap provided)
+    if (variablesMap) {
+      formatted = formatted.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
+        const varKey = p1.trim();
+        const val = variablesMap[varKey];
+        if (val !== undefined && val !== null) {
+          // Plain natural text — no separate background, border, font-family, or badge
+          return val;
+        } else {
+          // Missing variable fallback: subtle inline placeholder
+          return `<span class="var-missing">{{${varKey}}}</span>`;
+        }
+      });
+    } else {
+      // If no variablesMap passed (e.g. Faculty preview mode before substitution),
+      // render {{varKey}} smoothly without heavy chip box
+      formatted = formatted.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
+        return `<span class="var-placeholder">{{${p1.trim()}}}</span>`;
+      });
+    }
+
+    // Step 2: Render LaTeX math if KaTeX is present and text contains $...$ or \(...\)
+    if (window.katex && (formatted.includes('$') || formatted.includes('\\('))) {
+      formatted = formatted.replace(/\$(.*?)\$/g, (m, math) => {
+        try { return window.katex.renderToString(math, { throwOnError: false }); } catch(e) { return m; }
+      });
+      formatted = formatted.replace(/\\\((.*?)\\\)/g, (m, math) => {
+        try { return window.katex.renderToString(math, { throwOnError: false }); } catch(e) { return m; }
+      });
+    }
+
+    // Step 3: Natural ASCII Math Formatting (Powers, Ratios, Numerators/Denominators)
+    formatted = this.formatNaturalMath(formatted);
+
+    return formatted;
+  }
+
   showToast(message, type = 'info') {
     let container = document.getElementById('toast-container');
     if (!container) {

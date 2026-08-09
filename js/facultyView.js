@@ -237,14 +237,7 @@ const facultyView = {
           <div style="margin-top:16px;">
             <h4 style="font-size:13px; font-weight:700; margin-bottom:10px;">Substituted Question Set (${asg.title}):</h4>
             ${asg.questions.map(q => {
-              const substitutedText = q.text.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
-                const val = studentVarsMap[p1];
-                if (val !== undefined) {
-                  return `<span style="background:#FEF3C7; color:#92400E; font-weight:700; padding:2px 6px; border-radius:4px; font-family:var(--font-mono);">${val}</span>`;
-                } else {
-                  return `<span style="background:var(--danger-subtle); color:var(--danger); font-weight:700; padding:2px 6px; border:1px solid var(--danger); border-radius:3px; font-family:var(--font-mono); font-size:11px;">{{${p1}}}</span>`;
-                }
-              });
+              const substitutedText = app.formatQuestionText(q.text, studentVarsMap);
 
               return `
                 <div style="border:1px solid var(--border-default); padding:12px; border-radius:6px; margin-bottom:12px; background:#FAFAFA;">
@@ -253,8 +246,8 @@ const facultyView = {
                   <div style="margin-top:10px; font-size:12px; color:var(--text-secondary);">
                     <strong>Expected Parameters:</strong>
                     ${q.parameters.map(p => `
-                      <div style="margin-top:4px; font-family:var(--font-mono);">
-                        • ${p.label}: Tol ±${p.tolerancePct}% | Accepted: [${p.acceptedUnits.join(', ')}]
+                      <div style="margin-top:4px;">
+                        • ${app.formatNaturalMath(p.label)}: Tol ±${p.tolerancePct}% | Accepted: [${p.acceptedUnits.map(u => app.formatNaturalMath(u)).join(', ')}]
                       </div>
                     `).join('')}
                   </div>
@@ -1149,11 +1142,16 @@ const facultyView = {
                 <span class="tag tag-co">${q.coId}</span>
                 <span class="tag tag-bt">${q.btLevel}</span>
               </div>
-              <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteQuestion('${selectedAsg.id}', '${q.id}')">
-                🗑️ Delete Question
-              </button>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="facultyView.openEditQuestionModal('${selectedAsg.id}', '${q.id}')">
+                  ✏️ Edit Question
+                </button>
+                <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteQuestion('${selectedAsg.id}', '${q.id}')">
+                  🗑️ Delete Question
+                </button>
+              </div>
             </div>
-            <div class="question-text">${q.text.replace(/\{\{(.*?)\}\}/g, '<span class="var-chip">{{$1}}</span>')}</div>
+            <div class="question-text">${app.formatQuestionText(q.text)}</div>
 
             ${q.imageUrl ? `
               <div class="question-diagram-container" style="margin:12px 0;">
@@ -1169,10 +1167,10 @@ const facultyView = {
               <div style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Evaluation Parameters (${q.parameters.length}):</div>
               ${q.parameters.map(p => `
                 <div class="parameter-input-row">
-                  <span class="param-label">${p.label} <code class="code-font" style="font-size:11px; color:var(--accent-blue);">(${p.code})</code></span>
+                  <span class="param-label">${app.formatNaturalMath(p.label)} <code class="code-font" style="font-size:11px; color:var(--accent-blue);">(${p.code})</code></span>
                   <span style="font-size:12px; color:var(--text-secondary);">Marks: ${p.valueMarks}v + ${p.unitMarks}u</span>
                   <span style="font-size:12px; color:var(--text-secondary);">Tol: ±${p.tolerancePct}%</span>
-                  <span style="font-size:12px; color:var(--text-secondary);">Accepted: [${p.acceptedUnits.join(', ')}]</span>
+                  <span style="font-size:12px; color:var(--text-secondary);">Accepted: [${p.acceptedUnits.map(u => app.formatNaturalMath(u)).join(', ')}]</span>
                 </div>
               `).join('')}
             </div>
@@ -1243,8 +1241,12 @@ const facultyView = {
         </div>
 
         <div class="form-group">
-          <label class="form-label">Question Text (Use {{variable_name}} syntax)</label>
-          <textarea id="q-text" class="form-textarea" rows="3" placeholder="Enter question text using {{var_name}} placeholders for dynamic student variables..." required></textarea>
+          <label class="form-label">Question Text (Use {{variable_name}} syntax & math notation like m^2, N/(m^2), \frac{a}{b})</label>
+          <textarea id="q-text" class="form-textarea" rows="3" placeholder="Enter question text using {{var_name}} placeholders and natural math expressions..." oninput="facultyView.updateQuestionLivePreview(this.value)" required></textarea>
+          <div style="margin-top:8px; padding:10px 14px; background:var(--bg-primary); border:1px solid var(--border-default); border-radius:var(--radius-md); font-size:13px;">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">✨ Live Natural Math & Variable Preview:</div>
+            <div id="q-text-live-preview" style="color:var(--text-primary); line-height:1.5;"><em>Type above to see natural math and variable preview...</em></div>
+          </div>
         </div>
 
         <div class="form-group">
@@ -1303,6 +1305,133 @@ const facultyView = {
         </div>
       </div>
     `).join('');
+  },
+
+  updateQuestionLivePreview(val) {
+    const el = document.getElementById('q-text-live-preview');
+    if (!el) return;
+    if (!val || !val.trim()) {
+      el.innerHTML = '<em>Type above to see natural math and variable preview...</em>';
+      return;
+    }
+    el.innerHTML = app.formatQuestionText(val);
+  },
+
+  openEditQuestionModal(asgId, qId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+    const q = asg.questions.find(x => x.id === qId);
+    if (!q) return;
+
+    this.tempModalParameters = JSON.parse(JSON.stringify(q.parameters || []));
+
+    const subjectId = asg.subjectId || '';
+    const filteredCOs = (app.data.courseOutcomes || []).filter(co => !subjectId || co.subjectId === subjectId);
+    const targetCOs = filteredCOs.length > 0 ? filteredCOs : (app.data.courseOutcomes || []);
+
+    const coOptions = (targetCOs.length > 0) ?
+      targetCOs.map(co => {
+        const type = co.type || (co.code && co.code.includes('.LO') ? 'LO' : 'CO');
+        const isSel = co.code === q.coId ? 'selected' : '';
+        return `<option value="${co.code}" ${isSel}>[${type}] ${co.code}</option>`;
+      }).join('') :
+      '<option value="">-- No Outcomes Defined --</option>';
+
+    const btOptions = ['BT1', 'BT2', 'BT3', 'BT4', 'BT5'].map(bt =>
+      `<option value="${bt}" ${q.btLevel === bt ? 'selected' : ''}>${bt}</option>`
+    ).join('');
+
+    app.showModal('Edit Question & Evaluation Parameters', `
+      <form onsubmit="facultyView.saveEditedQuestion(event, '${asgId}', '${qId}')">
+        <div style="display:flex; gap:12px;">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Section Label</label>
+            <input type="text" id="q-label" class="form-input code-font" value="${q.sectionLabel}" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Course Outcome</label>
+            <select id="q-co" class="form-select">${coOptions}</select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Bloom's Level</label>
+            <select id="q-bt" class="form-select">${btOptions}</select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Question Text (Use {{variable_name}} syntax & math notation like m^2, N/(m^2))</label>
+          <textarea id="q-text" class="form-textarea" rows="3" oninput="facultyView.updateQuestionLivePreview(this.value)" required>${q.text}</textarea>
+          <div style="margin-top:8px; padding:10px 14px; background:var(--bg-primary); border:1px solid var(--border-default); border-radius:var(--radius-md); font-size:13px;">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">✨ Live Natural Math & Variable Preview:</div>
+            <div id="q-text-live-preview" style="color:var(--text-primary); line-height:1.5;">${app.formatQuestionText(q.text)}</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Diagram Image URL / Google Drive Share Link / Local File</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="q-img" class="form-input" value="${q.imageUrl || ''}" placeholder="Image URL / Drive link" style="flex:1;">
+            <input type="file" id="q-img-file" accept="image/*" style="display:none;" onchange="facultyView.handleDiagramFileUpload(event)">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('q-img-file').click()">📁 Upload Image</button>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border-default); padding-top:16px; margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <label class="form-label" style="margin-bottom:0;">Evaluation Parameters (Multiple Answers)</label>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="facultyView.addModalParameterField()">+ Add Another Parameter</button>
+          </div>
+          <div id="modal-parameters-list">${this.buildModalParametersHTML()}</div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Question</button>
+        </div>
+      </form>
+    `);
+  },
+
+  saveEditedQuestion(e, asgId, qId) {
+    e.preventDefault();
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+    const qIndex = asg.questions.findIndex(x => x.id === qId);
+    if (qIndex === -1) return;
+
+    const paramLabels = document.querySelectorAll('.p-label-input');
+    const paramUnits = document.querySelectorAll('.p-units-input');
+    const paramVMarks = document.querySelectorAll('.p-vmarks-input');
+    const paramUMarks = document.querySelectorAll('.p-umarks-input');
+    const paramTols = document.querySelectorAll('.p-tol-input');
+
+    const paramsList = [];
+    paramLabels.forEach((el, idx) => {
+      paramsList.push({
+        id: (asg.questions[qIndex].parameters[idx] ? asg.questions[qIndex].parameters[idx].id : 'param-' + Date.now() + '-' + idx),
+        code: `Q00${qIndex+1}_P0${idx+1}`,
+        order: idx + 1,
+        label: el.value,
+        acceptedUnits: (paramUnits[idx] ? paramUnits[idx].value : '').split(',').map(u => u.trim()),
+        unitRequired: true,
+        valueMarks: parseFloat(paramVMarks[idx] ? paramVMarks[idx].value : 4),
+        unitMarks: parseFloat(paramUMarks[idx] ? paramUMarks[idx].value : 1),
+        tolerancePct: parseFloat(paramTols[idx] ? paramTols[idx].value : 2)
+      });
+    });
+
+    asg.questions[qIndex].sectionLabel = document.getElementById('q-label').value;
+    asg.questions[qIndex].text = document.getElementById('q-text').value;
+    asg.questions[qIndex].imageUrl = app.getEmbeddableImageUrl(document.getElementById('q-img').value || '');
+    asg.questions[qIndex].coId = document.getElementById('q-co').value;
+    asg.questions[qIndex].btLevel = document.getElementById('q-bt').value;
+    asg.questions[qIndex].parameters = paramsList;
+
+    app.saveState();
+    app.syncAssignmentToSupabase(asg);
+    app.closeModal();
+    app.showToast('Updated Question & Parameters successfully', 'success');
+    this.renderAssignmentBuilder(document.getElementById('main-content'));
   },
 
   addModalParameterField() {

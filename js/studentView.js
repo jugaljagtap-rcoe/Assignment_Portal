@@ -484,16 +484,7 @@ const studentView = {
           <h3 style="font-size:14px; margin-bottom:12px; text-transform:uppercase;">Experiment Questions & Evaluation Parameters</h3>
           
           ${asg.questions.map(q => {
-            const substitutedText = q.text.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
-              const val = studentVars[p1];
-              if (val !== undefined) {
-                // Variable loaded — show as yellow chip
-                return `<span style="background:#FFF3BF; color:#742A2A; font-weight:700; padding:2px 6px; border:1px solid #D69E2E; border-radius:3px; font-family:var(--font-mono);">${val}</span>`;
-              } else {
-                // Variable missing — show as red placeholder
-                return `<span style="background:var(--danger-subtle); color:var(--danger); font-weight:700; padding:2px 6px; border:1px solid var(--danger); border-radius:3px; font-family:var(--font-mono); font-size:11px;">{{${p1}}}</span>`;
-              }
-            });
+            const substitutedText = app.formatQuestionText(q.text, studentVars);
 
             return `
               <div style="margin-bottom:20px; border-bottom:1px dashed #CCC; padding-bottom:14px;">
@@ -538,15 +529,18 @@ const studentView = {
     const isCapped = attemptCount >= 3;
     const isBlocked = !hasVarsLoaded;
 
+    const formattedLabel = app.formatNaturalMath(param.label);
+    const formattedUnitsHint = param.acceptedUnits.map(u => app.formatNaturalMath(u)).join('/');
+
     return `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; font-size:12px;">
-        <span style="font-weight:600; width:200px;">${param.label}:</span>
+        <span style="font-weight:600; width:200px;">${formattedLabel}:</span>
         
         <input type="number" step="any" id="input-val-${param.id}" class="form-input" placeholder="Value" 
           value="${latestAttempt ? latestAttempt.submittedValue : ''}" 
           ${isCapped || isBlocked ? 'disabled' : ''} style="width:110px; background:#FFF;">
 
-        <input type="text" id="input-unit-${param.id}" class="form-input code-font" placeholder="Unit (${param.acceptedUnits.join('/')})" 
+        <input type="text" id="input-unit-${param.id}" class="form-input code-font" placeholder="Unit (${formattedUnitsHint})" 
           value="${latestAttempt ? latestAttempt.submittedUnit : ''}" 
           ${isCapped || isBlocked ? 'disabled' : ''} style="width:110px; background:#FFF;">
 
@@ -829,12 +823,16 @@ const studentView = {
             </thead>
             <tbody>
               ${mySubmissions.length === 0 ? `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-secondary);">No submissions recorded yet. Click "Active Canvas Sheet" to solve questions.</td></tr>` : 
-                mySubmissions.map(s => `
+                mySubmissions.map(s => {
+                  const paramObj = (app.data.assignments || []).flatMap(a => a.questions || []).flatMap(q => q.parameters || []).find(p => p.id === s.parameterId);
+                  const paramLabel = paramObj ? app.formatNaturalMath(paramObj.label) : s.parameterId;
+                  const formattedUnit = s.submittedUnit ? app.formatNaturalMath(s.submittedUnit) : '-';
+                  return `
                   <tr>
                     <td><span class="tag tag-bt">Attempt ${s.attemptNumber}/3</span></td>
-                    <td style="font-family:var(--font-mono); font-weight:700;">${s.parameterId}</td>
+                    <td style="font-weight:600;">${paramLabel}</td>
                     <td style="font-weight:600;">${s.submittedValue}</td>
-                    <td style="font-family:var(--font-mono);">${s.submittedUnit || '-'}</td>
+                    <td>${formattedUnit}</td>
                     <td>
                       <span style="color:var(--warning); font-weight:600;">
                         -${s.attemptDeductionPct || s.deductionPct || 0}%

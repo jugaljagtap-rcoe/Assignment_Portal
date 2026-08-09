@@ -946,18 +946,61 @@ h1.page-title {
   margin-bottom: 16px;
 }
 
-/* Variable Substitution Chip */
-.var-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  background: var(--accent-blue-subtle);
+/* Variable Placeholder & Math Typography */
+.var-chip,
+.var-placeholder {
   color: var(--accent-blue);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: inherit;
   font-weight: 600;
-  border-radius: var(--radius-pill);
-  border: 1px solid rgba(24, 137, 230, 0.20);
+  background: rgba(24, 137, 230, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.var-missing {
+  color: var(--danger);
+  font-family: inherit;
+  font-weight: 600;
+  background: var(--danger-subtle);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.math-frac {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.92em;
+  padding: 0 4px;
+  line-height: 1.1;
+  font-style: normal;
+}
+
+.math-frac .num {
+  border-bottom: 1.5px solid currentColor;
+  padding-bottom: 2px;
+  font-weight: 500;
+}
+
+.math-frac .den {
+  padding-top: 2px;
+  font-weight: 500;
+}
+
+sup, sub {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+sup {
+  top: -0.45em;
+}
+
+sub {
+  bottom: -0.25em;
 }
 
 .parameter-input-row {
