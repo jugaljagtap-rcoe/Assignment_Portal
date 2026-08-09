@@ -292,59 +292,6 @@ const INITIAL_DATA = {
 
   assignments: [
     {
-      id: "asg-vmd-001",
-      code: "VMD-EXP-01",
-      subjectId: "sub-24051181",
-      facultyId: "fac-admin-jugal",
-      number: 1,
-      title: "Free and Damped Torsional Vibration Analysis",
-      className: "TE Mech",
-      semester: "Semester V",
-      assessmentType: "lab_experiment",
-      modulesCovered: ["Module 1"],
-      outcomeCovered: ["CO1", "PO1"],
-      publishDate: "2026-08-01T09:00",
-      deadline: "2026-12-31T23:59",
-      rubricPresetId: "rub-analytical-001",
-      createdAt: "2026-08-01",
-      schedules: [
-        {
-          id: "sch-vmd-01",
-          scopeType: "batch",
-          scopeValue: "A1",
-          publishDate: "2026-08-01T09:00",
-          deadline: "2026-12-31T23:59",
-          submissionsOpen: true,
-          gradesReleased: true,
-          latePenaltyValue: 10,
-          lateMaxCap: 30
-        }
-      ],
-      questions: [
-        {
-          id: "q-vmd-01",
-          number: 1,
-          title: "Experimental Torsional Natural Frequency",
-          description: "Calculate the experimental natural frequency (fn) of the single-rotor torsional system given shaft diameter d = {d} mm, length L = {L} m, and polar moment of inertia J.",
-          variables: [
-            { name: "d", min: 10, max: 25, step: 1, unit: "mm" },
-            { name: "L", min: 0.5, max: 1.5, step: 0.1, unit: "m" }
-          ],
-          parameters: [
-            {
-              id: "p-vmd-01a",
-              label: "Natural Frequency fn",
-              formula: "sqrt((3.14159 * d^4 * 80 * 10^9) / (32 * L)) / (2 * 3.14159)",
-              expectedUnit: "Hz",
-              valueMarks: 5,
-              unitMarks: 1,
-              tolerancePct: 2
-            }
-          ]
-        }
-      ]
-    },
-    {
       id: "asg-vmd-custom-001",
       code: "RCOE/Mech/2026-27/VMDLab_A001",
       subjectId: "sub-24051181",
@@ -377,70 +324,21 @@ const INITIAL_DATA = {
         {
           id: "q-vmd-custom-01",
           number: 1,
-          text: "Determine the natural frequency of the single degree of freedom system given in the lab setup.",
+          sectionLabel: "Q1",
+          text: "Determine the natural frequency of the single degree of freedom system given shaft diameter d = {{d}} mm, length L = {{L}} m.",
+          coId: "co-1",
+          btLevel: "BT3",
           parameters: [
             {
               id: "p-vmd-custom-01-fn",
+              code: "Q001_P01",
+              order: 1,
               label: "Experimental Natural Frequency (fn)",
-              symbol: "fn",
-              unitOptions: ["Hz", "rad/s"],
+              acceptedUnits: ["Hz", "rad/s"],
+              unitRequired: true,
               valueMarks: 5,
               unitMarks: 1,
               tolerancePct: 5
-            }
-          ]
-        }
-      ]
-    },
-    {
-      id: "asg-em-001",
-      code: "EM-EXP-01",
-      subjectId: "sub-esl101",
-      facultyId: "fac-admin-jugal",
-      number: 1,
-      title: "Verification of Law of Polygon of Forces",
-      className: "FE",
-      semester: "Semester I",
-      assessmentType: "lab_experiment",
-      modulesCovered: ["Module 1"],
-      outcomeCovered: ["CO1", "PO1"],
-      publishDate: "2026-08-01T09:00",
-      deadline: "2026-12-31T23:59",
-      rubricPresetId: "rub-analytical-001",
-      createdAt: "2026-08-01",
-      schedules: [
-        {
-          id: "sch-em-01",
-          scopeType: "batch",
-          scopeValue: "A1",
-          publishDate: "2026-08-01T09:00",
-          deadline: "2026-12-31T23:59",
-          submissionsOpen: true,
-          gradesReleased: true,
-          latePenaltyValue: 10,
-          lateMaxCap: 30
-        }
-      ],
-      questions: [
-        {
-          id: "q-em-01",
-          number: 1,
-          title: "Resultant Force Calculation",
-          description: "Calculate the resultant force R for two concurrent forces F1 = {F1} N and F2 = {F2} N acting at angle theta = {theta} degrees.",
-          variables: [
-            { name: "F1", min: 10, max: 100, step: 5, unit: "N" },
-            { name: "F2", min: 10, max: 100, step: 5, unit: "N" },
-            { name: "theta", min: 30, max: 120, step: 15, unit: "deg" }
-          ],
-          parameters: [
-            {
-              id: "p-em-01a",
-              label: "Resultant Force R",
-              formula: "sqrt(F1^2 + F2^2 + 2*F1*F2*cos(theta * 3.14159 / 180))",
-              expectedUnit: "N",
-              valueMarks: 5,
-              unitMarks: 1,
-              tolerancePct: 2
             }
           ]
         }
