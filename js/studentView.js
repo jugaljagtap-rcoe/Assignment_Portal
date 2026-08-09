@@ -19,6 +19,47 @@ const studentView = {
     }
   },
 
+  getAssignmentsForStudent(student) {
+    if (!student) return [];
+
+    const allAssignments = app.data.assignments || [];
+    const subjects = app.data.subjects || [];
+    const departments = app.data.departments || [];
+
+    const studentYear = (student.yearOfStudy || 'FE').toUpperCase();
+    const studentBranch = (student.branch || '').toLowerCase();
+
+    return allAssignments.filter(asg => {
+      const sub = subjects.find(s => s.id === asg.subjectId);
+      if (!sub) return true;
+
+      const isFESubject = sub.departmentId === 'dept-fe' || (sub.className && sub.className.toUpperCase() === 'FE');
+      const isFEStudent = studentYear === 'FE';
+
+      if (isFEStudent) {
+        return isFESubject;
+      }
+
+      if (isFESubject) return false;
+
+      const classMatches = sub.className ? sub.className.toUpperCase().includes(studentYear) : false;
+
+      const dept = departments.find(d => d.id === sub.departmentId);
+      let deptMatches = false;
+      if (dept) {
+        const deptName = (dept.name || '').toLowerCase();
+        const deptShort = (dept.shortName || '').toLowerCase();
+        deptMatches = deptName.includes(studentBranch) || studentBranch.includes(deptName) ||
+                      (deptShort && studentBranch.includes(deptShort)) ||
+                      (sub.className && sub.className.toLowerCase().includes(deptShort));
+      } else {
+        deptMatches = true;
+      }
+
+      return classMatches && deptMatches;
+    });
+  },
+
   renderDashboard(container) {
     const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
 
@@ -37,7 +78,7 @@ const studentView = {
       return;
     }
 
-    const assignments = app.data.assignments || [];
+    const assignments = this.getAssignmentsForStudent(student);
     
     let activeAsg = assignments.length > 0 ? (assignments.find(a => a.id === app.activeAssignmentId) || assignments[0]) : null;
     let schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
@@ -55,28 +96,63 @@ const studentView = {
       });
     }
 
+    const isPreviewingMode = app.currentUser && app.currentUser.role !== 'student';
+
     const studentHeader = student 
-      ? `Welcome, <strong>${student.name}</strong> (<code class="code-font">${student.uin}</code>) | Branch: ${student.branch} | Div ${student.division} / Batch ${student.batch}`
+      ? `Welcome, <strong>${student.name}</strong> (<code class="code-font">${student.uin}</code>) | Year: ${student.yearOfStudy || 'FE'} | Branch: ${student.branch} | Div ${student.division} / Batch ${student.batch}`
       : `Welcome to Student Lab Portal | No Student Profile Selected`;
 
     container.innerHTML = `
-      <div class="page-header-container">
+      ${!student ? `
+        <div class="card" style="padding:16px 20px; background:var(--accent-blue-subtle); border:1px solid rgba(0,102,204,0.2); margin-bottom:16px; border-radius:var(--radius-md);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div>
+              <strong style="color:var(--accent-blue);">ℹ️ No Active Student Profile Selected:</strong> 
+              <span style="font-size:13px; color:var(--text-secondary);">
+                ${app.data.students.length === 0 ? 'There are currently 0 students enrolled in the Student Master roster. Enroll a student in Admin View to test Student Preview.' : 'Please select an enrolled student profile to inspect their assigned lab experiments.'}
+              </span>
+            </div>
+            ${app.data.students.length > 0 ? `
+              <select class="form-select" style="width:auto; padding:4px 10px; font-size:12px;" onchange="app.setActiveStudent(this.value); app.renderCurrentView();">
+                <option value="">-- Select Student Profile --</option>
+                ${app.data.students.map(s => `<option value="${s.id}">${s.name} (${s.uin} - ${s.yearOfStudy || 'FE'} ${s.branch})</option>`).join('')}
+              </select>
+            ` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <div>
           <h1 class="page-title">Home</h1>
           <p class="page-subtitle">${studentHeader}</p>
         </div>
-        ${activeAsg ? `
-          <button class="btn btn-primary" onclick="app.switchNav('solver')">
-            ✏️ Continue Lab: ${activeAsg.code}
-          </button>
-        ` : ''}
+        <div style="display:flex; gap:10px; align-items:center;">
+          ${isPreviewingMode && app.data.students.length > 0 ? `
+            <div style="display:flex; align-items:center; gap:8px; background:var(--bg-subtle); padding:6px 12px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+              <span style="font-size:12px; font-weight:600; color:var(--text-secondary);">👁️ Preview Profile:</span>
+              <select class="form-select" style="width:auto; padding:4px 8px; font-size:12px;" onchange="app.setActiveStudent(this.value); app.renderCurrentView();">
+                ${app.data.students.map(s => `
+                  <option value="${s.id}" ${student && s.id === student.id ? 'selected' : ''}>
+                    ${s.name} (${s.uin} - ${s.yearOfStudy || 'FE'} ${s.branch})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          ` : ''}
+          ${activeAsg ? `
+            <button class="btn btn-primary" onclick="app.switchNav('solver')">
+              ✏️ Continue Lab: ${activeAsg.code}
+            </button>
+          ` : ''}
+        </div>
       </div>
 
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-card-content">
             <span class="kpi-label">My Class & Division</span>
-            <span class="kpi-value">${student ? `${student.division} / ${student.batch}` : '--'}</span>
+            <span class="kpi-value">${student ? `${student.yearOfStudy || 'FE'} ${student.division} / ${student.batch}` : '--'}</span>
             <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
           </div>
         </div>
@@ -129,7 +205,7 @@ const studentView = {
               ${assignments.length === 0 ? `
                 <tr>
                   <td colspan="6" style="text-align:center; padding:24px; color:var(--text-secondary);">
-                    ℹ️ No lab experiments currently assigned. Contact your subject faculty.
+                    ${!student ? '⚠️ No active student profile selected. Please enroll or select a student profile.' : 'ℹ️ No lab experiments currently assigned for this class/branch.'}
                   </td>
                 </tr>
               ` : assignments.map(asg => {
@@ -169,13 +245,16 @@ const studentView = {
 
   renderSolverCanvas(container) {
     const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
-    const asg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || (app.data.assignments.length > 0 ? app.data.assignments[0] : null);
+    const studentAssignments = this.getAssignmentsForStudent(student);
+    const asg = studentAssignments.find(a => a.id === app.activeAssignmentId) || (studentAssignments.length > 0 ? studentAssignments[0] : null);
 
     if (!asg || !student) {
       container.innerHTML = `
         <div class="card" style="padding:40px; text-align:center;">
           <h2 style="font-size:18px; margin-bottom:8px;">No Active Canvas Sheet</h2>
-          <p style="color:var(--text-secondary); margin-bottom:16px;">There are currently no lab assignments published to solve.</p>
+          <p style="color:var(--text-secondary); margin-bottom:16px;">
+            ${!student ? 'No student profile selected.' : 'There are currently no lab assignments published for your class/branch to solve.'}
+          </p>
           <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
         </div>
       `;
@@ -601,7 +680,8 @@ const studentView = {
 
   renderStudentGrades(container) {
     const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
-    const activeAsg = app.data.assignments.length > 0 ? (app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0]) : null;
+    const studentAssignments = this.getAssignmentsForStudent(student);
+    const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId) || studentAssignments[0]) : null;
     const mySubmissions = student && activeAsg
       ? app.data.submissions.filter(s => s.studentId === student.id && s.assignmentId === activeAsg.id)
       : [];
@@ -610,7 +690,6 @@ const studentView = {
     const studentTitle = student ? `${student.name} (${student.uin})` : 'No Student Profile Selected';
 
     // Calculate Summary Metrics
-    // Max possible marks = sum of valueMarks across all parameters in all questions
     let maxPossibleMarks = 0;
     if (activeAsg && activeAsg.questions) {
       activeAsg.questions.forEach(q => {
@@ -619,9 +698,8 @@ const studentView = {
         });
       });
     }
-    if (maxPossibleMarks === 0) maxPossibleMarks = 10; // fallback if no questions defined yet
+    if (maxPossibleMarks === 0) maxPossibleMarks = 10;
 
-    // Earned marks = best attempt per parameter (highest marksAwarded)
     let totalMarks = 0;
     const parameterIds = [...new Set(mySubmissions.map(s => s.parameterId))];
     parameterIds.forEach(pid => {
@@ -652,13 +730,13 @@ const studentView = {
       </div>
 
       <!-- Assignment Selector -->
-      ${app.data.assignments.length > 1 ? `
+      ${studentAssignments.length > 1 ? `
       <div class="card" style="padding:14px 20px; margin-bottom:4px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
         <div style="display:flex; align-items:center; gap:12px;">
           <label style="font-size:13px; font-weight:600; color:var(--accent-blue); white-space:nowrap;">View Grades For:</label>
           <select class="form-select" style="flex:1; background:#FFF;" 
             onchange="app.activeAssignmentId=this.value; studentView.renderStudentGrades(document.getElementById('main-content'));">
-            ${app.data.assignments.map(a => `
+            ${studentAssignments.map(a => `
               <option value="${a.id}" ${a.id === (activeAsg ? activeAsg.id : '') ? 'selected' : ''}>
                 ${a.code} — ${a.title}
               </option>
@@ -814,7 +892,8 @@ const studentView = {
       return;
     }
 
-    const activeAsg = app.data.assignments.find(a => a.id === app.activeAssignmentId) || app.data.assignments[0];
+    const studentAssignments = this.getAssignmentsForStudent(student);
+    const activeAsg = studentAssignments.find(a => a.id === app.activeAssignmentId) || (studentAssignments.length > 0 ? studentAssignments[0] : null);
     const mySubmissions = activeAsg
       ? app.data.submissions.filter(s => s.studentId === student.id && s.assignmentId === activeAsg.id)
       : app.data.submissions.filter(s => s.studentId === student.id);

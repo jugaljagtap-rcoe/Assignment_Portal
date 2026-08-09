@@ -803,7 +803,7 @@ class AppEngine {
         userBadge.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px;">
             <span class="avatar-dot"></span>
-            <span style="font-size:13px; font-weight:600; color:var(--text-primary);">${student ? student.name : 'Student'} (${student ? student.uin || '' : ''})</span>
+            <span style="font-size:13px; font-weight:600; color:var(--text-primary);">${student ? `${student.name} ${student.uin ? '(' + student.uin + ')' : ''}` : 'Student (No Profile)'}</span>
             <button class="btn btn-ghost btn-sm" onclick="app.logout()" style="color:var(--danger); font-weight:600; padding:3px 8px; font-size:11px; margin-left:6px; border:1px solid rgba(255,59,48,0.2); background:var(--danger-subtle);">
               Log Out
             </button>
