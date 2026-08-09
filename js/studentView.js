@@ -858,7 +858,7 @@ const studentView = {
                     </td>
                     <td style="font-size:11px; color:var(--text-secondary);">${new Date(s.submittedAt).toLocaleString()}</td>
                   </tr>
-                `).join('')
+                `; }).join('')
               }
             </tbody>
           </table>
