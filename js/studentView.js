@@ -67,58 +67,52 @@ const studentView = {
         </div>
         ${activeAsg ? `
           <button class="btn btn-primary" onclick="app.switchNav('solver')">
-            ✏️ Solve: ${activeAsg.code}
+            ✏️ Continue Lab: ${activeAsg.code}
           </button>
         ` : ''}
       </div>
 
       <div class="kpi-grid">
         <div class="kpi-card">
-          <span class="kpi-label">My Class & Division</span>
-          <span class="kpi-value">${student ? `${student.division} / ${student.batch}` : '--'}</span>
-          <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
-        </div>
-        <div class="kpi-card" style="grid-column: span 2;">
-          <span class="kpi-label">Select Assignment to Work On</span>
-          ${assignments.length === 0 ? `
-            <span class="kpi-value" style="font-size:16px; color:var(--text-secondary);">—</span>
-            <span class="kpi-trend neutral">No experiments assigned yet</span>
-          ` : `
-            <select class="form-select" style="margin-top:8px; background:#FFF; font-weight:600;"
-              onchange="app.activeAssignmentId=this.value; studentView.renderDashboard(document.getElementById('main-content'));">
-              ${assignments.map(a => {
-                const sch = app.getAssignmentSchedule(a.id, student ? student.batch : 'A1');
-                const isOpen = sch && sch.submissionsOpen;
-                const deadlineStr = sch ? new Date(sch.deadline).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'No deadline';
-                return `
-                  <option value="${a.id}" ${a.id === (activeAsg ? activeAsg.id : '') ? 'selected' : ''}>
-                    ${a.code} — ${a.title} | Deadline: ${deadlineStr} | ${isOpen ? 'Open' : 'Closed'}
-                  </option>
-                `;
-              }).join('')}
-            </select>
-            <div style="display:flex; gap:12px; margin-top:10px; font-size:12px;">
-              <span>
-                <strong>Deadline:</strong> 
-                ${schedule ? new Date(schedule.deadline).toLocaleString() : '—'}
-              </span>
-              <span class="tag ${schedule && schedule.submissionsOpen ? 'tag-success' : 'tag-danger'}">
-                ${schedule ? (schedule.submissionsOpen ? 'Submissions Open' : 'Submissions Closed') : 'No Schedule'}
-              </span>
-            </div>
-          `}
+          <div class="kpi-card-content">
+            <span class="kpi-label">My Class & Division</span>
+            <span class="kpi-value">${student ? `${student.division} / ${student.batch}` : '--'}</span>
+            <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
+          </div>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">My Marks Earned</span>
-          <span class="kpi-value">${totalEarnedMarks} / ${totalPossibleMarks}</span>
-          <span class="kpi-trend positive">
-            ${schedule ? (schedule.gradesReleased ? 'Grades Released' : 'Pending Evaluation') : 'No Grades'}
-          </span>
+          <div class="kpi-card-content">
+            <span class="kpi-label">Assigned Experiments</span>
+            <span class="kpi-value">${assignments.length}</span>
+            <span class="kpi-trend ${assignments.length > 0 ? 'positive' : 'neutral'}">
+              ${assignments.filter(a => app.getAssignmentSchedule(a.id, student ? student.batch : 'A1')?.submissionsOpen).length} Open Submissions
+            </span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card-content">
+            <span class="kpi-label">Active Experiment</span>
+            <span class="kpi-value" style="font-size:20px; font-family:var(--font-mono); color:var(--accent-blue);" title="${activeAsg ? activeAsg.title : ''}">
+              ${activeAsg ? activeAsg.code : 'None'}
+            </span>
+            <span class="kpi-trend ${schedule && schedule.submissionsOpen ? 'positive' : 'negative'}">
+              ${schedule ? (schedule.submissionsOpen ? '● Submissions Open' : '● Submissions Closed') : 'No Schedule'}
+            </span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card-content">
+            <span class="kpi-label">My Marks Earned</span>
+            <span class="kpi-value">${totalEarnedMarks} / ${totalPossibleMarks}</span>
+            <span class="kpi-trend positive">
+              ${schedule ? (schedule.gradesReleased ? 'Grades Released' : 'Pending Evaluation') : 'No Grades'}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div class="card" style="margin-top: 24px;">
-        <h2 class="card-title" style="margin-bottom:16px;">Assigned Experiments</h2>
+      <div class="card" style="margin-top: 16px;">
+        <h2 class="card-title" style="margin-bottom:12px;">Assigned Experiments</h2>
         <div class="table-container">
           <table class="custom-table">
             <thead>
@@ -141,17 +135,18 @@ const studentView = {
               ` : assignments.map(asg => {
                 const sub = app.data.subjects.find(s => s.id === asg.subjectId);
                 const sch = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1');
+                const isActive = activeAsg && asg.id === activeAsg.id;
                 return `
-                  <tr style="${asg.id === (activeAsg ? activeAsg.id : '') ? 'background:var(--accent-blue-subtle);' : ''}">
+                  <tr style="${isActive ? 'background:var(--accent-blue-subtle);' : ''}">
                     <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${asg.code}</td>
                     <td style="font-weight:600;">${asg.title}</td>
                     <td><span class="tag tag-co">${sub ? sub.code : ''}</span></td>
-                    <td style="font-size:12px; font-weight:600;">${new Date(sch.deadline).toLocaleString()}</td>
-                    <td><span class="tag ${sch.submissionsOpen ? 'tag-success' : 'tag-danger'}">${sch.submissionsOpen ? 'Open' : 'Closed'}</span></td>
+                    <td style="font-size:12px; font-weight:600;">${sch ? new Date(sch.deadline).toLocaleString() : '—'}</td>
+                    <td><span class="tag ${sch && sch.submissionsOpen ? 'tag-success' : 'tag-danger'}">${sch && sch.submissionsOpen ? 'Open' : 'Closed'}</span></td>
                     <td>
-                      <button class="btn ${asg.id === (activeAsg ? activeAsg.id : '') ? 'btn-primary' : 'btn-secondary'} btn-sm" 
+                      <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" 
                         onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('solver');">
-                        ${asg.id === (activeAsg ? activeAsg.id : '') ? '✏️ Currently Selected' : 'Solve Canvas Sheet'}
+                        ✏️ ${isActive ? 'Continue Experiment' : 'Start Experiment'}
                       </button>
                     </td>
                   </tr>

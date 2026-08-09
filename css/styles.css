@@ -296,12 +296,14 @@ body {
   margin: 0 auto;
   padding: 0;
   gap: 0;
+  position: relative;
+  background: linear-gradient(to right, var(--sidebar-bg) 232px, var(--bg-primary) 232px);
+  align-items: stretch;
 }
 
 /* Dark Sidebar Nav */
 .sidebar-nav {
   width: 232px;
-  min-height: calc(100vh - 58px);
   background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
@@ -377,9 +379,9 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   min-width: 0;
-  padding: 28px 32px;
+  padding: 20px 28px;
   background: var(--bg-primary);
 }
 
@@ -442,7 +444,7 @@ h1.page-title {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   gap: 16px;
 }
 
@@ -450,7 +452,7 @@ h1.page-title {
 .page-separator {
   display: flex;
   align-items: center;
-  margin: 24px 0 18px 0;
+  margin: 14px 0 10px 0;
   gap: 12px;
 }
 
@@ -671,6 +673,16 @@ h1.page-title {
   color: var(--text-primary);
   outline: none;
   transition: all var(--transition-fast);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.form-select {
+  width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .form-textarea {

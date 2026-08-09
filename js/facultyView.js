@@ -1082,8 +1082,8 @@ const facultyView = {
 
     // Section 3: Student Sheet Inspection
     html += `
-      <div class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
-        <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">🔍 Student Sheet Inspection</span>
+      <div class="page-separator">
+        <span class="page-separator__text">🔍 Student Sheet Inspection</span>
       </div>
 
       <div class="card" style="background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
@@ -1104,14 +1104,14 @@ const facultyView = {
 
     // Section 4: Question Builder
     html += `
-      <div id="question-builder-section" class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
-        <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">📝 Question Builder</span>
+      <div id="question-builder-section" class="page-separator">
+        <span class="page-separator__text">📝 Question Builder</span>
       </div>
     `;
 
     if (selectedAsg) {
       html += `
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; background:var(--bg-secondary); padding:10px 16px; border-radius:8px; border:1px solid var(--border-default);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px; background:var(--bg-secondary); padding:10px 16px; border-radius:8px; border:1px solid var(--border-default);">
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:280px;">
             <span style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Editing Assignment:</span>
             <select class="form-select" style="flex:1; max-width:480px; font-size:13px; font-weight:600; color:var(--accent-blue); background:var(--bg-primary); border:1px solid var(--border-default); border-radius:6px; padding:6px 12px; cursor:pointer;"
@@ -1128,7 +1128,7 @@ const facultyView = {
           </button>
         </div>
 
-        <div class="card" style="margin-bottom: 20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
+        <div class="card" style="margin-bottom: 14px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2); padding:14px 18px;">
           <div style="display:flex; gap:12px; align-items:center;">
             <span style="font-size:20px;">💡</span>
             <div style="font-size:13px; color:var(--accent-blue);">
@@ -1138,7 +1138,7 @@ const facultyView = {
         </div>
 
         ${selectedAsg.questions.length === 0 ? `
-          <div class="card" style="text-align:center; padding:24px; color:var(--text-muted);">
+          <div class="card" style="text-align:center; padding:20px; color:var(--text-muted);">
             No questions added to this assignment yet. Click "+ Add Question" above to start building.
           </div>
         ` : selectedAsg.questions.map((q, idx) => `
@@ -1175,8 +1175,8 @@ const facultyView = {
 
     // Section 5: Rubric Presets
     html += `
-      <div class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
-        <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">📐 Rubric Presets</span>
+      <div class="page-separator">
+        <span class="page-separator__text">📐 Rubric Presets</span>
       </div>
 
       <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
