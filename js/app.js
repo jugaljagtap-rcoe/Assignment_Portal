@@ -45,6 +45,16 @@ class AppEngine {
   init() {
     this.setupEventListeners();
     this.syncWithSupabase();
+
+    // Cross-tab and cross-window real-time data sync listener
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'rizvi_fe_portal_data') {
+        this.data = this.loadState();
+        this.reconcileUserSession();
+        this.renderCurrentView();
+      }
+    });
+
     if (!this.currentUser) {
       // Prompt Google Auth Sign-In Modal on startup if not logged in
       this.showLoginModal(false);
