@@ -643,9 +643,12 @@ const adminView = {
         const batch = batchIdx >= 0 && cols[batchIdx] ? cols[batchIdx].toUpperCase() : 'A1';
         const academicYear = ayIdx >= 0 && cols[ayIdx] ? cols[ayIdx] : '2026-27';
 
-        const existingIdx = app.data.students.findIndex(s => s.uin === uin || s.email === email);
+        const cleanId = (uin || (email ? email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        const studentId = 'st-' + cleanId;
+
+        const existingIdx = app.data.students.findIndex(s => s.id === studentId || (s.uin && s.uin.toLowerCase() === uin.toLowerCase()) || (s.email && s.email.toLowerCase() === email.toLowerCase()));
         const studentRecord = {
-          id: existingIdx >= 0 ? app.data.students[existingIdx].id : 'st-' + Date.now() + '-' + i,
+          id: studentId,
           uin: uin,
           name: name,
           email: email,
@@ -893,18 +896,29 @@ const adminView = {
 
   saveNewStudent(e) {
     e.preventDefault();
+    const uin = (document.getElementById('new-uin').value || '').trim();
+    const email = (document.getElementById('new-email').value || '').trim().toLowerCase();
+    const cleanKey = (uin || (email ? email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const cleanId = 'st-' + cleanKey;
+
     const newSt = {
-      id: 'st-' + Date.now(),
-      uin: (document.getElementById('new-uin').value || '').trim(),
+      id: cleanId,
+      uin: uin,
       name: (document.getElementById('new-name').value || '').trim(),
-      email: (document.getElementById('new-email').value || '').trim().toLowerCase(),
+      email: email,
       academicYear: document.getElementById('new-ay').value,
       yearOfStudy: document.getElementById('new-year').value,
       branch: document.getElementById('new-branch').value,
       division: document.getElementById('new-div').value,
       batch: (document.getElementById('new-batch').value || '').trim()
     };
-    app.data.students.push(newSt);
+
+    const existingIdx = app.data.students.findIndex(s => s.id === cleanId || (s.uin && s.uin.toLowerCase() === uin.toLowerCase()));
+    if (existingIdx >= 0) {
+      app.data.students[existingIdx] = newSt;
+    } else {
+      app.data.students.push(newSt);
+    }
     app.saveState();
 
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -1005,11 +1019,17 @@ const adminView = {
     const idx = app.data.students.findIndex(s => s.id === id);
     if (idx === -1) return;
 
+    const uin = (document.getElementById('edit-st-uin').value || '').trim();
+    const email = (document.getElementById('edit-st-email').value || '').trim().toLowerCase();
+    const cleanKey = (uin || (email ? email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const cleanId = 'st-' + cleanKey;
+
     const updated = {
       ...app.data.students[idx],
-      uin: (document.getElementById('edit-st-uin').value || '').trim(),
+      id: cleanId,
+      uin: uin,
       name: (document.getElementById('edit-st-name').value || '').trim(),
-      email: (document.getElementById('edit-st-email').value || '').trim().toLowerCase(),
+      email: email,
       academicYear: document.getElementById('edit-st-ay').value,
       yearOfStudy: document.getElementById('edit-st-year').value,
       branch: document.getElementById('edit-st-branch').value,

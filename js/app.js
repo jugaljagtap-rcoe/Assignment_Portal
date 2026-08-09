@@ -64,13 +64,16 @@ class AppEngine {
       const { data: stData, error: stErr } = await supabaseClient.from('students').select('*');
       if (!stErr && stData && Array.isArray(stData) && stData.length > 0) {
         stData.forEach(st => {
-          const stUin = (st.uin || '').trim().toLowerCase();
+          const stUin = (st.uin || (st.email ? st.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
           const stEmail = (st.email || '').trim().toLowerCase();
+          const cleanId = 'st-' + stUin;
+
           const existingIdx = this.data.students.findIndex(x =>
-            x.id === st.id ||
-            (stUin && x.uin && x.uin.trim().toLowerCase() === stUin) ||
+            x.id === cleanId ||
+            (x.uin && x.uin.trim().toLowerCase() === stUin) ||
             (stEmail && x.email && x.email.trim().toLowerCase() === stEmail)
           );
+
           let resolvedYear = (st.year_of_study && st.year_of_study !== 'FE') ? st.year_of_study : null;
           if (!resolvedYear) {
             if (existingIdx >= 0 && this.data.students[existingIdx].yearOfStudy) {
@@ -81,8 +84,8 @@ class AppEngine {
           }
 
           const formatted = {
-            id: st.id,
-            uin: st.uin,
+            id: cleanId,
+            uin: st.uin || stUin.toUpperCase(),
             name: st.name,
             email: st.email,
             academicYear: st.academic_year || '2026-27',
@@ -98,11 +101,12 @@ class AppEngine {
           }
         });
 
-        // Deduplicate local student roster by UIN/Email to prevent orphan records
+        // Deduplicate local student roster by deterministic clean ID
         const uniqueStudentsMap = new Map();
         this.data.students.forEach(s => {
-          const key = (s.uin || s.email || s.id).trim().toLowerCase();
-          uniqueStudentsMap.set(key, s);
+          const uinKey = (s.uin || (s.email ? s.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          s.id = 'st-' + uinKey;
+          uniqueStudentsMap.set(uinKey, s);
         });
         this.data.students = Array.from(uniqueStudentsMap.values());
       }
@@ -668,6 +672,28 @@ class AppEngine {
     }
 
     if (!state.students) state.students = [];
+    
+    // Standardize all student IDs to deterministic format (st-{uin}) and merge seed data
+    const uniqueStMap = new Map();
+    (state.students || []).forEach(st => {
+      const uinKey = (st.uin || (st.email ? st.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      st.id = 'st-' + uinKey;
+      uniqueStMap.set(uinKey, st);
+    });
+    (INITIAL_DATA.students || []).forEach(seedSt => {
+      const seedKey = (seedSt.uin || seedSt.email.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      if (!uniqueStMap.has(seedKey)) {
+        uniqueStMap.set(seedKey, seedSt);
+      } else {
+        const existing = uniqueStMap.get(seedKey);
+        if (seedSt.yearOfStudy === 'TE' && (!existing.yearOfStudy || existing.yearOfStudy === 'FE')) {
+          existing.yearOfStudy = 'TE';
+          existing.branch = seedSt.branch;
+          existing.batch = seedSt.batch;
+        }
+      }
+    });
+    state.students = Array.from(uniqueStMap.values());
     if (!state.faculty) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
     if (!state.courseOutcomes) state.courseOutcomes = [];
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
