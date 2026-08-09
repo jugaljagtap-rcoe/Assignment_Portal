@@ -320,29 +320,7 @@ const INITIAL_DATA = {
           lateMaxCap: 30
         }
       ],
-      questions: [
-        {
-          id: "q-vmd-custom-01",
-          number: 1,
-          sectionLabel: "Q1",
-          text: "Determine the natural frequency of the single degree of freedom system given shaft diameter d = {{d}} mm, length L = {{L}} m.",
-          coId: "co-1",
-          btLevel: "BT3",
-          parameters: [
-            {
-              id: "p-vmd-custom-01-fn",
-              code: "Q001_P01",
-              order: 1,
-              label: "Experimental Natural Frequency (fn)",
-              acceptedUnits: ["Hz", "rad/s"],
-              unitRequired: true,
-              valueMarks: 5,
-              unitMarks: 1,
-              tolerancePct: 5
-            }
-          ]
-        }
-      ]
+      questions: []
     }
   ],
 

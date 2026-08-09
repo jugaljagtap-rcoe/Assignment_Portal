@@ -149,6 +149,15 @@ class AppEngine {
         asgData.forEach(asg => {
           if (asg.code === 'VMD-EXP-01' || asg.code === 'EM-EXP-01' || asg.id === 'asg-vmd-001' || asg.id === 'asg-em-001') return;
           const existingIdx = this.data.assignments.findIndex(x => x.id === asg.id || x.code === asg.code);
+          let parsedSchedules = asg.schedules;
+          if (typeof parsedSchedules === 'string') {
+            try { parsedSchedules = JSON.parse(parsedSchedules); } catch(e) { parsedSchedules = []; }
+          }
+          let parsedQuestions = asg.questions;
+          if (typeof parsedQuestions === 'string') {
+            try { parsedQuestions = JSON.parse(parsedQuestions); } catch(e) { parsedQuestions = []; }
+          }
+
           const formatted = {
             id: asg.id,
             code: asg.code,
@@ -165,8 +174,8 @@ class AppEngine {
             deadline: asg.deadline,
             rubricPresetId: asg.rubric_preset_id,
             createdAt: asg.created_at,
-            schedules: asg.schedules || [],
-            questions: (asg.questions && asg.questions.length > 0) ? asg.questions : []
+            schedules: Array.isArray(parsedSchedules) ? parsedSchedules : [],
+            questions: Array.isArray(parsedQuestions) ? parsedQuestions : []
           };
           if (existingIdx >= 0) {
             if (formatted.questions.length === 0 && this.data.assignments[existingIdx].questions && this.data.assignments[existingIdx].questions.length > 0) {
@@ -336,12 +345,12 @@ class AppEngine {
 
       let { error } = await supabaseClient.from('assignments').upsert(payload);
       if (error) {
-        console.warn('Supabase assignment upsert notice:', error);
-        delete payload.schedules;
-        delete payload.questions;
+        console.warn('Supabase assignment upsert notice, trying stringified JSON payload:', error);
+        payload.schedules = JSON.stringify(asg.schedules || []);
+        payload.questions = JSON.stringify(asg.questions || []);
         const retry = await supabaseClient.from('assignments').upsert(payload);
-        if (retry.error) console.warn('Supabase assignment fallback retry notice:', retry.error);
-        else console.log('Synced assignment (base) to Supabase Cloud:', asg.code);
+        if (retry.error) console.warn('Supabase assignment stringified retry notice:', retry.error);
+        else console.log('Successfully synced assignment (stringified JSON) to Supabase Cloud:', asg.code);
       } else {
         console.log('Successfully synced full assignment to Supabase Cloud:', asg.code);
       }
@@ -789,18 +798,6 @@ class AppEngine {
         }
       });
     }
-
-    // Guarantee RCOE/Mech/2026-27/VMDLab_A001 has full questions populated
-    state.assignments.forEach(asg => {
-      if (asg.code === 'RCOE/Mech/2026-27/VMDLab_A001' || asg.id === 'asg-vmd-custom-001') {
-        if (!asg.questions || asg.questions.length === 0) {
-          const seed = INITIAL_DATA.assignments.find(a => a.code === 'RCOE/Mech/2026-27/VMDLab_A001');
-          if (seed && seed.questions && seed.questions.length > 0) {
-            asg.questions = JSON.parse(JSON.stringify(seed.questions));
-          }
-        }
-      }
-    });
     if (!state.submissions) state.submissions = [];
     if (!state.studentVariables) state.studentVariables = [];
     if (!state.studentAnswers) state.studentAnswers = [];
