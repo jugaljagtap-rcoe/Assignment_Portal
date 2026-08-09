@@ -471,7 +471,7 @@ const studentView = {
         </div>
 
         <!-- Student Notice Box -->
-        <div style="border:2px solid #C00000; background:#FFF5F5; padding:10px 14px; margin-bottom:18px; border-radius:4px; font-size:11px; color:#900;">
+        <div class="student-notice-box" style="border:2px solid #C00000; background:#FFF5F5; padding:10px 14px; margin-bottom:18px; border-radius:4px; font-size:11px; color:#900;">
           <strong style="font-size:12px;">📌 IMPORTANT SUBMISSION NOTICE FOR STUDENTS:</strong>
           <ul style="margin:4px 0 0 18px; padding:0;">
             <li><strong>Your data is unique:</strong> The values given in your questions are assigned only to you. Do not share or compare with others.</li>
@@ -479,8 +479,8 @@ const studentView = {
           </ul>
         </div>
 
-        <!-- Questions Section -->
-        <div style="border-top:2px solid #000; padding-top:14px;">
+        <!-- Questions Section (Always Starts On Page 2) -->
+        <div class="questions-section-printable" style="border-top:2px solid #000; padding-top:14px;">
           <h3 style="font-size:14px; margin-bottom:12px; text-transform:uppercase;">Experiment Questions & Evaluation Parameters</h3>
           
           ${asg.questions.map(q => {

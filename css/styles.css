@@ -1106,7 +1106,6 @@ sub {
   .card,
   .kpi-grid,
   .sub-tabs-container,
-  .student-notice-box,
   .diagram-fallback-card,
   .skip-link,
   #sidebar-nav,
@@ -1173,6 +1172,21 @@ sub {
   img {
     max-width: 100% !important;
     page-break-inside: avoid;
+  }
+
+  /* Page Break Boundary Rules for Assignment Sheet Printing */
+  .student-notice-box {
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 20px !important;
+  }
+
+  .questions-section-printable {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 0 !important;
+    padding-top: 14px !important;
   }
 
   table, tr, .question-block {
