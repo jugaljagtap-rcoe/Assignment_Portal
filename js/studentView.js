@@ -260,103 +260,123 @@ const studentView = {
   },
 
   renderSolverCanvas(container) {
-    const student = this.getResolvedStudent();
-    const studentAssignments = this.getAssignmentsForStudent(student);
-    const asg = studentAssignments.find(a => a.id === app.activeAssignmentId) || (studentAssignments.length > 0 ? studentAssignments[0] : null);
+    try {
+      const student = this.getResolvedStudent();
+      const studentAssignments = this.getAssignmentsForStudent(student);
+      const asg = (app.data.assignments || []).find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId) ||
+                  studentAssignments.find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId) ||
+                  (studentAssignments.length > 0 ? studentAssignments[0] : null);
 
-    if (!asg || !student) {
-      container.innerHTML = `
-        <div class="card" style="padding:40px; text-align:center;">
-          <h2 style="font-size:18px; margin-bottom:8px;">No Active Canvas Sheet</h2>
-          <p style="color:var(--text-secondary); margin-bottom:16px;">
-            ${!student ? 'No student profile selected.' : 'There are currently no lab assignments published for your class/branch to solve.'}
-          </p>
-          <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
-        </div>
-      `;
-      return;
-    }
+      if (!asg || !student) {
+        container.innerHTML = `
+          <div class="card" style="padding:40px; text-align:center;">
+            <h2 style="font-size:18px; margin-bottom:8px;">No Active Canvas Sheet</h2>
+            <p style="color:var(--text-secondary); margin-bottom:16px;">
+              ${!student ? 'No student profile selected.' : 'There are currently no lab assignments published for your class/branch to solve.'}
+            </p>
+            <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
+          </div>
+        `;
+        return;
+      }
 
-    if (asg.questions.length === 0) {
+      // Guarantee questions are loaded if missing
+      if (!asg.questions || asg.questions.length === 0) {
+        const seed = INITIAL_DATA.assignments.find(a => a.code === asg.code || a.id === asg.id);
+        if (seed && seed.questions && seed.questions.length > 0) {
+          asg.questions = JSON.parse(JSON.stringify(seed.questions));
+        }
+      }
+
+      if (!asg.questions || asg.questions.length === 0) {
+        container.innerHTML = `
+          <div class="page-header-container">
+            <div>
+              <h1 class="page-title">Solve Assignment</h1>
+              <p class="page-subtitle">${asg.code} — ${asg.title}</p>
+            </div>
+            <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Back to Dashboard</button>
+          </div>
+          <div class="card" style="padding:48px 24px; text-align:center;">
+            <div style="font-size:48px; margin-bottom:12px;">📋</div>
+            <h2 style="font-size:18px; font-weight:700; margin-bottom:8px;">Questions Not Yet Published</h2>
+            <p style="color:var(--text-secondary); max-width:480px; margin:0 auto; font-size:13px;">
+              Your faculty is still building the questions for <strong>${asg.code}</strong>. 
+              Please check back later or contact your subject faculty for an update.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      const subject = (app.data.subjects || []).find(s => s.id === asg.subjectId || s.code === asg.subjectId);
+      const department = subject ? (app.data.departments || []).find(d => d.id === subject.departmentId) : null;
+      const schedule = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1') || {
+        deadline: '2026-12-31T23:59',
+        submissionsOpen: true,
+        gradesReleased: true,
+        latePenaltyValue: 10,
+        lateMaxCap: 30
+      };
+
+      const deadlineText = schedule.deadline ? new Date(schedule.deadline).toLocaleString() : '31/12/2026, 11:59:00 PM';
+      const isLate = schedule.deadline ? new Date() > new Date(schedule.deadline) : false;
+
+      const deptTitle = department ? department.name.toUpperCase() : 'MECHANICAL ENGINEERING DEPARTMENT';
+      const deptVision = department ? department.vision : "To establish a strong foundation in basic sciences, engineering principles, and ethical values.";
+      const deptMission = department ? department.mission : [
+        "To provide a strong foundation in basic sciences and engineering fundamentals.",
+        "To nurture critical thinking and analytical problem-solving abilities.",
+        "To bridge theoretical knowledge with practical laboratory experimentation."
+      ];
+
+      // Build Student Variable Map
+      const studentVars = {};
+      (app.data.studentVariables || []).forEach(v => {
+        if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.code)) {
+          studentVars[v.key] = v.value;
+        }
+      });
+
+      const hasVariables = Object.keys(studentVars).length > 0;
+
+      // Count how many unique variable placeholders exist in this assignment's questions
+      const variablePlaceholders = new Set();
+      asg.questions.forEach(q => {
+        const matches = (q.text || '').match(/\{\{(.*?)\}\}/g) || [];
+        matches.forEach(m => variablePlaceholders.add(m.replace(/\{\{|\}\}/g, '').trim()));
+      });
+      const allVariablesLoaded = variablePlaceholders.size === 0 || 
+        [...variablePlaceholders].every(key => studentVars[key] !== undefined);
+
+      const currentDateFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
       container.innerHTML = `
-        <div class="page-header-container">
+        <div class="page-header-container print-hide">
           <div>
             <h1 class="page-title">Solve Assignment</h1>
             <p class="page-subtitle">${asg.code} — ${asg.title}</p>
           </div>
-          <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Back to Dashboard</button>
+          <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
         </div>
-        <div class="card" style="padding:48px 24px; text-align:center;">
-          <div style="font-size:48px; margin-bottom:12px;">📋</div>
-          <h2 style="font-size:18px; font-weight:700; margin-bottom:8px;">Questions Not Yet Published</h2>
-          <p style="color:var(--text-secondary); max-width:480px; margin:0 auto; font-size:13px;">
-            Your faculty is still building the questions for <strong>${asg.code}</strong>. 
-            Please check back later or contact your subject faculty for an update.
-          </p>
-        </div>
-      `;
-      return;
-    }
 
-    const subject = app.data.subjects.find(s => s.id === asg.subjectId);
-    const department = subject ? app.data.departments.find(d => d.id === subject.departmentId) : null;
-    const schedule = app.getAssignmentSchedule(asg.id, student.batch);
-
-    const deptTitle = department ? department.name.toUpperCase() : 'FIRST YEAR ENGINEERING DEPARTMENT';
-    const deptVision = department ? department.vision : "To establish a strong foundation in basic sciences, engineering principles, and ethical values.";
-    const deptMission = department ? department.mission : [
-      "To provide a strong foundation in basic sciences and engineering fundamentals.",
-      "To nurture critical thinking and analytical problem-solving abilities.",
-      "To bridge theoretical knowledge with practical laboratory experimentation."
-    ];
-
-    // Build Student Variable Map
-    const studentVars = {};
-    app.data.studentVariables.forEach(v => {
-      if (v.studentId === student.id && v.assignmentId === asg.id) {
-        studentVars[v.key] = v.value;
-      }
-    });
-
-    const hasVariables = Object.keys(studentVars).length > 0;
-
-    // Count how many unique variable placeholders exist in this assignment's questions
-    const variablePlaceholders = new Set();
-    asg.questions.forEach(q => {
-      const matches = q.text.match(/\{\{(.*?)\}\}/g) || [];
-      matches.forEach(m => variablePlaceholders.add(m.replace(/\{\{|\}\}/g, '').trim()));
-    });
-    const allVariablesLoaded = variablePlaceholders.size === 0 || 
-      [...variablePlaceholders].every(key => studentVars[key] !== undefined);
-
-    const currentDateFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-
-    container.innerHTML = `
-      <div class="page-header-container print-hide">
-        <div>
-          <h1 class="page-title">Solve Assignment</h1>
-          <p class="page-subtitle">${asg.code} — ${asg.title}</p>
-        </div>
-        <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
-      </div>
-
-      <!-- Dynamic Batch Deadline & Policy Banner -->
-      <div class="card print-hide" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <strong style="color:var(--accent-blue);">📅 Batch ${student.batch} Deadline:</strong> ${new Date(schedule.deadline).toLocaleString()}
-            <span style="font-size:12px; color:var(--text-secondary); margin-left:12px;">(Attempts Allowed: Max 3 per parameter | Retries: 2nd = -10%, 3rd = -20%)</span>
-            ${new Date() > new Date(schedule.deadline) ? `
-              <div style="margin-top:8px; background:var(--danger-subtle); border:1px solid var(--danger); border-radius:var(--radius-md); padding:8px 12px; font-size:12px; color:var(--danger); font-weight:600;">
-                ⚠️ LATE SUBMISSION: Your batch deadline has passed. 
-                A late penalty of ${schedule.latePenaltyValue || 10}% per day 
-                (max ${schedule.lateMaxCap || 30}%) will be applied to all marks earned.
-              </div>
-            ` : ''}
+        <!-- Dynamic Batch Deadline & Policy Banner -->
+        <div class="card print-hide" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="color:var(--accent-blue);">📅 Batch ${student.batch} Deadline:</strong> ${deadlineText}
+              <span style="font-size:12px; color:var(--text-secondary); margin-left:12px;">(Attempts Allowed: Max 3 per parameter | Retries: 2nd = -10%, 3rd = -20%)</span>
+              ${isLate ? `
+                <div style="margin-top:8px; background:var(--danger-subtle); border:1px solid var(--danger); border-radius:var(--radius-md); padding:8px 12px; font-size:12px; color:var(--danger); font-weight:600;">
+                  ⚠️ LATE SUBMISSION: Your batch deadline has passed. 
+                  A late penalty of ${schedule.latePenaltyValue || 10}% per day 
+                  (max ${schedule.lateMaxCap || 30}%) will be applied to all marks earned.
+                </div>
+              ` : ''}
+            </div>
+            <span class="tag tag-success">Submissions Open</span>
           </div>
-          <span class="tag tag-success">Submissions Open</span>
         </div>
-      </div>
 
       ${!hasVariables && variablePlaceholders.size > 0 ? `
         <div class="card print-hide" style="margin-bottom:20px; background:var(--danger-subtle); border-color:var(--danger);">
@@ -547,6 +567,18 @@ const studentView = {
         </div>
       </div>
     `;
+    } catch(err) {
+      console.error('Error rendering solver canvas:', err);
+      container.innerHTML = `
+        <div class="card" style="padding:40px; text-align:center;">
+          <h2 style="font-size:18px; margin-bottom:8px; color:var(--accent-blue);">Solve Assignment</h2>
+          <p style="color:var(--text-secondary); margin-bottom:16px;">
+            Unable to load solver canvas. Please return to the dashboard.
+          </p>
+          <button class="btn btn-primary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
+        </div>
+      `;
+    }
   },
 
   buildParameterSubmissionRow(asgId, studentId, param) {
