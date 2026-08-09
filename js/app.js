@@ -39,6 +39,7 @@ class AppEngine {
     const savedAsgId = localStorage.getItem('rizvi_fe_active_asg_id');
     const firstAsgId = this.data.assignments.length > 0 ? this.data.assignments[0].id : null;
     this.activeAssignmentId = savedAsgId || firstAsgId || null;
+    this.reconcileUserSession();
   }
 
   init() {
@@ -210,6 +211,7 @@ class AppEngine {
       }
 
       this.saveState();
+      this.reconcileUserSession();
       this.renderCurrentView();
     } catch (e) {
       console.warn('Supabase cloud sync background notice:', e);
@@ -414,6 +416,7 @@ class AppEngine {
       this.saveUserSession(sessionUser);
       this.currentRole = role;
       if (studentId) this.activeStudentId = studentId;
+      this.reconcileUserSession();
       this.closeModal();
       this.showToast(`Welcome back, ${sessionUser.name}! (${sessionUser.email})`, 'success');
       this.renderRoleSwitcher();
@@ -709,8 +712,39 @@ class AppEngine {
   resetState() {
     this.data = JSON.parse(JSON.stringify(INITIAL_DATA));
     this.saveState();
+    this.reconcileUserSession();
     this.showToast('Database reset to default seed state', 'success');
     this.renderCurrentView();
+  }
+
+  reconcileUserSession() {
+    if (!this.currentUser) return;
+
+    const email = (this.currentUser.email || '').trim().toLowerCase();
+    const uin = (this.currentUser.uin || '').trim().toLowerCase();
+    const studentId = this.currentUser.studentId;
+
+    if (email || uin || studentId) {
+      const matchedStudent = (this.data.students || []).find(s =>
+        (email && s.email && s.email.trim().toLowerCase() === email) ||
+        (uin && s.uin && s.uin.trim().toLowerCase() === uin) ||
+        (studentId && s.id === studentId)
+      );
+
+      if (matchedStudent) {
+        this.currentUser.role = 'student';
+        this.currentUser.studentId = matchedStudent.id;
+        this.currentUser.branch = matchedStudent.branch;
+        this.currentUser.batch = matchedStudent.batch;
+        this.currentUser.uin = matchedStudent.uin;
+        if (!this.currentUser.name || this.currentUser.name === 'User') {
+          this.currentUser.name = matchedStudent.name;
+        }
+        this.currentRole = 'student';
+        this.activeStudentId = matchedStudent.id;
+        this.saveUserSession(this.currentUser);
+      }
+    }
   }
 
   getAssignmentSchedule(asgId, batchName) {

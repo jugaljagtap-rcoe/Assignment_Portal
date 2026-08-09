@@ -60,8 +60,24 @@ const studentView = {
     });
   },
 
+  getResolvedStudent() {
+    let student = app.data.students.find(s => s.id === app.activeStudentId);
+    if (!student && app.currentUser && app.currentUser.email) {
+      const email = app.currentUser.email.trim().toLowerCase();
+      const uin = (app.currentUser.uin || '').trim().toLowerCase();
+      student = app.data.students.find(s =>
+        (s.email && s.email.trim().toLowerCase() === email) ||
+        (s.uin && s.uin.trim().toLowerCase() === uin)
+      );
+    }
+    if (!student && app.data.students.length > 0) {
+      student = app.data.students[0];
+    }
+    return student || null;
+  },
+
   renderDashboard(container) {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const student = this.getResolvedStudent();
 
     if (!student && app.currentUser && app.currentUser.role === 'student') {
       container.innerHTML = `
@@ -244,7 +260,7 @@ const studentView = {
   },
 
   renderSolverCanvas(container) {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const student = this.getResolvedStudent();
     const studentAssignments = this.getAssignmentsForStudent(student);
     const asg = studentAssignments.find(a => a.id === app.activeAssignmentId) || (studentAssignments.length > 0 ? studentAssignments[0] : null);
 
@@ -689,7 +705,7 @@ const studentView = {
   },
 
   renderStudentGrades(container) {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const student = this.getResolvedStudent();
     const studentAssignments = this.getAssignmentsForStudent(student);
     const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId) || studentAssignments[0]) : null;
     const mySubmissions = student && activeAsg
@@ -900,7 +916,7 @@ const studentView = {
   },
 
   exportStudentGradesCSV() {
-    const student = app.data.students.find(s => s.id === app.activeStudentId) || (app.data.students.length > 0 ? app.data.students[0] : null);
+    const student = this.getResolvedStudent();
     if (!student) {
       app.showToast('No active student profile found to export', 'danger');
       return;
