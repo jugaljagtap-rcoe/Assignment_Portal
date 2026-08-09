@@ -3,7 +3,7 @@
    ========================================================================== */
 
 const facultyView = {
-  activeCSVAssignmentId: 'asg-001',
+  activeCSVAssignmentId: null,
   tempModalParameters: [],
 
   render(container, activeNav) {

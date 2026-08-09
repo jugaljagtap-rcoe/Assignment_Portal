@@ -227,9 +227,6 @@ class AppEngine {
       // Purge ghost assignments from Supabase Cloud DB
       this.purgeGhostAssignmentsFromSupabase();
 
-      // Push local assignments to Supabase Cloud to ensure cross-browser availability
-      this.syncAllAssignmentsToSupabase();
-
       // Fetch submissions from Supabase
       const { data: submData, error: submErr } = await supabaseClient.from('submissions').select('*');
       if (!submErr && submData && Array.isArray(submData) && submData.length > 0) {
@@ -300,6 +297,11 @@ class AppEngine {
             this.data.studentAnswers.push(formatted);
           }
         });
+      }
+
+      // Only push local assignments to Supabase Cloud if current user is faculty or admin
+      if (this.currentUser && (this.currentRole === 'faculty' || this.currentRole === 'admin')) {
+        await this.syncAllAssignmentsToSupabase();
       }
 
       this.saveState();
@@ -996,19 +998,23 @@ class AppEngine {
   }
 
   ensureActiveAssignment() {
-    let match = (this.data.assignments || []).find(a =>
+    let pool = (this.data.assignments || []);
+    if (this.currentRole === 'student' && typeof studentView !== 'undefined') {
+      const student = studentView.getResolvedStudent();
+      const studentAsgs = studentView.getAssignmentsForStudent(student);
+      if (studentAsgs && studentAsgs.length > 0) {
+        pool = studentAsgs;
+      }
+    }
+
+    let match = pool.find(a =>
       a.id === this.activeAssignmentId ||
       a.code === this.activeAssignmentId ||
       (a.originalId && a.originalId === this.activeAssignmentId)
     );
 
-    // If current activeNav is student, check student's visible assignments
-    if (!match && this.currentRole === 'student' && typeof studentView !== 'undefined') {
-      const student = studentView.getResolvedStudent();
-      const studentAsgs = studentView.getAssignmentsForStudent(student);
-      if (studentAsgs && studentAsgs.length > 0) {
-        match = studentAsgs[0];
-      }
+    if (!match && pool.length > 0) {
+      match = pool[0];
     }
 
     if (!match && this.data.assignments && this.data.assignments.length > 0) {
