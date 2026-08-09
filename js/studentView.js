@@ -466,7 +466,7 @@ const studentView = {
           <!-- Large, Crystal Clear Bloom's Taxonomy Pyramid Diagram -->
           <div style="border-top:1px solid #000; padding-top:12px; text-align:center;">
             <div style="font-size:11px; font-weight:700; margin-bottom:8px; text-transform:uppercase; color:#333;">Bloom's Taxonomy Cognitive Domain Levels</div>
-            <img src="assets/blooms_taxonomy.png" style="max-width:100%; height:240px; display:block; margin:0 auto; object-fit:contain;" alt="Bloom's Taxonomy Pyramid">
+            <img src="assets/blooms_taxonomy.png" class="blooms-pyramid-img" style="max-width:100%; height:240px; display:block; margin:0 auto; object-fit:contain;" alt="Bloom's Taxonomy Pyramid">
           </div>
         </div>
 

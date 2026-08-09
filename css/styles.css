@@ -1175,18 +1175,29 @@ sub {
   }
 
   /* Page Break Boundary Rules for Assignment Sheet Printing */
+  .blooms-pyramid-img {
+    height: 140px !important;
+    max-height: 140px !important;
+    margin: 4px auto !important;
+  }
+
+  .printable-assignment-sheet > div {
+    margin-bottom: 8px !important;
+  }
+
   .student-notice-box {
     display: block !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    margin-bottom: 20px !important;
+    margin-bottom: 0 !important;
+    padding: 6px 10px !important;
   }
 
   .questions-section-printable {
     page-break-before: always !important;
     break-before: page !important;
     margin-top: 0 !important;
-    padding-top: 14px !important;
+    padding-top: 10px !important;
   }
 
   table, tr, .question-block {
@@ -1210,7 +1221,7 @@ sub {
   }
 
   @page {
-    margin: 15mm 12mm;
+    margin: 8mm 10mm;
     size: A4 portrait;
   }
 }
