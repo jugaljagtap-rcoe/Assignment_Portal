@@ -967,6 +967,20 @@ const facultyView = {
     }
   },
 
+  selectAssignmentToEdit(asgId) {
+    if (asgId) {
+      app.activeAssignmentId = asgId;
+      localStorage.setItem('rizvi_fe_active_asg_id', asgId);
+    }
+    this.renderAssignmentBuilder(document.getElementById('main-content'));
+    setTimeout(() => {
+      const qbEl = document.getElementById('question-builder-section');
+      if (qbEl) {
+        qbEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  },
+
   renderAssignmentBuilder(container) {
     const assignments = app.data.assignments || [];
     const subjects = app.data.subjects || [];
@@ -1051,7 +1065,7 @@ const facultyView = {
                           <td><span class="tag tag-co">${asg.semester || 'Sem 1'}</span></td>
                           <td><span class="tag ${isOpen ? 'tag-success' : 'tag-danger'}">${isOpen ? 'Open' : 'Closed'}</span></td>
                           <td style="display:flex; gap:6px;">
-                            <button class="btn btn-secondary btn-sm" onclick="app.activeAssignmentId='${asg.id}'; facultyView.renderAssignmentBuilder(document.getElementById('main-content'));">✏️ Edit Questions</button>
+                            <button class="btn btn-secondary btn-sm" onclick="facultyView.selectAssignmentToEdit('${asg.id}')">✏️ Edit Questions</button>
                             <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteAssignment('${asg.id}')">🗑️ Delete</button>
                           </td>
                         </tr>
@@ -1090,7 +1104,7 @@ const facultyView = {
 
     // Section 4: Question Builder
     html += `
-      <div class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
+      <div id="question-builder-section" class="page-separator" style="margin:32px 0 20px 0; border-top:1px dashed var(--border-default); text-align:center; position:relative;">
         <span class="page-separator__text" style="background:var(--bg-primary); padding:0 12px; font-weight:700; color:var(--text-secondary); font-size:13px;">📝 Question Builder</span>
       </div>
     `;
@@ -1101,7 +1115,7 @@ const facultyView = {
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:280px;">
             <span style="font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap;">Editing Assignment:</span>
             <select class="form-select" style="flex:1; max-width:480px; font-size:13px; font-weight:600; color:var(--accent-blue); background:var(--bg-primary); border:1px solid var(--border-default); border-radius:6px; padding:6px 12px; cursor:pointer;"
-              onchange="app.activeAssignmentId=this.value; localStorage.setItem('rizvi_fe_active_asg_id', this.value); facultyView.renderAssignmentBuilder(document.getElementById('main-content'));">
+              onchange="facultyView.selectAssignmentToEdit(this.value)">
               ${assignments.map(a => `
                 <option value="${a.id}" ${a.id === selectedAsg.id ? 'selected' : ''}>
                   ${a.code} — ${a.title}
