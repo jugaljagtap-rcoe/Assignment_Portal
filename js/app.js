@@ -147,7 +147,7 @@ class AppEngine {
       const { data: asgData, error: asgErr } = await supabaseClient.from('assignments').select('*');
       if (!asgErr && asgData && Array.isArray(asgData) && asgData.length > 0) {
         asgData.forEach(asg => {
-          const existingIdx = this.data.assignments.findIndex(x => x.id === asg.id);
+          const existingIdx = this.data.assignments.findIndex(x => x.id === asg.id || x.code === asg.code);
           const formatted = {
             id: asg.id,
             code: asg.code,
@@ -174,6 +174,16 @@ class AppEngine {
           }
         });
       }
+
+      // Guarantee seed assignments exist in assignments array
+      (INITIAL_DATA.assignments || []).forEach(seedAsg => {
+        if (!this.data.assignments.some(a => a.id === seedAsg.id || a.code === seedAsg.code)) {
+          this.data.assignments.push(seedAsg);
+        }
+      });
+
+      // Push local assignments to Supabase Cloud to ensure cross-browser availability
+      this.syncAllAssignmentsToSupabase();
 
       // Fetch submissions from Supabase
       const { data: submData, error: submErr } = await supabaseClient.from('submissions').select('*');
@@ -256,29 +266,39 @@ class AppEngine {
     }
   }
 
+  async syncAllAssignmentsToSupabase() {
+    if (!supabaseClient || !this.data.assignments) return;
+    for (const asg of this.data.assignments) {
+      await this.syncAssignmentToSupabase(asg);
+    }
+  }
+
   async syncAssignmentToSupabase(asg) {
     if (!supabaseClient || !asg) return;
     try {
-      const { error } = await supabaseClient.from('assignments').upsert({
+      const payload = {
         id: asg.id,
         code: asg.code,
         subject_id: asg.subjectId,
         faculty_id: asg.facultyId,
-        number: asg.number,
+        number: asg.number || 1,
         title: asg.title,
         class_name: asg.className,
         semester: asg.semester,
-        assessment_type: asg.assessmentType,
-        modules_covered: asg.modulesCovered,
-        outcome_covered: asg.outcomeCovered,
+        assessment_type: asg.assessmentType || 'Direct',
+        modules_covered: Array.isArray(asg.modulesCovered) ? asg.modulesCovered.join(', ') : (asg.modulesCovered || ''),
+        outcome_covered: Array.isArray(asg.outcomeCovered) ? asg.outcomeCovered.join(', ') : (asg.outcomeCovered || ''),
         publish_date: asg.publishDate,
         deadline: asg.deadline,
         rubric_preset_id: asg.rubricPresetId,
-        created_at: asg.createdAt,
-        schedules: asg.schedules,
-        questions: asg.questions
-      });
+        created_at: asg.createdAt || new Date().toISOString().split('T')[0],
+        schedules: asg.schedules || [],
+        questions: asg.questions || []
+      };
+
+      const { error } = await supabaseClient.from('assignments').upsert(payload);
       if (error) console.warn('Supabase assignment sync notice:', error);
+      else console.log('Successfully synced assignment to Supabase Cloud:', asg.code);
     } catch(e) {
       console.warn('Supabase assignment sync error:', e);
     }
@@ -709,7 +729,15 @@ class AppEngine {
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
     state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
-    if (!state.assignments) state.assignments = [];
+    if (!state.assignments || state.assignments.length === 0) {
+      state.assignments = JSON.parse(JSON.stringify(INITIAL_DATA.assignments));
+    } else {
+      (INITIAL_DATA.assignments || []).forEach(seedAsg => {
+        if (!state.assignments.some(a => a.id === seedAsg.id || a.code === seedAsg.code)) {
+          state.assignments.push(seedAsg);
+        }
+      });
+    }
     if (!state.submissions) state.submissions = [];
     if (!state.studentVariables) state.studentVariables = [];
     if (!state.studentAnswers) state.studentAnswers = [];
