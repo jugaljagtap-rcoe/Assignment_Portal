@@ -425,7 +425,14 @@ const studentView = {
 
                 <div style="font-size:13px; line-height:1.6; margin-bottom:10px;">${substitutedText}</div>
 
-                ${q.imageUrl ? `<img src="${q.imageUrl}" style="max-height:160px; display:block; margin:10px 0; border:1px solid #CCC;" alt="Diagram">` : ''}
+                ${q.imageUrl ? `
+                  <div class="question-diagram-container" style="margin:10px 0;">
+                    <img src="${app.getEmbeddableImageUrl(q.imageUrl)}" 
+                         style="max-height:220px; width:auto; border:1px solid #CCC; border-radius:6px; display:block; max-width:100%; margin:8px 0;" 
+                         alt="Diagram"
+                         onerror="app.handleImageError(this, ${JSON.stringify(q.imageUrl || '')})">
+                  </div>
+                ` : ''}
 
                 <!-- Answer Form Inputs -->
                 <div style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">

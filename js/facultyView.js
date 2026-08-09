@@ -1155,7 +1155,15 @@ const facultyView = {
             </div>
             <div class="question-text">${q.text.replace(/\{\{(.*?)\}\}/g, '<span class="var-chip">{{$1}}</span>')}</div>
 
-            ${q.imageUrl ? `<img src="${q.imageUrl}" class="question-diagram" alt="Experiment Diagram">` : ''}
+            ${q.imageUrl ? `
+              <div class="question-diagram-container" style="margin:12px 0;">
+                <img src="${app.getEmbeddableImageUrl(q.imageUrl)}" 
+                     class="question-diagram" 
+                     alt="Experiment Diagram" 
+                     style="max-height:280px; width:auto; border:1px solid var(--border-default); border-radius:var(--radius-md); display:block; max-width:100%; margin:10px 0;"
+                     onerror="app.handleImageError(this, ${JSON.stringify(q.imageUrl || '')})">
+              </div>
+            ` : ''}
 
             <div style="margin-top:16px;">
               <div style="font-size:12px; font-weight:600; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Evaluation Parameters (${q.parameters.length}):</div>
@@ -1247,8 +1255,13 @@ const facultyView = {
         </div>
 
         <div class="form-group">
-          <label class="form-label">Diagram Image URL / Google Drive Share Link</label>
-          <input type="url" id="q-img" class="form-input" placeholder="https://drive.google.com/... or https://images.unsplash.com/...">
+          <label class="form-label">Diagram Image URL / Google Drive Share Link / Local File</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="q-img" class="form-input" placeholder="https://drive.google.com/... or paste image URL / Data URI" style="flex:1;">
+            <input type="file" id="q-img-file" accept="image/*" style="display:none;" onchange="facultyView.handleDiagramFileUpload(event)">
+            <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;" onclick="document.getElementById('q-img-file').click()">📁 Upload Image</button>
+          </div>
+          <span style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">Google Drive share links are automatically converted to embeddable images.</span>
         </div>
 
         <div style="border-top:1px solid var(--border-default); padding-top:16px; margin-top:16px;">
@@ -1335,7 +1348,7 @@ const facultyView = {
       order: asg.questions.length + 1,
       sectionLabel: document.getElementById('q-label').value,
       text: document.getElementById('q-text').value,
-      imageUrl: document.getElementById('q-img').value || '',
+      imageUrl: app.getEmbeddableImageUrl(document.getElementById('q-img').value || ''),
       coId: document.getElementById('q-co').value,
       btLevel: document.getElementById('q-bt').value,
       parameters: paramsList
@@ -1347,6 +1360,22 @@ const facultyView = {
     app.closeModal();
     app.showToast(`Added Question with ${paramsList.length} evaluation parameters`, 'success');
     this.renderAssignmentBuilder(document.getElementById('main-content'));
+  },
+
+  handleDiagramFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) {
+      app.showToast('Image file size should be under 3MB', 'warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imgInput = document.getElementById('q-img');
+      if (imgInput) imgInput.value = event.target.result;
+      app.showToast('Diagram image attached successfully', 'success');
+    };
+    reader.readAsDataURL(file);
   },
 
   getRubricLevelData(c, levelIndex) {
@@ -2024,8 +2053,21 @@ const facultyView = {
     this.renderScheduleManager(document.getElementById('main-content'));
   },
 
+  getActiveCSVAssignment() {
+    let asg = (app.data.assignments || []).find(a => a.id === this.activeCSVAssignmentId);
+    if (!asg && app.activeAssignmentId) {
+      asg = (app.data.assignments || []).find(a => a.id === app.activeAssignmentId);
+      if (asg) this.activeCSVAssignmentId = asg.id;
+    }
+    if (!asg && app.data.assignments && app.data.assignments.length > 0) {
+      asg = app.data.assignments[0];
+      this.activeCSVAssignmentId = asg.id;
+    }
+    return asg;
+  },
+
   renderCSVPipeline(container) {
-    const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId) || app.data.assignments[0];
+    const selectedAsg = this.getActiveCSVAssignment();
 
     if (!selectedAsg) {
       container.innerHTML = `
@@ -2111,8 +2153,55 @@ const facultyView = {
   },
 
   downloadQuestionCSVTemplate() {
-    const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId) || app.data.assignments[0];
-    const csvContent = "data:text/csv;charset=utf-8,uin,var_m_kg,var_k_Nmm,var_c_Nsm\n24051001,12.5,450.0,8.2\n24051002,14.0,380.0,6.5";
+    const selectedAsg = this.getActiveCSVAssignment();
+    if (!selectedAsg) {
+      app.showToast('No assignment selected for template download', 'warning');
+      return;
+    }
+
+    // Extract all variable placeholders {{var}} across questions in this assignment
+    const variableKeysSet = new Set();
+    (selectedAsg.questions || []).forEach(q => {
+      const matches = (q.text || '').match(/\{\{(.*?)\}\}/g) || [];
+      matches.forEach(m => {
+        const key = m.replace(/\{\{|\}\}/g, '').trim();
+        if (key) variableKeysSet.add(key);
+      });
+    });
+
+    const variableKeys = Array.from(variableKeysSet);
+    if (variableKeys.length === 0) {
+      app.showToast(`No {{variable}} placeholders found in questions for ${selectedAsg.code || selectedAsg.title}. Add placeholders like {{var_m}} or {{A}} in question text first.`, 'warning');
+      return;
+    }
+
+    // Build header: uin, var1, var2, ...
+    const headers = ['uin', ...variableKeys];
+
+    // Build data rows for roster students
+    const students = app.data.students || [];
+    let dataRows = [];
+
+    if (students.length > 0) {
+      dataRows = students.map(st => {
+        const rowVals = [st.uin];
+        variableKeys.forEach(vk => {
+          const existingVar = (app.data.studentVariables || []).find(v => 
+            v.studentId === st.id && v.assignmentId === selectedAsg.id && v.key === vk
+          );
+          rowVals.push(existingVar ? existingVar.value : '');
+        });
+        return rowVals.join(',');
+      });
+    } else {
+      // Sample row with empty values if no roster exists yet
+      dataRows = [`24051001,${variableKeys.map(() => '').join(',')}`];
+    }
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(',') + '\n'
+      + dataRows.join('\n');
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -2120,7 +2209,8 @@ const facultyView = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    app.showToast(`Downloaded Question CSV Template for ${selectedAsg.code}`, "success");
+
+    app.showToast(`Downloaded Question Variables Template for ${selectedAsg.code || selectedAsg.title} (${variableKeys.length} variable columns: ${variableKeys.join(', ')})`, "success");
   },
 
   deleteQuestion(asgId, questionId) {
@@ -2164,7 +2254,7 @@ const facultyView = {
   },
 
   downloadSolutionCSVTemplate() {
-    const selectedAsg = app.data.assignments.find(a => a.id === this.activeCSVAssignmentId) || app.data.assignments[0];
+    const selectedAsg = this.getActiveCSVAssignment();
     if (!selectedAsg) {
       app.showToast('No assignment selected for template download', 'warning');
       return;

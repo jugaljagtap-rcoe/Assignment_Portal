@@ -961,6 +961,48 @@ class AppEngine {
     }
   }
 
+  getEmbeddableImageUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    url = url.trim();
+    if (!url) return '';
+
+    // Data URIs or blob URLs
+    if (url.startsWith('data:image/') || url.startsWith('blob:')) return url;
+
+    // Convert Google Drive view/share URLs to direct image URLs
+    // e.g. https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+    // e.g. https://drive.google.com/open?id=FILE_ID
+    // e.g. https://drive.google.com/uc?id=FILE_ID
+    const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                       url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (driveMatch && driveMatch[1]) {
+      const fileId = driveMatch[1];
+      return `https://lh3.googleusercontent.com/d/${fileId}`;
+    }
+
+    // Convert Dropbox sharing URLs to raw direct images
+    if (url.includes('dropbox.com')) {
+      return url.replace('dl=0', 'raw=1').replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    }
+
+    return url;
+  }
+
+  handleImageError(imgEl, originalUrl) {
+    if (!imgEl || !imgEl.parentElement) return;
+    const parent = imgEl.parentElement;
+    const safeUrl = originalUrl ? String(originalUrl).replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
+    parent.innerHTML = `
+      <div class="diagram-fallback-card" style="padding:12px; border:1px dashed var(--border-warning, #e6a23c); background:var(--warning-subtle, #fdf6ec); border-radius:6px; font-size:13px; display:flex; align-items:center; gap:10px; color:var(--text-secondary, #606266); margin:10px 0;">
+        <span style="font-size:20px;">🖼️</span>
+        <div>
+          <strong>Diagram Image Failed to Load:</strong> Make sure link is set to <em>"Anyone with link can view"</em> on Google Drive, or 
+          <a href="${safeUrl}" target="_blank" rel="noopener" style="color:var(--accent-blue, #0066cc); text-decoration:underline;">click here to view diagram image directly</a>.
+        </div>
+      </div>
+    `;
+  }
+
   showToast(message, type = 'info') {
     let container = document.getElementById('toast-container');
     if (!container) {
