@@ -24,40 +24,44 @@ const studentView = {
     if (allAssignments.length === 0) return [];
     if (!student) return allAssignments;
 
-    const studentYear = (student.yearOfStudy || 'FE').toUpperCase();
+    const studentYear = (student.yearOfStudy || 'FE').trim().toUpperCase();
 
-    return allAssignments.filter(asg => {
-      const subjects = app.data.subjects || [];
-      const sub = subjects.find(s => s.id === asg.subjectId || s.code === asg.subjectId) || null;
+    const filtered = allAssignments.filter(asg => {
+      const className = (asg.className || '').trim().toUpperCase();
+      const semester = (asg.semester || '').trim().toUpperCase();
 
-      const asgText = (
-        (asg.className || '') + ' ' +
-        (asg.code || '') + ' ' +
-        (asg.title || '') + ' ' +
-        (asg.semester || '') + ' ' +
-        (sub ? (sub.className || '') + ' ' + (sub.semester || '') + ' ' + (sub.fullName || '') : '')
-      ).toUpperCase();
-
-      // First Year (FE) students: show FE & Semester I/II labs
+      // Check explicit class/semester target if specified
       if (studentYear === 'FE') {
-        if (asgText.includes('SEMESTER III') || asgText.includes('SEMESTER IV') || asgText.includes('SEMESTER V') || asgText.includes('SEMESTER VI') || asgText.includes('SEMESTER VII') || asgText.includes('SEMESTER VIII')) {
-          return false;
-        }
+        if (className.startsWith('SE') || className.startsWith('TE') || className.startsWith('BE')) return false;
+        if (semester.includes('SEMESTER III') || semester.includes('SEMESTER IV') || semester.includes('SEMESTER V') || semester.includes('SEMESTER VI') || semester.includes('SEMESTER VII') || semester.includes('SEMESTER VIII')) return false;
         return true;
       }
 
-      // Upper Year students (SE, TE, BE): hide explicit Semester I/II FE labs
-      if (asgText.includes('SEMESTER I') || asgText.includes('SEMESTER II')) {
+      // Upper year students (SE, TE, BE): hide explicit FE (Semester I / II) labs
+      if (className === 'FE' || semester.includes('SEM I') || semester.includes('SEM II') || semester.includes('SEMESTER I') || semester.includes('SEMESTER II')) {
         return false;
       }
 
-      // Hide labs meant explicitly for another upper year
-      if (studentYear === 'SE' && (asgText.includes(' TE ') || asgText.includes(' BE ') || asgText.includes('SEMESTER V') || asgText.includes('SEMESTER VI') || asgText.includes('SEMESTER VII') || asgText.includes('SEMESTER VIII'))) return false;
-      if (studentYear === 'TE' && (asgText.includes(' SE ') || asgText.includes(' BE ') || asgText.includes('SEMESTER III') || asgText.includes('SEMESTER IV') || asgText.includes('SEMESTER VII') || asgText.includes('SEMESTER VIII'))) return false;
-      if (studentYear === 'BE' && (asgText.includes(' SE ') || asgText.includes(' TE ') || asgText.includes('SEMESTER III') || asgText.includes('SEMESTER IV') || asgText.includes('SEMESTER V') || asgText.includes('SEMESTER VI'))) return false;
+      if (studentYear === 'SE') {
+        if (className.startsWith('TE') || className.startsWith('BE')) return false;
+        if (semester.includes('SEM V') || semester.includes('SEM VI') || semester.includes('SEM VII') || semester.includes('SEM VIII') || semester.includes('SEMESTER V') || semester.includes('SEMESTER VI') || semester.includes('SEMESTER VII') || semester.includes('SEMESTER VIII')) return false;
+      }
+
+      if (studentYear === 'TE') {
+        if (className.startsWith('SE') || className.startsWith('BE')) return false;
+        if (semester.includes('SEM III') || semester.includes('SEM IV') || semester.includes('SEM VII') || semester.includes('SEM VIII') || semester.includes('SEMESTER III') || semester.includes('SEMESTER IV') || semester.includes('SEMESTER VII') || semester.includes('SEMESTER VIII')) return false;
+      }
+
+      if (studentYear === 'BE') {
+        if (className.startsWith('SE') || className.startsWith('TE')) return false;
+        if (semester.includes('SEM III') || semester.includes('SEM IV') || semester.includes('SEM V') || semester.includes('SEM VI') || semester.includes('SEMESTER III') || semester.includes('SEMESTER IV') || semester.includes('SEMESTER V') || semester.includes('SEMESTER VI')) return false;
+      }
 
       return true;
     });
+
+    // Fallback: if filtering yields no assignments but there are published assignments in the system, return all published assignments so student is not stranded
+    return filtered.length > 0 ? filtered : allAssignments;
   },
 
   getResolvedStudent() {
@@ -253,8 +257,10 @@ const studentView = {
 
   calculateStudentTotalMarks(studentId) {
     let sum = 0;
+    const student = app.data.students.find(s => s.id === studentId || s.uin === studentId);
+    const uin = student ? student.uin : studentId;
     app.data.submissions.forEach(s => {
-      if (s.studentId === studentId) sum += (s.marksAwarded || 0);
+      if (s.studentId === studentId || (uin && s.studentId === uin)) sum += (s.marksAwarded || 0);
     });
     return sum;
   },
@@ -263,8 +269,8 @@ const studentView = {
     try {
       const student = this.getResolvedStudent();
       const studentAssignments = this.getAssignmentsForStudent(student);
-      const asg = (app.data.assignments || []).find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId) ||
-                  studentAssignments.find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId) ||
+      const asg = (app.data.assignments || []).find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId || (a.originalId && a.originalId === app.activeAssignmentId)) ||
+                  studentAssignments.find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId || (a.originalId && a.originalId === app.activeAssignmentId)) ||
                   (studentAssignments.length > 0 ? studentAssignments[0] : null);
 
       if (!asg || !student) {
@@ -740,9 +746,10 @@ const studentView = {
   renderStudentGrades(container) {
     const student = this.getResolvedStudent();
     const studentAssignments = this.getAssignmentsForStudent(student);
-    const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId) || studentAssignments[0]) : null;
+    const studentUin = student ? student.uin : '';
+    const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId || (a.originalId && a.originalId === app.activeAssignmentId)) || studentAssignments[0]) : null;
     const mySubmissions = student && activeAsg
-      ? app.data.submissions.filter(s => s.studentId === student.id && s.assignmentId === activeAsg.id)
+      ? app.data.submissions.filter(s => (s.studentId === student.id || (studentUin && s.studentId === studentUin)) && s.assignmentId === activeAsg.id)
       : [];
     const schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
 

@@ -163,6 +163,7 @@ class AppEngine {
 
           const formatted = {
             id: cleanId,
+            originalId: asg.id,
             code: asg.code,
             subjectId: asg.subject_id,
             facultyId: asg.faculty_id,
@@ -281,6 +282,7 @@ class AppEngine {
 
       this.saveState();
       this.reconcileUserSession();
+      this.ensureActiveAssignment();
       this.renderCurrentView();
     } catch (e) {
       console.warn('Supabase cloud sync background notice:', e);
@@ -960,10 +962,25 @@ class AppEngine {
   }
 
   ensureActiveAssignment() {
-    let match = (this.data.assignments || []).find(a => a.id === this.activeAssignmentId || a.code === this.activeAssignmentId);
+    let match = (this.data.assignments || []).find(a =>
+      a.id === this.activeAssignmentId ||
+      a.code === this.activeAssignmentId ||
+      (a.originalId && a.originalId === this.activeAssignmentId)
+    );
+
+    // If current activeNav is student, check student's visible assignments
+    if (!match && this.currentRole === 'student' && typeof studentView !== 'undefined') {
+      const student = studentView.getResolvedStudent();
+      const studentAsgs = studentView.getAssignmentsForStudent(student);
+      if (studentAsgs && studentAsgs.length > 0) {
+        match = studentAsgs[0];
+      }
+    }
+
     if (!match && this.data.assignments && this.data.assignments.length > 0) {
       match = this.data.assignments[0];
     }
+
     if (match) {
       this.activeAssignmentId = match.id;
       localStorage.setItem('rizvi_fe_active_asg_id', match.id);
