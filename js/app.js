@@ -148,7 +148,10 @@ class AppEngine {
       if (!asgErr && asgData && Array.isArray(asgData) && asgData.length > 0) {
         asgData.forEach(asg => {
           if (asg.code === 'VMD-EXP-01' || asg.code === 'EM-EXP-01' || asg.id === 'asg-vmd-001' || asg.id === 'asg-em-001') return;
-          const existingIdx = this.data.assignments.findIndex(x => x.id === asg.id || x.code === asg.code);
+          const codeKey = (asg.code || 'asg').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          const cleanId = 'asg-' + codeKey;
+
+          const existingIdx = this.data.assignments.findIndex(x => x.id === cleanId || (x.code && x.code.toLowerCase() === (asg.code || '').toLowerCase()));
           let parsedSchedules = asg.schedules;
           if (typeof parsedSchedules === 'string') {
             try { parsedSchedules = JSON.parse(parsedSchedules); } catch(e) { parsedSchedules = []; }
@@ -159,7 +162,7 @@ class AppEngine {
           }
 
           const formatted = {
-            id: asg.id,
+            id: cleanId,
             code: asg.code,
             subjectId: asg.subject_id,
             facultyId: asg.faculty_id,
@@ -784,16 +787,18 @@ class AppEngine {
     if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
     state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
     state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
-    // Purge ghost dummy assignments from local state
-    if (state.assignments && Array.isArray(state.assignments)) {
-      state.assignments = state.assignments.filter(a => a.id !== 'asg-vmd-001' && a.code !== 'VMD-EXP-01' && a.id !== 'asg-em-001' && a.code !== 'EM-EXP-01');
-    }
+    // Standardize all assignment IDs to deterministic format (asg-{code})
+    (state.assignments || []).forEach(asg => {
+      if (asg.code) {
+        asg.id = 'asg-' + asg.code.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      }
+    });
 
     if (!state.assignments || state.assignments.length === 0) {
       state.assignments = JSON.parse(JSON.stringify(INITIAL_DATA.assignments));
     } else {
       (INITIAL_DATA.assignments || []).forEach(seedAsg => {
-        if (!state.assignments.some(a => a.id === seedAsg.id || a.code === seedAsg.code)) {
+        if (!state.assignments.some(a => a.id === seedAsg.id || (a.code && seedAsg.code && a.code.toLowerCase() === seedAsg.code.toLowerCase()))) {
           state.assignments.push(seedAsg);
         }
       });

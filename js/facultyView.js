@@ -2795,12 +2795,18 @@ const facultyView = {
   saveAssignment(e) {
     e.preventDefault();
     const selectedSubId = document.getElementById('new-asg-subject').value;
+    const code = (document.getElementById('new-asg-code').value || '').trim();
+    const cleanId = 'asg-' + code.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
+    const existingIdx = app.data.assignments.findIndex(a => a.id === cleanId || (a.code && a.code.toLowerCase() === code.toLowerCase()));
+    const existingQuestions = (existingIdx >= 0 && app.data.assignments[existingIdx].questions) ? app.data.assignments[existingIdx].questions : [];
+
     const newAsg = {
-      id: 'asg-' + Date.now(),
-      code: document.getElementById('new-asg-code').value,
+      id: cleanId,
+      code: code,
       subjectId: selectedSubId,
       facultyId: 'fac-admin-jugal',
-      number: app.data.assignments.length + 1,
+      number: existingIdx >= 0 ? app.data.assignments[existingIdx].number : (app.data.assignments.length + 1),
       title: document.getElementById('new-asg-title').value,
       className: document.getElementById('new-asg-class').value,
       semester: document.getElementById('new-asg-sem').value,
@@ -2813,7 +2819,7 @@ const facultyView = {
       createdAt: new Date().toISOString().split('T')[0],
       schedules: [
         {
-          id: 'sch-' + Date.now(),
+          id: 'sch-' + cleanId,
           scopeType: 'batch',
           scopeValue: 'A1',
           publishDate: document.getElementById('new-asg-pub').value,
@@ -2824,13 +2830,18 @@ const facultyView = {
           lateMaxCap: 30
         }
       ],
-      questions: []
+      questions: existingQuestions
     };
-    app.data.assignments.push(newAsg);
+
+    if (existingIdx >= 0) {
+      app.data.assignments[existingIdx] = newAsg;
+    } else {
+      app.data.assignments.push(newAsg);
+    }
     app.saveState();
     app.syncAssignmentToSupabase(newAsg);
     app.closeModal();
-    app.showToast(`Created assignment ${newAsg.code}`, 'success');
+    app.showToast(`Saved assignment ${newAsg.code}`, 'success');
     this.renderDashboard(document.getElementById('main-content'));
   }
 };
