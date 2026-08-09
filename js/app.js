@@ -55,6 +55,13 @@ class AppEngine {
       }
     });
 
+    // Background periodic cloud sync (every 30s)
+    setInterval(() => {
+      if (supabaseClient) {
+        this.syncWithSupabase();
+      }
+    }, 30000);
+
     if (!this.currentUser) {
       // Prompt Google Auth Sign-In Modal on startup if not logged in
       this.showLoginModal(false);

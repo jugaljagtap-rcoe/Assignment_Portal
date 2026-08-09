@@ -96,7 +96,7 @@ const facultyView = {
                     <td style="font-weight:600;">${asg.title}</td>
                     <td><span class="tag ${isOpen ? 'tag-success' : 'tag-danger'}">${isOpen ? 'Open' : 'Closed'}</span></td>
                     <td>
-                      <button class="btn btn-ghost btn-sm" onclick="app.activeAssignmentId='${asg.id}'; app.switchNav('assignments');">View →</button>
+                      <button class="btn btn-ghost btn-sm" onclick="app.startAssignment('${asg.id}');">View →</button>
                     </td>
                   </tr>
                 `;
@@ -2460,7 +2460,12 @@ const facultyView = {
 
       const headerParts = lines[0].split(',').map(c => c.trim());
       const variableKeys = headerParts.slice(1);
-      const assignmentId = this.activeCSVAssignmentId;
+      const selectedAsg = this.getActiveCSVAssignment();
+      if (!selectedAsg) {
+        app.showToast('Please select or create an assignment before uploading variables CSV', 'warning');
+        return;
+      }
+      const assignmentId = selectedAsg.id;
 
       if (!app.data.studentVariables) {
         app.data.studentVariables = [];
@@ -2475,7 +2480,12 @@ const facultyView = {
         const uin = parts[0];
         if (!uin) continue;
 
-        const student = app.data.students.find(s => s.uin === uin);
+        const cleanUin = uin.trim().toLowerCase();
+        const student = app.data.students.find(s =>
+          (s.uin || '').trim().toLowerCase() === cleanUin ||
+          (s.id || '').trim().toLowerCase() === cleanUin ||
+          (s.email || '').trim().toLowerCase().split('@')[0] === cleanUin
+        );
         if (!student) continue;
 
         matchedStudentCount++;
@@ -2550,7 +2560,14 @@ const facultyView = {
       for (let i = 2; i < lines.length; i++) {
         const parts = lines[i].split(',').map(p => p.trim());
         const uin = parts[0];
-        const student = app.data.students.find(s => s.uin === uin);
+        if (!uin) continue;
+
+        const cleanUin = uin.trim().toLowerCase();
+        const student = app.data.students.find(s =>
+          (s.uin || '').trim().toLowerCase() === cleanUin ||
+          (s.id || '').trim().toLowerCase() === cleanUin ||
+          (s.email || '').trim().toLowerCase().split('@')[0] === cleanUin
+        );
         if (!student) continue;
 
         paramCodes.forEach((code, idx) => {
@@ -2564,9 +2581,9 @@ const facultyView = {
           const paramObj = selectedAsg.questions
             .flatMap(q => q.parameters || [])
             .find(p => p.id === parameterId);
-          const correctUnit = paramObj && paramObj.acceptedUnits && paramObj.acceptedUnits.length > 0
-            ? paramObj.acceptedUnits[0]
-            : '';
+          const correctUnit = paramObj && paramObj.expectedUnit
+            ? paramObj.expectedUnit
+            : (paramObj && paramObj.acceptedUnits && paramObj.acceptedUnits.length > 0 ? paramObj.acceptedUnits[0] : '');
 
           let existingAns = app.data.studentAnswers.find(a => a.studentId === student.id && a.parameterId === parameterId);
           if (existingAns) {
@@ -2608,8 +2625,13 @@ const facultyView = {
         if (gt) {
           const expectedVal = parseFloat(gt.correctValue);
           const submittedVal = parseFloat(subm.submittedValue);
-          const diffPct = Math.abs(submittedVal - expectedVal) / expectedVal * 100;
-          
+          let diffPct = 0;
+          if (!isNaN(expectedVal) && expectedVal !== 0) {
+            diffPct = (Math.abs(submittedVal - expectedVal) / Math.abs(expectedVal)) * 100;
+          } else if (expectedVal === 0) {
+            diffPct = Math.abs(submittedVal) === 0 ? 0 : 100;
+          }
+
           subm.isCorrectValue = diffPct <= 5.0;
           subm.isCorrectUnit = (subm.submittedUnit || '').toLowerCase() === (gt.correctUnit || '').toLowerCase();
 
@@ -2817,19 +2839,21 @@ const facultyView = {
       deadline: document.getElementById('new-asg-dead').value,
       rubricPresetId: document.getElementById('new-asg-rub').value,
       createdAt: new Date().toISOString().split('T')[0],
-      schedules: [
-        {
-          id: 'sch-' + cleanId,
-          scopeType: 'batch',
-          scopeValue: 'A1',
-          publishDate: document.getElementById('new-asg-pub').value,
-          deadline: document.getElementById('new-asg-dead').value,
-          submissionsOpen: true,
-          gradesReleased: true,
-          latePenaltyValue: 10,
-          lateMaxCap: 30
-        }
-      ],
+      schedules: (existingIdx >= 0 && app.data.assignments[existingIdx].schedules && app.data.assignments[existingIdx].schedules.length > 0)
+        ? app.data.assignments[existingIdx].schedules
+        : [
+            {
+              id: 'sch-' + cleanId,
+              scopeType: 'batch',
+              scopeValue: 'All Students',
+              publishDate: document.getElementById('new-asg-pub').value,
+              deadline: document.getElementById('new-asg-dead').value,
+              submissionsOpen: true,
+              gradesReleased: true,
+              latePenaltyValue: 10,
+              lateMaxCap: 30
+            }
+          ],
       questions: existingQuestions
     };
 

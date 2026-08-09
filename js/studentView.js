@@ -38,7 +38,8 @@ const studentView = {
       }
 
       // Upper year students (SE, TE, BE): hide explicit FE (Semester I / II) labs
-      if (className === 'FE' || semester.includes('SEM I') || semester.includes('SEM II') || semester.includes('SEMESTER I') || semester.includes('SEMESTER II')) {
+      const isSem1Or2 = className === 'FE' || semester === 'SEM I' || semester === 'SEM II' || semester === 'SEMESTER I' || semester === 'SEMESTER II' || semester === 'SEM 1' || semester === 'SEM 2';
+      if (isSem1Or2) {
         return false;
       }
 
@@ -760,7 +761,7 @@ const studentView = {
     if (activeAsg && activeAsg.questions) {
       activeAsg.questions.forEach(q => {
         (q.parameters || []).forEach(p => {
-          maxPossibleMarks += (p.valueMarks || 4);
+          maxPossibleMarks += ((p.valueMarks || 4) + (p.unitMarks || 0));
         });
       });
     }

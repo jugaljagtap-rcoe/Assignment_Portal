@@ -1740,22 +1740,6 @@ const adminView = {
     `);
   },
 
-  saveSubject(e) {
-    e.preventDefault();
-    const newSub = {
-      id: 'sub-' + Date.now(),
-      code: document.getElementById('sub-code').value,
-      shortName: document.getElementById('sub-short').value,
-      fullName: document.getElementById('sub-full').value,
-      departmentId: document.getElementById('sub-dept').value
-    };
-    app.data.subjects.push(newSub);
-    app.saveState();
-    app.closeModal();
-    app.showToast(`Created subject ${newSub.code} - ${newSub.shortName}`, 'success');
-    this.renderDepartments(document.getElementById('main-content'));
-  },
-
   renderPOAccreditation(container) {
     container.innerHTML = `
       <div class="page-header-container">
