@@ -30,33 +30,58 @@ const studentView = {
     const studentBranch = (student.branch || '').toLowerCase();
 
     return allAssignments.filter(asg => {
-      const sub = subjects.find(s => s.id === asg.subjectId);
-      if (!sub) return true;
+      const sub = subjects.find(s => s.id === asg.subjectId || s.code === asg.subjectId) || null;
 
-      const isFESubject = sub.departmentId === 'dept-fe' || (sub.className && sub.className.toUpperCase() === 'FE');
+      // Extract class and semester text from assignment, subject, and code
+      const asgClass = ((asg.className || '') + ' ' + (sub ? sub.className || '' : '') + ' ' + (asg.code || '')).toUpperCase();
+      const asgSem = ((asg.semester || '') + ' ' + (sub ? sub.semester || '' : '')).toUpperCase();
+
       const isFEStudent = studentYear === 'FE';
+      const isFESubject = asgClass.includes('FE') || asgSem.includes('SEMESTER I') || asgSem.includes('SEMESTER II') || (sub && sub.departmentId === 'dept-fe');
 
       if (isFEStudent) {
-        return isFESubject;
+        return isFESubject || asgClass.includes('FE');
       }
 
-      if (isFESubject) return false;
+      // Upper year student (SE/TE/BE): skip explicit Semester I/II FE subjects
+      if (asgSem.includes('SEMESTER I') || asgSem.includes('SEMESTER II')) {
+        return false;
+      }
 
-      const classMatches = sub.className ? sub.className.toUpperCase().includes(studentYear) : false;
+      // Check Year Match
+      let yearMatches = false;
+      if (studentYear === 'SE' && (asgClass.includes('SE') || asgSem.includes('SEMESTER III') || asgSem.includes('SEMESTER IV'))) yearMatches = true;
+      if (studentYear === 'TE' && (asgClass.includes('TE') || asgSem.includes('SEMESTER V') || asgSem.includes('SEMESTER VI'))) yearMatches = true;
+      if (studentYear === 'BE' && (asgClass.includes('BE') || asgSem.includes('SEMESTER VII') || asgSem.includes('SEMESTER VIII'))) yearMatches = true;
 
-      const dept = departments.find(d => d.id === sub.departmentId);
-      let deptMatches = false;
-      if (dept) {
-        const deptName = (dept.name || '').toLowerCase();
-        const deptShort = (dept.shortName || '').toLowerCase();
-        deptMatches = deptName.includes(studentBranch) || studentBranch.includes(deptName) ||
-                      (deptShort && studentBranch.includes(deptShort)) ||
-                      (sub.className && sub.className.toLowerCase().includes(deptShort));
+      // Fallback: if no explicit year tag or semester is found, allow match
+      if (!asgClass.includes('FE') && !asgClass.includes('SE') && !asgClass.includes('TE') && !asgClass.includes('BE') && !asgSem.includes('SEMESTER')) {
+        yearMatches = true;
+      }
+
+      // Check Branch Match
+      let branchMatches = false;
+      const dept = sub ? departments.find(d => d.id === sub.departmentId) : null;
+      const deptName = dept ? (dept.name || '').toLowerCase() : '';
+      const deptShort = dept ? (dept.shortName || '').toLowerCase() : '';
+
+      if (!studentBranch) {
+        branchMatches = true;
+      } else if (
+        deptName.includes(studentBranch) || studentBranch.includes(deptName) ||
+        (deptShort && studentBranch.includes(deptShort)) ||
+        asgClass.toLowerCase().includes(studentBranch) ||
+        asgClass.toLowerCase().includes(deptShort) ||
+        (sub && (sub.fullName || '').toLowerCase().includes(studentBranch))
+      ) {
+        branchMatches = true;
+      } else if (studentBranch.includes('mech') && (sub?.departmentId === 'dept-mech' || asgClass.toLowerCase().includes('mech') || (asg.code || '').toLowerCase().includes('mech'))) {
+        branchMatches = true;
       } else {
-        deptMatches = true;
+        branchMatches = true; // Permissive fallback so assignments aren't hidden inadvertently
       }
 
-      return classMatches && deptMatches;
+      return yearMatches && branchMatches;
     });
   },
 
