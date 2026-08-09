@@ -1409,10 +1409,13 @@ const facultyView = {
     const paramUMarks = document.querySelectorAll('.p-umarks-input');
     const paramTols = document.querySelectorAll('.p-tol-input');
 
+    const cleanAsgKey = (asg.id || asg.code).replace(/[^a-z0-9_-]/gi, '');
+    const currentQId = asg.questions[qIndex].id || `q-${cleanAsgKey}-q${qIndex+1}`;
+
     const paramsList = [];
     paramLabels.forEach((el, idx) => {
       paramsList.push({
-        id: (asg.questions[qIndex].parameters[idx] ? asg.questions[qIndex].parameters[idx].id : 'param-' + Date.now() + '-' + idx),
+        id: (asg.questions[qIndex].parameters && asg.questions[qIndex].parameters[idx] && asg.questions[qIndex].parameters[idx].id) ? asg.questions[qIndex].parameters[idx].id : `${currentQId}-p${idx+1}`,
         code: `Q00${qIndex+1}_P0${idx+1}`,
         order: idx + 1,
         label: el.value,
@@ -1461,11 +1464,15 @@ const facultyView = {
     const paramUMarks = document.querySelectorAll('.p-umarks-input');
     const paramTols = document.querySelectorAll('.p-tol-input');
 
+    const qOrder = asg.questions.length + 1;
+    const cleanAsgKey = (asg.id || asg.code).replace(/[^a-z0-9_-]/gi, '');
+    const qId = `q-${cleanAsgKey}-q${qOrder}`;
+
     const paramsList = [];
     paramLabels.forEach((el, idx) => {
       paramsList.push({
-        id: 'param-' + Date.now() + '-' + idx,
-        code: `Q00${asg.questions.length+1}_P0${idx+1}`,
+        id: `${qId}-p${idx+1}`,
+        code: `Q00${qOrder}_P0${idx+1}`,
         order: idx + 1,
         label: el.value,
         acceptedUnits: (paramUnits[idx] ? paramUnits[idx].value : '').split(',').map(u => u.trim()),
@@ -1477,8 +1484,8 @@ const facultyView = {
     });
 
     const newQ = {
-      id: 'q-' + Date.now(),
-      order: asg.questions.length + 1,
+      id: qId,
+      order: qOrder,
       sectionLabel: document.getElementById('q-label').value,
       text: document.getElementById('q-text').value,
       imageUrl: app.getEmbeddableImageUrl(document.getElementById('q-img').value || ''),
