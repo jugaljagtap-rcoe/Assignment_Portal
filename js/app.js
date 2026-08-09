@@ -266,6 +266,23 @@ class AppEngine {
     }
   }
 
+  async syncSubjectToSupabase(subId) {
+    if (!supabaseClient || !subId) return;
+    const sub = (this.data.subjects || []).find(s => s.id === subId || s.code === subId);
+    if (!sub) return;
+    try {
+      await supabaseClient.from('subjects').upsert({
+        id: sub.id,
+        code: sub.code,
+        short_name: sub.shortName || sub.code,
+        full_name: sub.fullName || sub.shortName,
+        department_id: sub.departmentId || 'dept-mech',
+        class_name: sub.className || 'TE Mech',
+        semester: sub.semester || 'Semester V'
+      });
+    } catch(e) {}
+  }
+
   async syncAllAssignmentsToSupabase() {
     if (!supabaseClient || !this.data.assignments) return;
     for (const asg of this.data.assignments) {
@@ -276,15 +293,19 @@ class AppEngine {
   async syncAssignmentToSupabase(asg) {
     if (!supabaseClient || !asg) return;
     try {
+      if (asg.subjectId) {
+        await this.syncSubjectToSupabase(asg.subjectId);
+      }
+
       const payload = {
         id: asg.id,
         code: asg.code,
         subject_id: asg.subjectId,
-        faculty_id: asg.facultyId,
+        faculty_id: asg.facultyId || 'fac-admin-jugal',
         number: asg.number || 1,
         title: asg.title,
-        class_name: asg.className,
-        semester: asg.semester,
+        class_name: asg.className || 'TE Mech',
+        semester: asg.semester || 'Semester V',
         assessment_type: asg.assessmentType || 'Direct',
         modules_covered: Array.isArray(asg.modulesCovered) ? asg.modulesCovered.join(', ') : (asg.modulesCovered || ''),
         outcome_covered: Array.isArray(asg.outcomeCovered) ? asg.outcomeCovered.join(', ') : (asg.outcomeCovered || ''),
@@ -296,9 +317,17 @@ class AppEngine {
         questions: asg.questions || []
       };
 
-      const { error } = await supabaseClient.from('assignments').upsert(payload);
-      if (error) console.warn('Supabase assignment sync notice:', error);
-      else console.log('Successfully synced assignment to Supabase Cloud:', asg.code);
+      let { error } = await supabaseClient.from('assignments').upsert(payload);
+      if (error) {
+        console.warn('Supabase assignment upsert notice:', error);
+        delete payload.schedules;
+        delete payload.questions;
+        const retry = await supabaseClient.from('assignments').upsert(payload);
+        if (retry.error) console.warn('Supabase assignment fallback retry notice:', retry.error);
+        else console.log('Synced assignment (base) to Supabase Cloud:', asg.code);
+      } else {
+        console.log('Successfully synced full assignment to Supabase Cloud:', asg.code);
+      }
     } catch(e) {
       console.warn('Supabase assignment sync error:', e);
     }

@@ -345,6 +345,54 @@ const INITIAL_DATA = {
       ]
     },
     {
+      id: "asg-vmd-custom-001",
+      code: "RCOE/Mech/2026-27/VMDLab_A001",
+      subjectId: "sub-24051181",
+      facultyId: "fac-admin-jugal",
+      number: 1,
+      title: "Natural Frequency Measurement of Dynamic Systems",
+      className: "TE Mech",
+      semester: "Semester V",
+      assessmentType: "Direct",
+      modulesCovered: ["Module 1"],
+      outcomeCovered: ["CO1"],
+      publishDate: "2026-08-01T09:00",
+      deadline: "2026-12-31T23:59",
+      rubricPresetId: "rub-analytical-001",
+      createdAt: "2026-08-09",
+      schedules: [
+        {
+          id: "sch-vmd-custom-001",
+          scopeType: "batch",
+          scopeValue: "A1",
+          publishDate: "2026-08-01T09:00",
+          deadline: "2026-12-31T23:59",
+          submissionsOpen: true,
+          gradesReleased: true,
+          latePenaltyValue: 10,
+          lateMaxCap: 30
+        }
+      ],
+      questions: [
+        {
+          id: "q-vmd-custom-01",
+          number: 1,
+          text: "Determine the natural frequency of the single degree of freedom system given in the lab setup.",
+          parameters: [
+            {
+              id: "p-vmd-custom-01-fn",
+              label: "Experimental Natural Frequency (fn)",
+              symbol: "fn",
+              unitOptions: ["Hz", "rad/s"],
+              valueMarks: 5,
+              unitMarks: 1,
+              tolerancePct: 5
+            }
+          ]
+        }
+      ]
+    },
+    {
       id: "asg-em-001",
       code: "EM-EXP-01",
       subjectId: "sub-esl101",
