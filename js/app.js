@@ -106,7 +106,7 @@ class AppEngine {
             name: st.name,
             email: st.email,
             academicYear: st.academic_year || '2026-27',
-            yearOfStudy: resolvedYear,
+            yearOfStudy: st.year_of_study || 'FE',
             branch: st.branch || 'Mechanical Engineering',
             division: st.division || 'A',
             batch: st.batch || 'A1'
