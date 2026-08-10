@@ -1214,6 +1214,12 @@ class AppEngine {
     const main = document.getElementById('main-content');
     if (!main) return;
 
+    // Skip re-rendering if user is actively typing inside an input/textarea in main content to preserve focus & unsubmitted values
+    const activeEl = document.activeElement;
+    if (activeEl && main.contains(activeEl) && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+      return;
+    }
+
     // Always ensure activeAssignmentId points to a valid assignment
     this.ensureActiveAssignment();
 
