@@ -1304,7 +1304,11 @@ const facultyView = {
           </div>
           <div style="width:140px;">
             <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Accepted Units</label>
-            <input type="text" class="form-input p-units-input" value="${p.acceptedUnits.join(', ')}" style="background:#FFF;">
+            <input type="text" class="form-input p-units-input" value="${(p.acceptedUnits || []).join(', ')}" style="background:#FFF;">
+          </div>
+          <div style="width:140px;">
+            <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Unit Hint to Student</label>
+            <input type="text" class="form-input p-unit-hint-input" value="${p.unitHint || ''}" placeholder="e.g. SI units, rad/s" style="background:#FFF;">
           </div>
           ${this.tempModalParameters.length > 1 ? `
             <button type="button" class="btn btn-destructive btn-sm" style="padding:6px 10px;" title="Remove Parameter" onclick="facultyView.removeModalParameterField(${idx})">🗑️</button>
@@ -1413,6 +1417,7 @@ const facultyView = {
 
     const paramLabels = document.querySelectorAll('.p-label-input');
     const paramUnits = document.querySelectorAll('.p-units-input');
+    const paramUnitHints = document.querySelectorAll('.p-unit-hint-input');
     const paramVMarks = document.querySelectorAll('.p-vmarks-input');
     const paramUMarks = document.querySelectorAll('.p-umarks-input');
     const paramTols = document.querySelectorAll('.p-tol-input');
@@ -1428,6 +1433,7 @@ const facultyView = {
         order: idx + 1,
         label: el.value,
         acceptedUnits: (paramUnits[idx] ? paramUnits[idx].value : '').split(',').map(u => u.trim()),
+        unitHint: (paramUnitHints[idx] ? paramUnitHints[idx].value : '').trim(),
         unitRequired: true,
         valueMarks: parseFloat(paramVMarks[idx] ? paramVMarks[idx].value : 4),
         unitMarks: parseFloat(paramUMarks[idx] ? paramUMarks[idx].value : 1),
@@ -1452,6 +1458,7 @@ const facultyView = {
   syncModalParametersFromDOM() {
     const paramLabels = document.querySelectorAll('.p-label-input');
     const paramUnits = document.querySelectorAll('.p-units-input');
+    const paramUnitHints = document.querySelectorAll('.p-unit-hint-input');
     const paramVMarks = document.querySelectorAll('.p-vmarks-input');
     const paramUMarks = document.querySelectorAll('.p-umarks-input');
     const paramTols = document.querySelectorAll('.p-tol-input');
@@ -1461,6 +1468,7 @@ const facultyView = {
     this.tempModalParameters = Array.from(paramLabels).map((el, idx) => ({
       label: el.value,
       acceptedUnits: paramUnits[idx] ? paramUnits[idx].value.split(',').map(u => u.trim()).filter(Boolean) : ["none"],
+      unitHint: (paramUnitHints[idx] ? paramUnitHints[idx].value : '').trim(),
       valueMarks: parseFloat(paramVMarks[idx] ? paramVMarks[idx].value : 4),
       unitMarks: parseFloat(paramUMarks[idx] ? paramUMarks[idx].value : 1),
       tolerancePct: parseFloat(paramTols[idx] ? paramTols[idx].value : 2)
@@ -1472,6 +1480,7 @@ const facultyView = {
     this.tempModalParameters.push({
       label: `Parameter ${this.tempModalParameters.length + 1}`,
       acceptedUnits: ["ratio", "none"],
+      unitHint: "",
       valueMarks: 4,
       unitMarks: 1,
       tolerancePct: 2
@@ -1496,6 +1505,7 @@ const facultyView = {
 
     const paramLabels = document.querySelectorAll('.p-label-input');
     const paramUnits = document.querySelectorAll('.p-units-input');
+    const paramUnitHints = document.querySelectorAll('.p-unit-hint-input');
     const paramVMarks = document.querySelectorAll('.p-vmarks-input');
     const paramUMarks = document.querySelectorAll('.p-umarks-input');
     const paramTols = document.querySelectorAll('.p-tol-input');
@@ -1512,6 +1522,7 @@ const facultyView = {
         order: idx + 1,
         label: el.value,
         acceptedUnits: (paramUnits[idx] ? paramUnits[idx].value : '').split(',').map(u => u.trim()),
+        unitHint: (paramUnitHints[idx] ? paramUnitHints[idx].value : '').trim(),
         unitRequired: true,
         valueMarks: parseFloat(paramVMarks[idx] ? paramVMarks[idx].value : 4),
         unitMarks: parseFloat(paramUMarks[idx] ? paramUMarks[idx].value : 1),
@@ -2621,9 +2632,7 @@ const facultyView = {
           const paramObj = selectedAsg.questions
             .flatMap(q => q.parameters || [])
             .find(p => p.id === parameterId);
-          const correctUnit = paramObj && paramObj.expectedUnit
-            ? paramObj.expectedUnit
-            : (paramObj && paramObj.acceptedUnits && paramObj.acceptedUnits.length > 0 ? paramObj.acceptedUnits[0] : '');
+          const correctUnit = (paramObj && paramObj.acceptedUnits && paramObj.acceptedUnits.length > 0) ? paramObj.acceptedUnits[0] : '';
 
           let existingAns = app.data.studentAnswers.find(a => a.studentId === student.id && a.parameterId === parameterId);
           if (existingAns) {
@@ -2674,11 +2683,16 @@ const facultyView = {
             diffPct = Math.abs(submittedVal) === 0 ? 0 : 100;
           }
 
-          subm.isCorrectValue = diffPct <= 5.0;
-          subm.isCorrectUnit = (subm.submittedUnit || '').toLowerCase() === (gt.correctUnit || '').toLowerCase();
+          const paramObj = (asgObj && asgObj.questions ? asgObj.questions : []).flatMap(q => q.parameters || []).find(p => p.id === subm.parameterId);
+          const acceptedUnits = (paramObj?.acceptedUnits || [gt.correctUnit || '']).map(u => u.toLowerCase().trim()).filter(Boolean);
 
-          // Base marks from correctness
-          const baseMarks = subm.isCorrectValue ? 4 : (diffPct <= 10.0 ? 2 : 0);
+          subm.isCorrectValue = diffPct <= 5.0;
+          subm.isCorrectUnit = acceptedUnits.length > 0 ? acceptedUnits.includes((subm.submittedUnit || '').toLowerCase().trim()) : true;
+
+          // Base marks from value correctness + unit correctness
+          const vMarks = paramObj?.valueMarks ?? 4;
+          const uMarks = paramObj?.unitMarks ?? 1;
+          const baseMarks = (subm.isCorrectValue ? vMarks : (diffPct <= 10.0 ? Math.round(vMarks / 2) : 0)) + (subm.isCorrectUnit ? uMarks : 0);
 
           // Re-apply attempt deduction
           const attemptDeductionPct = subm.attemptDeductionPct || subm.deductionPct || 0;

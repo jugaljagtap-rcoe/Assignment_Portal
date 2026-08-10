@@ -589,6 +589,7 @@ const studentView = {
     const isBlocked = false; // Allow entry even if variables are not loaded so students can test inputs
 
     const formattedLabel = app.formatQuestionText(param.label || 'Parameter', studentVars);
+    const unitHint = param.unitHint ? param.unitHint.trim() : '';
 
     return `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; font-size:12px;">
@@ -598,7 +599,7 @@ const studentView = {
           value="${latestAttempt ? latestAttempt.submittedValue : ''}" 
           ${isCapped ? 'disabled' : ''} style="width:110px; background:#FFF;">
 
-        <input type="text" id="input-unit-${paramId}" class="form-input code-font" placeholder="Unit" 
+        <input type="text" id="input-unit-${paramId}" class="form-input code-font" placeholder="${unitHint ? `Unit (${unitHint})` : 'Unit'}" 
           value="${latestAttempt ? latestAttempt.submittedUnit : ''}" 
           ${isCapped ? 'disabled' : ''} style="width:110px; background:#FFF;">
 
