@@ -459,6 +459,42 @@ class AppEngine {
     }
   }
 
+  async syncStudentsToSupabase() {
+    return this.syncAllStudentsToSupabase();
+  }
+
+  async syncAllStudentsToSupabase() {
+    if (!supabaseClient || !this.data.students || this.data.students.length === 0) return;
+    try {
+      for (const st of this.data.students) {
+        await this.syncStudentToSupabase(st);
+      }
+      console.log('Done syncing', this.data.students.length, 'students');
+    } catch(e) {
+      console.warn('Supabase syncAllStudents error:', e);
+    }
+  }
+
+  async syncStudentToSupabase(st) {
+    if (!supabaseClient || !st) return;
+    try {
+      const { error } = await supabaseClient.from('students').upsert({
+        id: st.id,
+        uin: st.uin,
+        name: st.name,
+        email: st.email,
+        academic_year: st.academicYear || '2026-27',
+        year_of_study: st.yearOfStudy || 'FE',
+        branch: st.branch,
+        division: st.division,
+        batch: st.batch
+      });
+      if (error) console.warn('Supabase student sync notice:', error);
+    } catch(e) {
+      console.warn('Supabase student sync error:', e);
+    }
+  }
+
   async syncFacultyToSupabase(fc) {
     if (!supabaseClient || !fc) return;
     try {
