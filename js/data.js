@@ -229,7 +229,7 @@ const INITIAL_DATA = {
 
   students: [
     {
-      id: "st-hod-humanities",
+      id: "st-f201506",
       uin: "F201506",
       name: "HoD Humanities",
       email: "hod.humanities@eng.rizvi.edu.in",
@@ -240,7 +240,7 @@ const INITIAL_DATA = {
       batch: "A1"
     },
     {
-      id: "st-test-student",
+      id: "st-test_student",
       uin: "test_student",
       name: "Test Student",
       email: "test_student@eng.rizvi.edu.in",
@@ -251,7 +251,7 @@ const INITIAL_DATA = {
       batch: "A1"
     },
     {
-      id: "st-fe-student",
+      id: "st-24051001",
       uin: "24051001",
       name: "Aarav Sharma",
       email: "24051001@eng.rizvi.edu.in",
