@@ -534,7 +534,7 @@ const studentView = {
 
                 <!-- Answer Form Inputs (Portal Online Entry Only - Hidden on Printed Canvas) -->
                 <div class="print-hide" style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">
-                  <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Enter Your Measured Answers:</div>
+                  <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Enter Your Calculated Answers:</div>
                   ${(q.parameters || []).map(p => this.buildParameterSubmissionRow(asg.id, student.id, p, studentVars)).join('')}
                 </div>
               </div>
