@@ -1297,7 +1297,7 @@ const facultyView = {
   buildModalParametersHTML() {
     return this.tempModalParameters.map((p, idx) => `
       <div style="background:var(--bg-primary); padding:12px; border-radius:var(--radius-md); margin-bottom:10px;">
-        <div style="display:flex; gap:12px; margin-bottom:8px;">
+        <div style="display:flex; gap:12px; margin-bottom:8px; align-items:flex-end;">
           <div style="flex:1;">
             <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Parameter Label</label>
             <input type="text" class="form-input p-label-input" value="${p.label}" required style="background:#FFF;">
@@ -1306,8 +1306,11 @@ const facultyView = {
             <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Accepted Units</label>
             <input type="text" class="form-input p-units-input" value="${p.acceptedUnits.join(', ')}" style="background:#FFF;">
           </div>
+          ${this.tempModalParameters.length > 1 ? `
+            <button type="button" class="btn btn-destructive btn-sm" style="padding:6px 10px;" title="Remove Parameter" onclick="facultyView.removeModalParameterField(${idx})">🗑️</button>
+          ` : ''}
         </div>
-        <div style="display:flex; gap:12px; font-size:12px;">
+        <div style="display:flex; gap:12px; font-size:12px; align-items:center;">
           <div>Value Marks: <input type="number" class="p-vmarks-input" value="${p.valueMarks}" style="width:50px;"></div>
           <div>Unit Marks: <input type="number" class="p-umarks-input" value="${p.unitMarks}" style="width:50px;"></div>
           <div>Tolerance %: <input type="number" class="p-tol-input" value="${p.tolerancePct}" style="width:50px;"></div>
@@ -1446,7 +1449,26 @@ const facultyView = {
     this.renderAssignmentBuilder(document.getElementById('main-content'));
   },
 
+  syncModalParametersFromDOM() {
+    const paramLabels = document.querySelectorAll('.p-label-input');
+    const paramUnits = document.querySelectorAll('.p-units-input');
+    const paramVMarks = document.querySelectorAll('.p-vmarks-input');
+    const paramUMarks = document.querySelectorAll('.p-umarks-input');
+    const paramTols = document.querySelectorAll('.p-tol-input');
+
+    if (!paramLabels || paramLabels.length === 0) return;
+
+    this.tempModalParameters = Array.from(paramLabels).map((el, idx) => ({
+      label: el.value,
+      acceptedUnits: paramUnits[idx] ? paramUnits[idx].value.split(',').map(u => u.trim()).filter(Boolean) : ["none"],
+      valueMarks: parseFloat(paramVMarks[idx] ? paramVMarks[idx].value : 4),
+      unitMarks: parseFloat(paramUMarks[idx] ? paramUMarks[idx].value : 1),
+      tolerancePct: parseFloat(paramTols[idx] ? paramTols[idx].value : 2)
+    }));
+  },
+
   addModalParameterField() {
+    this.syncModalParametersFromDOM();
     this.tempModalParameters.push({
       label: `Parameter ${this.tempModalParameters.length + 1}`,
       acceptedUnits: ["ratio", "none"],
@@ -1456,6 +1478,15 @@ const facultyView = {
     });
     const container = document.getElementById('modal-parameters-list');
     if (container) container.innerHTML = this.buildModalParametersHTML();
+  },
+
+  removeModalParameterField(idx) {
+    this.syncModalParametersFromDOM();
+    if (this.tempModalParameters.length > 1) {
+      this.tempModalParameters.splice(idx, 1);
+      const container = document.getElementById('modal-parameters-list');
+      if (container) container.innerHTML = this.buildModalParametersHTML();
+    }
   },
 
   saveQuestion(e, asgId) {
