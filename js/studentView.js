@@ -56,7 +56,7 @@ const studentView = {
       return true;
     });
 
-    return filtered.length > 0 ? filtered : allAssignments;
+    return filtered;
   },
 
   getResolvedStudent() {
@@ -657,7 +657,7 @@ const studentView = {
         return;
       }
 
-      const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
+      const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId && (s.assignmentId === asgId || s.assignmentId === app.data.assignments.find(a => a.id === asgId)?.originalId));
       if (priorAttempts.length >= 3) {
         app.showToast('Maximum attempt limit reached (3/3 attempts used). Submissions closed.', 'danger');
         return;
@@ -752,7 +752,7 @@ const studentView = {
     const studentUin = student ? student.uin : '';
     const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId || (a.originalId && a.originalId === app.activeAssignmentId)) || studentAssignments[0]) : null;
     const mySubmissions = student && activeAsg
-      ? app.data.submissions.filter(s => (s.studentId === student.id || (studentUin && s.studentId === studentUin)) && s.assignmentId === activeAsg.id)
+      ? app.data.submissions.filter(s => (s.studentId === student.id || (studentUin && s.studentId === studentUin)) && (s.assignmentId === activeAsg.id || s.assignmentId === activeAsg.originalId))
       : [];
     const schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
 
@@ -968,7 +968,7 @@ const studentView = {
     const studentAssignments = this.getAssignmentsForStudent(student);
     const activeAsg = studentAssignments.find(a => a.id === app.activeAssignmentId) || (studentAssignments.length > 0 ? studentAssignments[0] : null);
     const mySubmissions = activeAsg
-      ? app.data.submissions.filter(s => s.studentId === student.id && s.assignmentId === activeAsg.id)
+      ? app.data.submissions.filter(s => s.studentId === student.id && (s.assignmentId === activeAsg.id || s.assignmentId === activeAsg.originalId))
       : app.data.submissions.filter(s => s.studentId === student.id);
     if (mySubmissions.length === 0) {
       app.showToast('No submission history found for student to export', 'warning');

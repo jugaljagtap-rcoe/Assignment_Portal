@@ -786,7 +786,7 @@ const adminView = {
           const endNum = parseInt(rule.endUin.replace(/\D/g, ''), 10) || 0;
 
           if (studentUinNum >= startNum && studentUinNum <= endNum) {
-            s.batch = rule.batchName;
+            s.batch = rule.batchName.toUpperCase().trim();
             s.yearOfStudy = targetYear;
             updatedCount++;
             app.syncStudentToSupabase(s);
@@ -989,7 +989,7 @@ const adminView = {
       yearOfStudy: document.getElementById('edit-st-year').value,
       branch: document.getElementById('edit-st-branch').value,
       division: document.getElementById('edit-st-div').value,
-      batch: (document.getElementById('edit-st-batch').value || '').trim()
+      batch: (document.getElementById('edit-st-batch').value || '').trim().toUpperCase()
     };
 
     app.data.students[idx] = updated;

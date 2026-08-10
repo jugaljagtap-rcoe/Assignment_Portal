@@ -179,7 +179,7 @@ const facultyView = {
 
     const studentVarsMap = {};
     app.data.studentVariables.forEach(v => {
-      if (v.studentId === student.id && v.assignmentId === asg.id) {
+      if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.originalId || ('asg-' + (asg.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === v.assignmentId)) {
         studentVarsMap[v.key] = v.value;
       }
     });
@@ -2140,7 +2140,7 @@ const facultyView = {
     const scopeType = document.getElementById('sch-scope-type').value;
     const scopeValue = scopeType === 'all' 
       ? 'ALL' 
-      : (document.getElementById('sch-scope-value').value || '').trim();
+      : (document.getElementById('sch-scope-value').value || '').trim().toUpperCase();
 
     if (scopeType !== 'all' && !scopeValue) {
       app.showToast('Please enter a scope value (batch or division name)', 'warning');
@@ -2629,8 +2629,9 @@ const facultyView = {
 
   triggerRetroactiveGrading(asgId) {
     let reEvaluated = 0;
+    const asgObj = app.data.assignments.find(a => a.id === asgId);
     app.data.submissions.forEach(subm => {
-      if (subm.assignmentId === asgId) {
+      if (subm.assignmentId === asgId || (asgObj && subm.assignmentId === asgObj.originalId)) {
         const gt = app.data.studentAnswers.find(a => a.studentId === subm.studentId && a.parameterId === subm.parameterId);
         if (gt) {
           const expectedVal = parseFloat(gt.correctValue);
@@ -2675,7 +2676,7 @@ const facultyView = {
     });
     app.saveState();
     app.data.submissions
-      .filter(s => s.assignmentId === asgId)
+      .filter(s => s.assignmentId === asgId || (asgObj && s.assignmentId === asgObj.originalId))
       .forEach(s => app.syncSubmissionToSupabase(s));
     app.showToast(`Retroactive Auto-Grading Complete: ${reEvaluated} submissions re-evaluated against ground truth`, 'success');
   },

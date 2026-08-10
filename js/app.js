@@ -44,7 +44,10 @@ class AppEngine {
 
   init() {
     this.setupEventListeners();
-    this.syncWithSupabase();
+    this.syncWithSupabase().then(() => {
+      if (!this.currentUser) this.showLoginModal(false);
+      else { this.renderRoleSwitcher(); this.renderSidebar(); this.renderCurrentView(); }
+    });
 
     // Cross-tab and cross-window real-time data sync listener
     window.addEventListener('storage', (e) => {
@@ -61,14 +64,6 @@ class AppEngine {
         this.syncWithSupabase();
       }
     }, 30000);
-
-    if (!this.currentUser) {
-      // Prompt Google Auth Sign-In Modal on startup if not logged in
-      this.showLoginModal(false);
-    }
-    this.renderRoleSwitcher();
-    this.renderSidebar();
-    this.renderCurrentView();
   }
 
   async syncWithSupabase() {
@@ -246,20 +241,7 @@ class AppEngine {
             submittedAt: s.submitted_at
           };
 
-          // Normalize assignmentId to local cleanId
-          const asgMatch = this.data.assignments.find(a =>
-            a.id === formatted.assignmentId ||
-            a.originalId === formatted.assignmentId ||
-            ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.assignmentId
-          );
-          if (asgMatch) formatted.assignmentId = asgMatch.id;
-
-          // Normalize studentId to local st-{uin} format
-          const stMatch = this.data.students.find(s =>
-            s.id === formatted.studentId ||
-            ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.studentId
-          );
-          if (stMatch) formatted.studentId = stMatch.id;
+          this.normalizeSubmissionIds(formatted);
 
           if (existingIdx >= 0) {
             this.data.submissions[existingIdx] = formatted;
@@ -282,20 +264,7 @@ class AppEngine {
             value: v.value
           };
 
-          // Normalize assignmentId to local cleanId
-          const asgMatch = this.data.assignments.find(a =>
-            a.id === formatted.assignmentId ||
-            a.originalId === formatted.assignmentId ||
-            ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.assignmentId
-          );
-          if (asgMatch) formatted.assignmentId = asgMatch.id;
-
-          // Normalize studentId to local st-{uin} format
-          const stMatch = this.data.students.find(s =>
-            s.id === formatted.studentId ||
-            ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.studentId
-          );
-          if (stMatch) formatted.studentId = stMatch.id;
+          this.normalizeSubmissionIds(formatted);
 
           if (existingIdx >= 0) {
             this.data.studentVariables[existingIdx] = formatted;
@@ -320,20 +289,7 @@ class AppEngine {
             correctUnit: a.correct_unit
           };
 
-          // Normalize assignmentId to local cleanId
-          const asgMatch = this.data.assignments.find(a =>
-            a.id === formatted.assignmentId ||
-            a.originalId === formatted.assignmentId ||
-            ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.assignmentId
-          );
-          if (asgMatch) formatted.assignmentId = asgMatch.id;
-
-          // Normalize studentId to local st-{uin} format
-          const stMatch = this.data.students.find(s =>
-            s.id === formatted.studentId ||
-            ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.studentId
-          );
-          if (stMatch) formatted.studentId = stMatch.id;
+          this.normalizeSubmissionIds(formatted);
 
           if (existingIdx >= 0) {
             this.data.studentAnswers[existingIdx] = formatted;
@@ -1024,10 +980,35 @@ class AppEngine {
     }
   }
 
+  normalizeSubmissionIds(record) {
+    if (!record) return record;
+    // Normalize assignmentId
+    if (record.assignmentId) {
+      const asgMatch = this.data.assignments.find(a =>
+        a.id === record.assignmentId ||
+        a.originalId === record.assignmentId ||
+        ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === record.assignmentId
+      );
+      if (asgMatch) record.assignmentId = asgMatch.id;
+    }
+    // Normalize studentId
+    if (record.studentId) {
+      const stMatch = this.data.students.find(s =>
+        s.id === record.studentId ||
+        ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === record.studentId
+      );
+      if (stMatch) record.studentId = stMatch.id;
+    }
+    return record;
+  }
+
   getAssignmentSchedule(asgId, batchName) {
-    const asg = this.data.assignments.find(a => a.id === asgId) || this.data.assignments[0];
+    const asg = this.data.assignments.find(a =>
+      a.id === asgId || a.originalId === asgId ||
+      ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === asgId
+    ) || this.data.assignments[0];
     if (asg && asg.schedules && asg.schedules.length > 0) {
-      const match = asg.schedules.find(s => s.scopeValue === batchName);
+      const match = asg.schedules.find(s => (s.scopeValue || '').toUpperCase().trim() === (batchName || '').toUpperCase().trim());
       if (match) return match;
       return asg.schedules[0];
     }
