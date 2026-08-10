@@ -341,10 +341,10 @@ class AppEngine {
         assessment_type: asg.assessmentType || 'Direct',
         modules_covered: Array.isArray(asg.modulesCovered) ? asg.modulesCovered.join(', ') : (asg.modulesCovered || ''),
         outcome_covered: Array.isArray(asg.outcomeCovered) ? asg.outcomeCovered.join(', ') : (asg.outcomeCovered || ''),
-        publish_date: asg.publishDate,
-        deadline: asg.deadline,
+        publish_date: asg.publishDate ? new Date(asg.publishDate).toISOString() : null,
+        deadline: asg.deadline ? new Date(asg.deadline).toISOString() : null,
         rubric_preset_id: asg.rubricPresetId,
-        created_at: asg.createdAt || new Date().toISOString().split('T')[0],
+        created_at: asg.createdAt ? new Date(asg.createdAt).toISOString() : new Date().toISOString(),
         schedules: asg.schedules || [],
         questions: asg.questions || []
       };
