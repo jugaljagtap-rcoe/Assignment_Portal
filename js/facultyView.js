@@ -2599,6 +2599,7 @@ const facultyView = {
             existingAns.correctUnit = correctUnit;
           } else {
             app.data.studentAnswers.push({
+              id: 'sans-' + student.id + '-' + parameterId,
               assignmentId: this.activeCSVAssignmentId,
               studentId: student.id,
               parameterId: parameterId,

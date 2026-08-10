@@ -367,7 +367,7 @@ const studentView = {
                 </div>
               ` : ''}
             </div>
-            <span class="tag tag-success">Submissions Open</span>
+            <span class="tag ${schedule.submissionsOpen === false ? 'tag-danger' : 'tag-success'}">${schedule.submissionsOpen === false ? 'Submissions Closed' : 'Submissions Open'}</span>
           </div>
         </div>
 
@@ -649,6 +649,14 @@ const studentView = {
         return;
       }
 
+      const student2 = app.data.students.find(s => s.id === studentId);
+      const schedule2 = app.getAssignmentSchedule(asgId, student2?.batch);
+      if (schedule2 && schedule2.submissionsOpen === false) {
+        app.showToast('Submissions are closed for this assignment by your faculty.', 'danger');
+        this._submitting = false;
+        return;
+      }
+
       const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
       if (priorAttempts.length >= 3) {
         app.showToast('Maximum attempt limit reached (3/3 attempts used). Submissions closed.', 'danger');
@@ -680,11 +688,20 @@ const studentView = {
 
       if (gt) {
         const expectedVal = parseFloat(gt.correctValue);
-        const diffPct = Math.abs(submittedVal - expectedVal) / expectedVal * 100;
+        let diffPct = 0;
+        if (!isNaN(expectedVal) && expectedVal !== 0) {
+          diffPct = Math.abs(submittedVal - expectedVal) / Math.abs(expectedVal) * 100;
+        } else if (expectedVal === 0) {
+          diffPct = Math.abs(submittedVal) < 1e-9 ? 0 : 100;
+        }
         isCorrectValue = diffPct <= 5.0; // 5% tolerance
         isCorrectUnit = submittedUnit.toLowerCase() === (gt.correctUnit || '').toLowerCase();
         
-        const baseMarks = isCorrectValue ? 4 : (diffPct <= 10.0 ? 2 : 0);
+        const paramObj = (app.data.assignments.find(a => a.id === asgId)?.questions || []).flatMap(q => q.parameters || []).find(p => p.id === paramId);
+        const vMarks = paramObj?.valueMarks ?? 4;
+        const uMarks = paramObj?.unitMarks ?? 1;
+
+        const baseMarks = (isCorrectValue ? vMarks : (diffPct <= 10.0 ? Math.round(vMarks / 2) : 0)) + (isCorrectUnit ? uMarks : 0);
         const afterAttemptDeduction = baseMarks * (1 - attemptDeductionPct / 100);
         marksAwarded = Math.max(0, Math.round(afterAttemptDeduction * (1 - latePenaltyPct / 100)));
       } else {

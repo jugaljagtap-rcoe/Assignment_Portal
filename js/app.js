@@ -143,23 +143,12 @@ class AppEngine {
 
       // Fetch subjects from Supabase
       const { data: subData, error: subErr } = await supabaseClient.from('subjects').select('*');
-      if (!subErr && subData && Array.isArray(subData) && subData.length > 0) {
+      if (!subErr && subData && Array.isArray(subData)) {
         subData.forEach(sub => {
-          const existingIdx = this.data.subjects.findIndex(x => x.id === sub.id || (x.code && x.code.toLowerCase() === (sub.code || '').toLowerCase()));
-          const formatted = {
-            id: sub.id,
-            code: sub.code,
-            shortName: sub.short_name || sub.code,
-            fullName: sub.full_name || sub.short_name,
-            departmentId: sub.department_id || 'dept-mech',
-            className: sub.class_name || 'TE Mech',
-            semester: sub.semester || 'Semester V'
-          };
-          if (existingIdx >= 0) {
-            this.data.subjects[existingIdx] = formatted;
-          } else {
-            this.data.subjects.push(formatted);
-          }
+          const existingIdx = this.data.subjects.findIndex(x => x.id === sub.id || x.code === sub.code);
+          const formatted = { id: sub.id, code: sub.code, shortName: sub.short_name, fullName: sub.full_name, departmentId: sub.department_id, className: sub.class_name, semester: sub.semester };
+          if (existingIdx >= 0) this.data.subjects[existingIdx] = formatted;
+          else this.data.subjects.push(formatted);
         });
       }
 
@@ -256,6 +245,15 @@ class AppEngine {
             isLate: s.is_late || false,
             submittedAt: s.submitted_at
           };
+
+          const asgMatch = this.data.assignments.find(a => a.originalId === formatted.assignmentId || a.id === formatted.assignmentId);
+          if (asgMatch) formatted.assignmentId = asgMatch.id;
+          const stMatch = this.data.students.find(s => s.id === formatted.studentId);
+          if (!stMatch) {
+            const byUin = this.data.students.find(s => ('st-' + (s.uin || '').toLowerCase()) === formatted.studentId);
+            if (byUin) formatted.studentId = byUin.id;
+          }
+
           if (existingIdx >= 0) {
             this.data.submissions[existingIdx] = formatted;
           } else {
@@ -276,6 +274,15 @@ class AppEngine {
             key: v.key,
             value: v.value
           };
+
+          const asgMatch = this.data.assignments.find(a => a.originalId === formatted.assignmentId || a.id === formatted.assignmentId);
+          if (asgMatch) formatted.assignmentId = asgMatch.id;
+          const stMatch = this.data.students.find(s => s.id === formatted.studentId);
+          if (!stMatch) {
+            const byUin = this.data.students.find(s => ('st-' + (s.uin || '').toLowerCase()) === formatted.studentId);
+            if (byUin) formatted.studentId = byUin.id;
+          }
+
           if (existingIdx >= 0) {
             this.data.studentVariables[existingIdx] = formatted;
           } else {
@@ -298,6 +305,15 @@ class AppEngine {
             correctValue: a.correct_value,
             correctUnit: a.correct_unit
           };
+
+          const asgMatch = this.data.assignments.find(a => a.originalId === formatted.assignmentId || a.id === formatted.assignmentId);
+          if (asgMatch) formatted.assignmentId = asgMatch.id;
+          const stMatch = this.data.students.find(s => s.id === formatted.studentId);
+          if (!stMatch) {
+            const byUin = this.data.students.find(s => ('st-' + (s.uin || '').toLowerCase()) === formatted.studentId);
+            if (byUin) formatted.studentId = byUin.id;
+          }
+
           if (existingIdx >= 0) {
             this.data.studentAnswers[existingIdx] = formatted;
           } else {
@@ -908,19 +924,7 @@ class AppEngine {
     if (!state.studentAnswers) state.studentAnswers = [];
     if (!state.modules) state.modules = [];
 
-    // Clean and deduplicate subjects by subject code
-    const initialSubs = JSON.parse(JSON.stringify(INITIAL_DATA.subjects));
-    if (!state.subjects || state.subjects.length === 0 || state.subjects.filter(s => s.code === '24051181').length > 1) {
-      state.subjects = initialSubs;
-    } else {
-      const uniqueSubMap = new Map();
-      state.subjects.forEach(s => {
-        if (s && s.code && !uniqueSubMap.has(s.code)) {
-          uniqueSubMap.set(s.code, s);
-        }
-      });
-      state.subjects = Array.from(uniqueSubMap.values());
-    }
+    if (!state.subjects) state.subjects = [];
 
     // Force strict 6 Hardcoded Departments
     state.departments = JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS));
