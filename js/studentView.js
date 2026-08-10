@@ -326,7 +326,7 @@ const studentView = {
       // Build Student Variable Map
       const studentVars = {};
       (app.data.studentVariables || []).forEach(v => {
-        if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.code)) {
+        if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId || ('asg-' + (asg.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === v.assignmentId)) {
           studentVars[v.key] = v.value;
         }
       });

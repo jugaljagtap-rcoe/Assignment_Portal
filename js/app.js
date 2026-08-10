@@ -246,13 +246,20 @@ class AppEngine {
             submittedAt: s.submitted_at
           };
 
-          const asgMatch = this.data.assignments.find(a => a.originalId === formatted.assignmentId || a.id === formatted.assignmentId);
+          // Normalize assignmentId to local cleanId
+          const asgMatch = this.data.assignments.find(a =>
+            a.id === formatted.assignmentId ||
+            a.originalId === formatted.assignmentId ||
+            ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.assignmentId
+          );
           if (asgMatch) formatted.assignmentId = asgMatch.id;
-          const stMatch = this.data.students.find(s => s.id === formatted.studentId);
-          if (!stMatch) {
-            const byUin = this.data.students.find(s => ('st-' + (s.uin || '').toLowerCase()) === formatted.studentId);
-            if (byUin) formatted.studentId = byUin.id;
-          }
+
+          // Normalize studentId to local st-{uin} format
+          const stMatch = this.data.students.find(s =>
+            s.id === formatted.studentId ||
+            ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.studentId
+          );
+          if (stMatch) formatted.studentId = stMatch.id;
 
           if (existingIdx >= 0) {
             this.data.submissions[existingIdx] = formatted;
@@ -275,13 +282,20 @@ class AppEngine {
             value: v.value
           };
 
-          const asgMatch = this.data.assignments.find(a => a.originalId === formatted.assignmentId || a.id === formatted.assignmentId);
+          // Normalize assignmentId to local cleanId
+          const asgMatch = this.data.assignments.find(a =>
+            a.id === formatted.assignmentId ||
+            a.originalId === formatted.assignmentId ||
+            ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.assignmentId
+          );
           if (asgMatch) formatted.assignmentId = asgMatch.id;
-          const stMatch = this.data.students.find(s => s.id === formatted.studentId);
-          if (!stMatch) {
-            const byUin = this.data.students.find(s => ('st-' + (s.uin || '').toLowerCase()) === formatted.studentId);
-            if (byUin) formatted.studentId = byUin.id;
-          }
+
+          // Normalize studentId to local st-{uin} format
+          const stMatch = this.data.students.find(s =>
+            s.id === formatted.studentId ||
+            ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.studentId
+          );
+          if (stMatch) formatted.studentId = stMatch.id;
 
           if (existingIdx >= 0) {
             this.data.studentVariables[existingIdx] = formatted;
@@ -306,13 +320,20 @@ class AppEngine {
             correctUnit: a.correct_unit
           };
 
-          const asgMatch = this.data.assignments.find(a => a.originalId === formatted.assignmentId || a.id === formatted.assignmentId);
+          // Normalize assignmentId to local cleanId
+          const asgMatch = this.data.assignments.find(a =>
+            a.id === formatted.assignmentId ||
+            a.originalId === formatted.assignmentId ||
+            ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.assignmentId
+          );
           if (asgMatch) formatted.assignmentId = asgMatch.id;
-          const stMatch = this.data.students.find(s => s.id === formatted.studentId);
-          if (!stMatch) {
-            const byUin = this.data.students.find(s => ('st-' + (s.uin || '').toLowerCase()) === formatted.studentId);
-            if (byUin) formatted.studentId = byUin.id;
-          }
+
+          // Normalize studentId to local st-{uin} format
+          const stMatch = this.data.students.find(s =>
+            s.id === formatted.studentId ||
+            ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === formatted.studentId
+          );
+          if (stMatch) formatted.studentId = stMatch.id;
 
           if (existingIdx >= 0) {
             this.data.studentAnswers[existingIdx] = formatted;
