@@ -1448,7 +1448,7 @@ const facultyView = {
 
   addModalParameterField() {
     this.tempModalParameters.push({
-      label: `Q3: Parameter ${this.tempModalParameters.length + 1}`,
+      label: `Parameter ${this.tempModalParameters.length + 1}`,
       acceptedUnits: ["ratio", "none"],
       valueMarks: 4,
       unitMarks: 1,
@@ -1514,6 +1514,7 @@ const facultyView = {
       app.showToast('Image file size should be under 3MB', 'warning');
       return;
     }
+    app.showToast('Local image attached for preview only. Use a Google Drive share link for permanent storage — local images are not saved to the cloud.', 'warning');
     const reader = new FileReader();
     reader.onload = (event) => {
       const imgInput = document.getElementById('q-img');

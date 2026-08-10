@@ -535,7 +535,7 @@ const studentView = {
                 <!-- Answer Form Inputs (Portal Online Entry Only - Hidden on Printed Canvas) -->
                 <div class="print-hide" style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">
                   <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Enter Your Measured Answers:</div>
-                  ${(q.parameters || []).map(p => this.buildParameterSubmissionRow(asg.id, student.id, p)).join('')}
+                  ${(q.parameters || []).map(p => this.buildParameterSubmissionRow(asg.id, student.id, p, studentVars)).join('')}
                 </div>
               </div>
             `;
@@ -573,7 +573,7 @@ const studentView = {
     }
   },
 
-  buildParameterSubmissionRow(asgId, studentId, param) {
+  buildParameterSubmissionRow(asgId, studentId, param, studentVars = {}) {
     if (!param) return '';
 
     // Check if student has variables loaded for this assignment
@@ -588,7 +588,7 @@ const studentView = {
     const isCapped = attemptCount >= 3;
     const isBlocked = false; // Allow entry even if variables are not loaded so students can test inputs
 
-    const formattedLabel = app.formatNaturalMath(param.label || 'Parameter');
+    const formattedLabel = app.formatQuestionText(param.label || 'Parameter', studentVars);
     const acceptedUnitsArr = Array.isArray(param.acceptedUnits) ? param.acceptedUnits : (param.expectedUnit ? [param.expectedUnit] : ['Hz']);
     const formattedUnitsHint = acceptedUnitsArr.map(u => app.formatNaturalMath(u || '')).join('/');
 
@@ -694,10 +694,9 @@ const studentView = {
         } else if (expectedVal === 0) {
           diffPct = Math.abs(submittedVal) < 1e-9 ? 0 : 100;
         }
-        isCorrectValue = diffPct <= 5.0; // 5% tolerance
-        isCorrectUnit = submittedUnit.toLowerCase() === (gt.correctUnit || '').toLowerCase();
-        
         const paramObj = (app.data.assignments.find(a => a.id === asgId)?.questions || []).flatMap(q => q.parameters || []).find(p => p.id === paramId);
+        const acceptedUnits = (paramObj?.acceptedUnits || [gt.correctUnit || '']).map(u => u.toLowerCase().trim()).filter(Boolean);
+        isCorrectUnit = acceptedUnits.length > 0 ? acceptedUnits.includes(submittedUnit.toLowerCase().trim()) : true;
         const vMarks = paramObj?.valueMarks ?? 4;
         const uMarks = paramObj?.unitMarks ?? 1;
 

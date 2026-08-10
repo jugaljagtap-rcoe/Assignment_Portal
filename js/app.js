@@ -377,6 +377,8 @@ class AppEngine {
         await this.syncSubjectToSupabase(asg.subjectId);
       }
 
+      const sanitizedQuestions = (asg.questions || []).map(q => ({ ...q, imageUrl: (q.imageUrl && q.imageUrl.startsWith('data:image/')) ? '' : (q.imageUrl || '') }));
+
       const payload = {
         id: asg.id,
         code: asg.code,
@@ -394,14 +396,14 @@ class AppEngine {
         rubric_preset_id: asg.rubricPresetId,
         created_at: asg.createdAt ? new Date(asg.createdAt).toISOString() : new Date().toISOString(),
         schedules: asg.schedules || [],
-        questions: asg.questions || []
+        questions: sanitizedQuestions
       };
 
       let { error } = await supabaseClient.from('assignments').upsert(payload);
       if (error) {
         console.warn('Supabase assignment upsert notice, trying stringified JSON payload:', error);
         payload.schedules = JSON.stringify(asg.schedules || []);
-        payload.questions = JSON.stringify(asg.questions || []);
+        payload.questions = JSON.stringify(sanitizedQuestions);
         const retry = await supabaseClient.from('assignments').upsert(payload);
         if (retry.error) console.warn('Supabase assignment stringified retry notice:', retry.error);
         else console.log('Successfully synced assignment (stringified JSON) to Supabase Cloud:', asg.code);
