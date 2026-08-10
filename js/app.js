@@ -275,10 +275,11 @@ class AppEngine {
         });
       }
 
-      // Only push local assignments to Supabase Cloud if current user is faculty or admin
+      // Only push local assignments & students to Supabase Cloud if current user is faculty or admin
       if (this.currentUser && (this.currentRole === 'faculty' || this.currentRole === 'admin')) {
         this.purgeGhostAssignmentsFromSupabase();
         await this.syncAllAssignmentsToSupabase();
+        await this.syncStudentsToSupabase();
       }
 
       this.saveState();
@@ -425,6 +426,10 @@ class AppEngine {
     } catch(e) {
       console.warn('Supabase submission sync error:', e);
     }
+  }
+
+  async syncStudentsToSupabase() {
+    return this.syncAllStudentsToSupabase();
   }
 
   async syncAllStudentsToSupabase() {
@@ -899,7 +904,6 @@ class AppEngine {
     let matchedStudent = (this.data.students || []).find(s =>
       (email && s.email && s.email.trim().toLowerCase() === email) ||
       (uin && s.uin && s.uin.trim().toLowerCase() === uin) ||
-      (uin && s.uin && email.includes(s.uin.trim().toLowerCase())) ||
       (studentId && s.id === studentId)
     );
 
