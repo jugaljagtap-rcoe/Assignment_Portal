@@ -667,22 +667,7 @@ const adminView = {
           countAdded++;
         }
 
-        // Sync to Supabase Cloud if connected
-        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-          supabaseClient.from('students').upsert({
-            id: studentRecord.id,
-            uin: studentRecord.uin,
-            name: studentRecord.name,
-            email: studentRecord.email,
-            academic_year: studentRecord.academicYear,
-            year_of_study: studentRecord.yearOfStudy,
-            branch: studentRecord.branch,
-            division: studentRecord.division,
-            batch: studentRecord.batch
-          }).then(({ error }) => {
-            if (error) console.warn('Supabase cloud sync error for student:', uin, error);
-          });
-        }
+        app.syncStudentToSupabase(studentRecord);
       }
 
       app.saveState();
@@ -804,22 +789,7 @@ const adminView = {
             s.batch = rule.batchName;
             s.yearOfStudy = targetYear;
             updatedCount++;
-
-            if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-              supabaseClient.from('students').upsert({
-                id: s.id,
-                uin: s.uin,
-                name: s.name,
-                email: s.email,
-                academic_year: s.academicYear || '2026-27',
-                year_of_study: s.yearOfStudy,
-                branch: s.branch,
-                division: s.division,
-                batch: s.batch
-              }).then(({ error }) => {
-                if (error) console.warn('Supabase cloud sync notice:', error);
-              });
-            }
+            app.syncStudentToSupabase(s);
           }
         });
       }
@@ -921,22 +891,7 @@ const adminView = {
     }
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      supabaseClient.from('students').upsert({
-        id: newSt.id,
-        uin: newSt.uin,
-        name: newSt.name,
-        email: newSt.email,
-        academic_year: newSt.academicYear,
-        year_of_study: newSt.yearOfStudy,
-        branch: newSt.branch,
-        division: newSt.division,
-        batch: newSt.batch
-      }).then(({ error }) => {
-        if (error) console.warn('Supabase cloud sync notice:', error);
-        else console.log('Student synced to Supabase Cloud:', newSt.name);
-      });
-    }
+    app.syncStudentToSupabase(newSt);
 
     app.closeModal();
     app.showToast(`Enrolled student ${newSt.name} (${newSt.uin}) for ${newSt.yearOfStudy} (AY ${newSt.academicYear})`, 'success');
@@ -1040,22 +995,7 @@ const adminView = {
     app.data.students[idx] = updated;
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      supabaseClient.from('students').upsert({
-        id: updated.id,
-        uin: updated.uin,
-        name: updated.name,
-        email: updated.email,
-        academic_year: updated.academicYear,
-        year_of_study: updated.yearOfStudy,
-        branch: updated.branch,
-        division: updated.division,
-        batch: updated.batch
-      }).then(({ error }) => {
-        if (error) console.warn('Supabase cloud sync notice:', error);
-        else console.log('Updated student synced to Supabase:', updated.name);
-      });
-    }
+    app.syncStudentToSupabase(updated);
 
     if (app.currentUser && app.currentUser.studentId === id) {
       app.currentUser.branch = updated.branch;
