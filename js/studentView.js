@@ -281,14 +281,6 @@ const studentView = {
         return;
       }
 
-      // Guarantee questions are loaded if missing
-      if (!asg.questions || asg.questions.length === 0) {
-        const seed = INITIAL_DATA.assignments.find(a => a.code === asg.code || a.id === asg.id);
-        if (seed && seed.questions && seed.questions.length > 0) {
-          asg.questions = JSON.parse(JSON.stringify(seed.questions));
-        }
-      }
-
       if (!asg.questions || asg.questions.length === 0) {
         container.innerHTML = `
           <div class="page-header-container">

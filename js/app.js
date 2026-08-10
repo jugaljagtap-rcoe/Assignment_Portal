@@ -154,7 +154,7 @@ class AppEngine {
       const { data: asgData, error: asgErr } = await supabaseClient.from('assignments').select('*');
       if (!asgErr && asgData && Array.isArray(asgData) && asgData.length > 0) {
         asgData.forEach(asg => {
-          if (asg.code === 'VMD-EXP-01' || asg.code === 'EM-EXP-01' || asg.id === 'asg-vmd-001' || asg.id === 'asg-em-001') return;
+          if (asg.code === 'VMD-EXP-01' || asg.code === 'EM-EXP-01' || asg.id === 'asg-vmd-001' || asg.id === 'asg-em-001' || asg.id === 'asg-vmd-custom-001' || asg.id === 'asg-seed-placeholder-vmd') return;
           const codeKey = (asg.code || 'asg').toLowerCase().replace(/[^a-z0-9_-]/g, '');
           const cleanId = 'asg-' + codeKey;
 
@@ -189,11 +189,9 @@ class AppEngine {
             questions: Array.isArray(parsedQuestions) ? parsedQuestions : []
           };
           if (existingIdx >= 0) {
-            if (formatted.questions.length === 0 && this.data.assignments[existingIdx].questions && this.data.assignments[existingIdx].questions.length > 0) {
-              formatted.questions = this.data.assignments[existingIdx].questions.filter(q =>
-                q.id !== 'q-vmd-custom-01' &&
-                !(q.text || '').includes('Determine the natural frequency of the single degree of freedom system given')
-              );
+            const existingQuestions = this.data.assignments[existingIdx].questions || [];
+            if (formatted.questions.length === 0 && existingQuestions.length > 0) {
+              formatted.questions = existingQuestions;
             }
             this.data.assignments[existingIdx] = formatted;
           } else {
@@ -296,7 +294,7 @@ class AppEngine {
   async purgeGhostAssignmentsFromSupabase() {
     if (!supabaseClient) return;
     try {
-      await supabaseClient.from('assignments').delete().or('code.eq.VMD-EXP-01,code.eq.EM-EXP-01,id.eq.asg-vmd-001,id.eq.asg-em-001');
+      await supabaseClient.from('assignments').delete().or('code.eq.VMD-EXP-01,code.eq.EM-EXP-01,id.eq.asg-vmd-001,id.eq.asg-em-001,id.eq.asg-vmd-custom-001,id.eq.asg-seed-placeholder-vmd');
     } catch(e) {}
   }
 
