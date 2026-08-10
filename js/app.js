@@ -91,15 +91,6 @@ class AppEngine {
             (stEmail && x.email && x.email.trim().toLowerCase() === stEmail)
           );
 
-          let resolvedYear = (st.year_of_study && st.year_of_study !== 'FE') ? st.year_of_study : null;
-          if (!resolvedYear) {
-            if (existingIdx >= 0 && this.data.students[existingIdx].yearOfStudy) {
-              resolvedYear = this.data.students[existingIdx].yearOfStudy;
-            } else {
-              resolvedYear = (stUin === 'f201506' || stUin === 'test_student' || stEmail.includes('hod.humanities')) ? 'TE' : (st.year_of_study || 'FE');
-            }
-          }
-
           const formatted = {
             id: cleanId,
             uin: st.uin || stUin.toUpperCase(),
@@ -146,6 +137,46 @@ class AppEngine {
             this.data.faculty[existingIdx] = formatted;
           } else {
             this.data.faculty.push(formatted);
+          }
+        });
+      }
+
+      // Fetch subjects from Supabase
+      const { data: subData, error: subErr } = await supabaseClient.from('subjects').select('*');
+      if (!subErr && subData && Array.isArray(subData) && subData.length > 0) {
+        subData.forEach(sub => {
+          const existingIdx = this.data.subjects.findIndex(x => x.id === sub.id || (x.code && x.code.toLowerCase() === (sub.code || '').toLowerCase()));
+          const formatted = {
+            id: sub.id,
+            code: sub.code,
+            shortName: sub.short_name || sub.code,
+            fullName: sub.full_name || sub.short_name,
+            departmentId: sub.department_id || 'dept-mech',
+            className: sub.class_name || 'TE Mech',
+            semester: sub.semester || 'Semester V'
+          };
+          if (existingIdx >= 0) {
+            this.data.subjects[existingIdx] = formatted;
+          } else {
+            this.data.subjects.push(formatted);
+          }
+        });
+      }
+
+      // Fetch program outcomes from Supabase
+      const { data: poData, error: poErr } = await supabaseClient.from('program_outcomes').select('*');
+      if (!poErr && poData && Array.isArray(poData) && poData.length > 0) {
+        poData.forEach(po => {
+          const existingIdx = this.data.programOutcomes.findIndex(x => x.id === po.id || x.code === po.code);
+          const formatted = {
+            id: po.id,
+            code: po.code,
+            description: po.description
+          };
+          if (existingIdx >= 0) {
+            this.data.programOutcomes[existingIdx] = formatted;
+          } else {
+            this.data.programOutcomes.push(formatted);
           }
         });
       }
@@ -334,7 +365,7 @@ class AppEngine {
         id: asg.id,
         code: asg.code,
         subject_id: asg.subjectId,
-        faculty_id: asg.facultyId || 'fac-admin-jugal',
+        faculty_id: asg.facultyId || (this.currentUser ? this.currentUser.email : 'admin'),
         number: asg.number || 1,
         title: asg.title,
         class_name: asg.className || 'TE Mech',
@@ -428,39 +459,47 @@ class AppEngine {
     }
   }
 
-  async syncStudentsToSupabase() {
-    return this.syncAllStudentsToSupabase();
-  }
-
-  async syncAllStudentsToSupabase() {
-    if (!supabaseClient || !this.data.students || this.data.students.length === 0) return;
+  async syncFacultyToSupabase(fc) {
+    if (!supabaseClient || !fc) return;
     try {
-      for (const st of this.data.students) {
-        await this.syncStudentToSupabase(st);
-      }
-      console.log('Done syncing', this.data.students.length, 'students');
+      const { error } = await supabaseClient.from('faculty').upsert({
+        id: fc.id,
+        name: fc.name,
+        email: fc.email,
+        department_id: fc.departmentId || 'dept-fe',
+        role: fc.role || 'faculty',
+        assigned_subjects: fc.assignedSubjects || [],
+        is_dual_role: fc.isDualRole || false
+      });
+      if (error) console.warn('Supabase faculty sync notice:', error);
     } catch(e) {
-      console.warn('Supabase syncAllStudents error:', e);
+      console.warn('Supabase faculty sync error:', e);
     }
   }
 
-  async syncStudentToSupabase(st) {
-    if (!supabaseClient || !st) return;
+  async syncSubjectsToSupabase() {
+    if (!supabaseClient || !this.data.subjects) return;
     try {
-      const { error } = await supabaseClient.from('students').upsert({
-        id: st.id,
-        uin: st.uin,
-        name: st.name,
-        email: st.email,
-        academic_year: st.academicYear || '2026-27',
-        year_of_study: st.yearOfStudy || 'FE',
-        branch: st.branch,
-        division: st.division,
-        batch: st.batch
-      });
-      if (error) console.warn('Supabase student sync notice:', error);
+      for (const sub of this.data.subjects) {
+        await this.syncSubjectToSupabase(sub.id);
+      }
     } catch(e) {
-      console.warn('Supabase student sync error:', e);
+      console.warn('Supabase syncSubjects error:', e);
+    }
+  }
+
+  async syncPOsToSupabase() {
+    if (!supabaseClient || !this.data.programOutcomes) return;
+    try {
+      for (const po of this.data.programOutcomes) {
+        await supabaseClient.from('program_outcomes').upsert({
+          id: po.id,
+          code: po.code,
+          description: po.description
+        });
+      }
+    } catch(e) {
+      console.warn('Supabase syncPOs error:', e);
     }
   }
 
@@ -906,10 +945,6 @@ class AppEngine {
       (uin && s.uin && s.uin.trim().toLowerCase() === uin) ||
       (studentId && s.id === studentId)
     );
-
-    if (!matchedStudent && (uin === 'f201506' || email.includes('hod.humanities') || email.includes('f201506'))) {
-      matchedStudent = (this.data.students || []).find(s => s.uin === 'F201506' || s.uin === 'test_student');
-    }
 
     if (matchedStudent) {
       this.currentUser.role = 'student';

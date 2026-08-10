@@ -151,7 +151,7 @@ const INITIAL_DATA = {
       name: "Grading Rubric (Analytical)",
       type: "grading_analytical",
       isShared: true,
-      facultyId: "fac-admin-jugal",
+      facultyId: null,
       totalMarks: 20,
       criteria: [
         {
@@ -209,7 +209,7 @@ const INITIAL_DATA = {
       name: "NBA Attainment Rubric (Threshold)",
       type: "nba_threshold",
       isShared: true,
-      facultyId: "fac-admin-jugal",
+      facultyId: null,
       totalMarks: 100,
       criteria: [
         {
@@ -227,66 +227,13 @@ const INITIAL_DATA = {
     }
   ],
 
-  students: [
-    {
-      id: "st-f201506",
-      uin: "F201506",
-      name: "HoD Humanities",
-      email: "hod.humanities@eng.rizvi.edu.in",
-      academicYear: "2026-27",
-      yearOfStudy: "TE",
-      branch: "Mechanical Engineering",
-      division: "A",
-      batch: "A1"
-    },
-    {
-      id: "st-test_student",
-      uin: "test_student",
-      name: "Test Student",
-      email: "test_student@eng.rizvi.edu.in",
-      academicYear: "2026-27",
-      yearOfStudy: "TE",
-      branch: "Mechanical Engineering",
-      division: "A",
-      batch: "A1"
-    },
-    {
-      id: "st-24051001",
-      uin: "24051001",
-      name: "Aarav Sharma",
-      email: "24051001@eng.rizvi.edu.in",
-      academicYear: "2026-27",
-      yearOfStudy: "FE",
-      branch: "Mechanical Engineering",
-      division: "A",
-      batch: "A1"
-    }
-  ],
+  students: [],
 
   faculty: [
     { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: [], isDualRole: true }
   ],
 
-  subjects: [
-    {
-      id: "sub-24051181",
-      code: "24051181",
-      shortName: "VMD Lab",
-      fullName: "Vibration and Machinery Diagnostics Laboratory (PEL-I)",
-      departmentId: "dept-mech",
-      className: "TE Mech",
-      semester: "Semester V"
-    },
-    {
-      id: "sub-esl101",
-      code: "ESL101",
-      shortName: "EM Lab",
-      fullName: "Engineering Mechanics Lab",
-      departmentId: "dept-fe",
-      className: "FE",
-      semester: "Semester I"
-    }
-  ],
+  subjects: [],
 
   courseOutcomes: [],
 

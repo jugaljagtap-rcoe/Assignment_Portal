@@ -588,7 +588,7 @@ const adminView = {
   },
 
   downloadStudentCSVTemplate() {
-    const csvContent = "data:text/csv;charset=utf-8,uin,full_name,email,year_of_study,branch,division,batch,academic_year\n24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,FE,Computer Engineering,A,A1,2026-27\n24051021,Ananya Patel,24051021@eng.rizvi.edu.in,FE,Computer Engineering,A,A2,2026-27\n23051005,Rohan Kulkarni,23051005@eng.rizvi.edu.in,SE,Mechanical Engineering,B,B1,2026-27";
+    const csvContent = "data:text/csv;charset=utf-8,uin,full_name,email,year_of_study,branch,division,batch,academic_year\n# UIN,Student Name,Email,Year of Study,Branch,Division,Batch,Academic Year\nXXXXXX,Sample Student,sample.student@eng.rizvi.edu.in,FE,Computer Engineering,A,A1,2026-27";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -1122,8 +1122,22 @@ const adminView = {
     };
     app.data.faculty.push(newFac);
     app.saveState();
+    app.syncFacultyToSupabase(newFac);
     app.closeModal();
     app.showToast(`Added faculty member ${newFac.name}`, 'success');
+    this.renderFacultyRoster(document.getElementById('main-content'));
+  },
+
+  deleteFaculty(facId) {
+    const fac = app.data.faculty.find(f => f.id === facId);
+    if (!fac) return;
+    if (!confirm(`Are you sure you want to delete faculty member "${fac.name}"?`)) return;
+    app.data.faculty = app.data.faculty.filter(f => f.id !== facId);
+    app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('faculty').delete().eq('id', facId);
+    }
+    app.showToast(`Deleted faculty member ${fac.name}`, 'info');
     this.renderFacultyRoster(document.getElementById('main-content'));
   },
 
@@ -1491,6 +1505,7 @@ const adminView = {
     }
 
     app.saveState();
+    app.syncSubjectToSupabase(targetSub ? targetSub.id : newSub.id);
     app.closeModal();
     app.showToast(`Saved subject course ${code} (${className} — ${semester})`, 'success');
     this.renderDepartments(document.getElementById('main-content'));
@@ -1503,6 +1518,9 @@ const adminView = {
 
     app.data.subjects = app.data.subjects.filter(s => s.id !== subjectId);
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('subjects').delete().eq('id', subjectId);
+    }
     app.showToast(`Deleted subject course ${sub.code}`, 'info');
     this.renderDepartments(document.getElementById('main-content'));
   },
@@ -1574,6 +1592,15 @@ const adminView = {
 
     app.data.academicClasses.push(newClass);
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('academic_classes').upsert({
+        id: newClass.id,
+        code: newClass.code,
+        name: newClass.name,
+        department_id: newClass.departmentId,
+        semesters: newClass.semesters
+      });
+    }
     app.closeModal();
     app.showToast(`Added Academic Class ${newClass.name}`, 'success');
     this.renderDepartments(document.getElementById('main-content'));
@@ -1646,6 +1673,15 @@ const adminView = {
 
     dept.mission = missionPoints;
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('departments').upsert({
+        id: dept.id,
+        name: dept.name,
+        short_name: dept.shortName || dept.id,
+        vision: dept.vision,
+        mission: dept.mission
+      });
+    }
     app.closeModal();
     app.showToast(`Updated Vision & Mission for ${dept.name}`, 'success');
     this.renderDepartments(document.getElementById('main-content'));
@@ -1741,6 +1777,13 @@ const adminView = {
     };
     app.data.programOutcomes.push(newPO);
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('program_outcomes').upsert({
+        id: newPO.id,
+        code: newPO.code,
+        description: newPO.description
+      });
+    }
     app.closeModal();
     app.showToast(`Added Program Outcome ${newPO.code}`, 'success');
     this.renderPOAccreditation(document.getElementById('main-content'));
@@ -1771,6 +1814,13 @@ const adminView = {
     app.data.attainmentSettings.studentThresholdPct = parseFloat(document.getElementById('st-thresh').value);
     app.data.attainmentSettings.classTargetPct = parseFloat(document.getElementById('cl-target').value);
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      supabaseClient.from('attainment_settings').upsert({
+        id: 'default',
+        student_threshold_pct: app.data.attainmentSettings.studentThresholdPct,
+        class_target_pct: app.data.attainmentSettings.classTargetPct
+      });
+    }
     app.closeModal();
     app.showToast('Attainment thresholds updated successfully', 'success');
     this.renderDashboard(document.getElementById('main-content'));

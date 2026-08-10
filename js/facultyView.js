@@ -1850,11 +1850,14 @@ const facultyView = {
       });
     });
 
+    const activeFac = app.data.faculty.find(f => f.email === app.currentUser?.email);
+    const resolvedFacultyId = activeFac?.id || app.currentUser?.email || 'faculty';
+
     const newRub = {
       id: 'rub-' + Date.now(),
       name: name,
       isShared: true,
-      facultyId: 'fac-admin-jugal',
+      facultyId: resolvedFacultyId,
       totalMarks: totalMarks,
       criteria: criteriaList
     };
@@ -2293,7 +2296,7 @@ const facultyView = {
 
   testFormula() {
     document.getElementById('formula-test-result').innerHTML = `
-      <div style="color:var(--success); font-weight:600;">✓ Formula Valid! Calculated ω_n = 189.74 rad/s for Student 24051001 (m=12.5kg, k=450N/mm).</div>
+      <div style="color:var(--success); font-weight:600;">✓ Formula Valid! Calculated ω_n = 189.74 rad/s for Sample Student (m=12.5kg, k=450N/mm).</div>
     `;
   },
 
@@ -2340,7 +2343,7 @@ const facultyView = {
       });
     } else {
       // Sample row with empty values if no roster exists yet
-      dataRows = [`24051001,${variableKeys.map(() => '').join(',')}`];
+      dataRows = [`XXXXXX,${variableKeys.map(() => '').join(',')}`];
     }
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -2431,7 +2434,7 @@ const facultyView = {
           });
           return values.join(',');
         })
-      : [`24051001,${selectedAsg.questions.flatMap(q => q.parameters || []).map(() => '0.000').join(',')}`];
+      : [`XXXXXX,${selectedAsg.questions.flatMap(q => q.parameters || []).map(() => '0.000').join(',')}`];
 
     const csvContent = "data:text/csv;charset=utf-8,"
       + humanLabels.join(',') + '\n'
@@ -2828,11 +2831,14 @@ const facultyView = {
     const existingIdx = app.data.assignments.findIndex(a => a.id === cleanId || (a.code && a.code.toLowerCase() === code.toLowerCase()));
     const existingQuestions = (existingIdx >= 0 && app.data.assignments[existingIdx].questions) ? app.data.assignments[existingIdx].questions : [];
 
+    const activeFac = app.data.faculty.find(f => f.email === app.currentUser?.email);
+    const resolvedFacultyId = activeFac?.id || app.currentUser?.email || 'faculty';
+
     const newAsg = {
       id: cleanId,
       code: code,
       subjectId: selectedSubId,
-      facultyId: 'fac-admin-jugal',
+      facultyId: resolvedFacultyId,
       number: existingIdx >= 0 ? app.data.assignments[existingIdx].number : (app.data.assignments.length + 1),
       title: document.getElementById('new-asg-title').value,
       className: document.getElementById('new-asg-class').value,
