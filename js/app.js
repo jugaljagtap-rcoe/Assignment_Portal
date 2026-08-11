@@ -214,9 +214,8 @@ class AppEngine {
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
       if (coPoRes && coPoRes.data) this.data.coPOMapping = coPoRes.data;
 
-      if (!localStorage.getItem('rizvi_supabase_migrated')) {
+      if (!localStorage.getItem('rizvi_supabase_migrated_v2')) {
         await this.migrateLocalStorageToSupabase();
-        localStorage.setItem('rizvi_supabase_migrated', '1');
       }
 
       this.lastSyncedAt = new Date();
@@ -274,46 +273,52 @@ class AppEngine {
     }
 
     try {
-      // Upsert course Outcomes
+      // Upsert course outcomes with deterministic IDs
       if (Array.isArray(this.data.courseOutcomes) && this.data.courseOutcomes.length > 0) {
         for (const co of this.data.courseOutcomes) {
+          const deterministicId = `co-${(co.code || co.id || '').replace(/\./g, '-')}`;
           await supabaseClient.from('course_outcomes').upsert({
-            id: co.id,
+            id: deterministicId,
             code: co.code,
             description: co.description,
-            type: co.type || 'CO',
+            type: co.type || 'LO',
+            bt_level: co.btLevel || co.bt_level || '',
             subject_id: co.subjectId || co.subject_id || '',
-            bt_level: co.btLevel || co.bt_level || 'BT2',
-            module_id: co.moduleId || co.module_id || null,
-            assignment_id: co.assignmentId || co.assignment_id || null
+            module_id: co.moduleId || co.module_id || '',
+            assignment_id: co.assignmentId || co.assignment_id || ''
           });
         }
       }
 
-      // Upsert modules
+      // Upsert modules with deterministic IDs
       if (Array.isArray(this.data.modules) && this.data.modules.length > 0) {
         for (const m of this.data.modules) {
+          const deterministicId = `mod-${(m.code || m.module_code || m.id || '').replace(/\./g, '-')}`;
           await supabaseClient.from('modules').upsert({
-            id: m.id,
+            id: deterministicId,
             code: m.code || m.module_code || '',
-            name: m.name || m.module_name || m.title || '',
-            topics: m.topics || '',
-            subject_id: m.subjectId || m.subject_id || ''
+            module_name: m.title || m.name || m.module_name || '',
+            subject_id: m.subjectId || m.subject_id || '',
+            topics: m.topics || ''
           });
         }
       }
 
-      // Upsert subject_faculty
-      if (Array.isArray(this.data.subjectFaculty) && this.data.subjectFaculty.length > 0) {
-        for (const sf of this.data.subjectFaculty) {
-          await supabaseClient.from('subject_faculty').upsert({
-            id: sf.id,
-            faculty_id: sf.faculty_id || sf.facultyId,
-            subject_id: sf.subject_id || sf.subjectId,
-            academic_year: sf.academic_year || sf.academicYear || '2025-2026'
-          });
-        }
-      }
+      // Update local IDs to match deterministic IDs
+      this.data.courseOutcomes = (this.data.courseOutcomes || []).map(co => ({
+        ...co,
+        id: `co-${(co.code || co.id || '').replace(/\./g, '-')}`,
+        subject_id: co.subjectId || co.subject_id || ''
+      }));
+      this.data.modules = (this.data.modules || []).map(m => ({
+        ...m,
+        id: `mod-${(m.code || m.module_code || m.id || '').replace(/\./g, '-')}`,
+        subject_id: m.subjectId || m.subject_id || ''
+      }));
+      this.saveState();
+
+      localStorage.removeItem('rizvi_supabase_migrated');
+      localStorage.setItem('rizvi_supabase_migrated_v2', '1');
 
       this.showToast('Migration complete!', 'success');
     } catch(err) {
