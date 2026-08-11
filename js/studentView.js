@@ -18,6 +18,15 @@ const studentView = {
         this.renderDashboard(container);
         break;
     }
+
+    const navHtml = `
+      <div class="segmented-control print-hide" style="margin-bottom:20px; width:fit-content;">
+        <button class="segmented-btn ${activeNav === 'dashboard' || !activeNav ? 'active' : ''}" onclick="app.switchNav('dashboard')">📋 My Assignments</button>
+        <button class="segmented-btn ${activeNav === 'solver' ? 'active' : ''}" onclick="app.switchNav('solver')">✏️ Solve Assignment</button>
+        <button class="segmented-btn ${activeNav === 'grades' ? 'active' : ''}" onclick="app.switchNav('grades')">🏆 My Results</button>
+      </div>
+    `;
+    container.insertAdjacentHTML('afterbegin', navHtml);
   },
 
   getAssignmentsForStudent(student) {

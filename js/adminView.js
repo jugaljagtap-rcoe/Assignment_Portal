@@ -577,6 +577,12 @@ const adminView = {
      ========================================================================== */
   renderStudentsMaster(container) {
     container.innerHTML = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="#admin-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Admin Home</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Student Master Roster</span>
+      </div>
+
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Student Master Roster</h1>
@@ -837,6 +843,11 @@ const adminView = {
 
   renderFacultyRoster(container) {
     container.innerHTML = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="#admin-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Admin Home</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Faculty Roster</span>
+      </div>
       <div class="page-header-container"><div><h1 class="page-title">Faculty Roster</h1></div></div>
       <div class="card">
         <div class="table-container">

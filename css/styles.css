@@ -296,34 +296,23 @@ body {
   background: var(--success);
 }
 
-/* App Main Layout */
+/* App Main Layout (Full-Width Workspace) */
 .app-container {
   display: flex;
   flex: 1;
-  max-width: 1360px;
+  max-width: 1440px;
   width: 100%;
   margin: 0 auto;
   padding: 0;
   gap: 0;
   position: relative;
-  background: linear-gradient(to right, var(--sidebar-bg) 232px, var(--bg-primary) 232px);
+  background: var(--bg-primary);
   align-items: stretch;
 }
 
-/* Dark Sidebar Nav */
+/* Sidebar Nav (Hidden in favor of top role pills & card workspace) */
 .sidebar-nav {
-  width: 232px;
-  background: var(--sidebar-bg);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex-shrink: 0;
-  padding: 20px 12px;
-  border-right: none;
-  position: sticky;
-  top: 58px;
-  height: calc(100vh - 58px);
-  overflow-y: auto;
+  display: none !important;
 }
 
 .nav-item {
@@ -388,9 +377,12 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
   min-width: 0;
-  padding: 20px 28px;
+  padding: 24px 36px;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
   background: var(--bg-primary);
 }
 
