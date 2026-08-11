@@ -405,7 +405,7 @@ const adminView = {
   },
 
   renderDeptFacultyTab(dept) {
-    const deptFaculty = (app.data.faculty || []).filter(f => f.departmentId === dept.id || f.role === 'admin');
+    const deptFaculty = (app.data.faculty || []).filter(f => f.departmentId === dept.id);
     return `
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
@@ -431,7 +431,7 @@ const adminView = {
                 const taughtSfs = (app.data.subjectFaculty || []).filter(sf => sf.faculty_id === f.email || sf.facultyId === f.email);
                 const subCodes = taughtSfs.map(sf => {
                   const sub = app.data.subjects.find(s => s.id === sf.subject_id || s.id === sf.subjectId);
-                  return sub ? sub.code : sf.subject_id;
+                  return sub ? (sub.code || sub.fullName || sub.name) : (sf.subject_id || sf.subjectId || '?');
                 });
                 return `
                   <tr>
