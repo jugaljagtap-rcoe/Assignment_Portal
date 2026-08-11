@@ -383,6 +383,11 @@ const adminView = {
             <button class="btn btn-secondary btn-sm" onclick="adminView.openTransferStudentModal('${dept.id}')">🔄 Transfer Class / Branch</button>
           </div>
         </div>
+
+        <div style="margin-bottom:12px;">
+          <input type="text" id="dept-student-search" class="form-input" placeholder="Search by UIN, Name or Email..." oninput="adminView.filterDeptStudents(this.value, '${dept.id}')" style="max-width:360px;">
+        </div>
+
         <div class="table-container" style="max-height:500px; overflow-y:auto;">
           <table class="custom-table">
             <thead>
@@ -395,13 +400,38 @@ const adminView = {
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="dept-student-table-body">
               ${this.buildStudentRows(deptStudents)}
             </tbody>
           </table>
         </div>
       </div>
     `;
+  },
+
+  filterDeptStudents(query, deptId) {
+    const q = (query || '').toLowerCase().trim();
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || { id: deptId };
+
+    const deptStudents = app.data.students.filter(s => {
+      if (dept.id === 'dept-fe') return (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase() === 'FE';
+      const b = s.branch || '';
+      if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
+      if (dept.id === 'dept-civil') return b.includes('Civil');
+      if (dept.id === 'dept-comp') return b.includes('Computer Engineering');
+      if (dept.id === 'dept-ecs') return b.includes('Electronics');
+      if (dept.id === 'dept-mech') return b.includes('Mechanical');
+      return true;
+    });
+
+    const filtered = deptStudents.filter(s => {
+      return (s.name || '').toLowerCase().includes(q) ||
+             (s.uin || '').toLowerCase().includes(q) ||
+             (s.email || '').toLowerCase().includes(q);
+    });
+
+    const body = document.getElementById('dept-student-table-body');
+    if (body) body.innerHTML = this.buildStudentRows(filtered);
   },
 
   renderDeptFacultyTab(dept) {
@@ -1034,9 +1064,30 @@ const adminView = {
         <td style="display:flex; gap:6px;">
           <button class="btn btn-primary btn-sm" onclick="adminView.openStudentProfileModal('${s.id}')">👤 Profile</button>
           <button class="btn btn-ghost btn-sm" onclick="adminView.openEditStudentModal('${s.id}')">✏️ Edit</button>
+          <button class="btn btn-destructive btn-sm" onclick="adminView.deleteStudent('${s.id}')">🗑️ Delete</button>
         </td>
       </tr>
     `).join('');
+  },
+
+  async deleteStudent(id) {
+    const s = app.data.students.find(st => st.id === id);
+    if (!s) return;
+    if (!confirm(`Are you sure you want to delete student ${s.name} (${s.uin})?`)) return;
+
+    const idx = app.data.students.findIndex(st => st.id === id);
+    if (idx >= 0) app.data.students.splice(idx, 1);
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('students').delete().eq('id', id);
+      } catch(err) { console.warn('Delete student notice:', err); }
+    }
+
+    app.saveState();
+    writeAudit('deleted', 'student', id, s);
+    app.showToast(`Deleted student ${s.name}`, 'info');
+    app.renderCurrentView();
   },
 
   filterStudentRoster() {
@@ -1145,11 +1196,33 @@ const adminView = {
   openEditStudentModal(id) {
     const s = app.data.students.find(st => st.id === id);
     if (!s) return;
+    const curYear = (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase();
+    const curBranch = s.branch || HARDCODED_BRANCHES[0];
+
     app.showModal(`Edit Student: ${s.name}`, `
       <form onsubmit="adminView.saveEditedStudent(event, '${s.id}')">
-        <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-edit-name" class="form-input" value="${s.name}" required></div>
-        <div class="form-group"><label class="form-label">UIN</label><input type="text" id="st-edit-uin" class="form-input code-font" value="${s.uin}" required></div>
-        <div class="form-group"><label class="form-label">Email</label><input type="email" id="st-edit-email" class="form-input code-font" value="${s.email}" required></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-edit-name" class="form-input" value="${s.name || ''}" required></div>
+        <div class="form-group"><label class="form-label">UIN (Unique Identification Number)</label><input type="text" id="st-edit-uin" class="form-input code-font" value="${s.uin || ''}" required></div>
+        <div class="form-group"><label class="form-label">Email Address</label><input type="email" id="st-edit-email" class="form-input code-font" value="${s.email || ''}" required></div>
+        <div class="form-group">
+          <label class="form-label">Year of Study</label>
+          <select id="st-edit-year" class="form-select" required>
+            <option value="FE" ${curYear === 'FE' ? 'selected' : ''}>FE</option>
+            <option value="SE" ${curYear === 'SE' ? 'selected' : ''}>SE</option>
+            <option value="TE" ${curYear === 'TE' ? 'selected' : ''}>TE</option>
+            <option value="BE" ${curYear === 'BE' ? 'selected' : ''}>BE</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Branch</label>
+          <select id="st-edit-branch" class="form-select" required>
+            ${HARDCODED_BRANCHES.map(b => `<option value="${b}" ${b === curBranch ? 'selected' : ''}>${b}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group"><label class="form-label">Division</label><input type="text" id="st-edit-div" class="form-input" value="${s.division || 'A'}" required></div>
+          <div class="form-group"><label class="form-label">Batch</label><input type="text" id="st-edit-batch" class="form-input" value="${s.batch || 'A1'}" required></div>
+        </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
           <button type="submit" class="btn btn-primary">Update Student</button>
@@ -1162,13 +1235,33 @@ const adminView = {
     e.preventDefault();
     const s = app.data.students.find(st => st.id === id);
     if (!s) return;
-    s.name = document.getElementById('st-edit-name').value;
-    s.uin = document.getElementById('st-edit-uin').value;
-    s.email = document.getElementById('st-edit-email').value;
+
+    s.name = document.getElementById('st-edit-name').value.trim();
+    s.uin = document.getElementById('st-edit-uin').value.trim();
+    s.email = document.getElementById('st-edit-email').value.trim();
+    s.yearOfStudy = document.getElementById('st-edit-year').value;
+    s.branch = document.getElementById('st-edit-branch').value;
+    s.division = document.getElementById('st-edit-div').value.trim();
+    s.batch = document.getElementById('st-edit-batch').value.trim();
+
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('students').upsert({
+          id: s.id,
+          name: s.name,
+          uin: s.uin,
+          email: s.email,
+          branch: s.branch,
+          division: s.division,
+          batch: s.batch,
+          year_of_study: s.yearOfStudy
+        });
+      } catch(err) { console.warn('Student upsert notice:', err); }
+    }
     writeAudit('updated', 'student', id, s);
     app.closeModal();
-    app.showToast('Updated student profile', 'success');
+    app.showToast(`Updated student profile for ${s.name}`, 'success');
     app.renderCurrentView();
   },
 
