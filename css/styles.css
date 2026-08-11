@@ -246,6 +246,15 @@ body {
   gap: 2px;
 }
 
+.role-switcher-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+  margin: 0 4px;
+  align-self: center;
+  flex-shrink: 0;
+}
+
 .role-btn {
   padding: 5px 13px;
   font-size: 12px;

@@ -113,6 +113,7 @@ class AppEngine {
     else if (hash.startsWith('#nba')) this.activeTabCategory = 'nba';
 
     this.renderTopNavTabs();
+    this.renderRoleSwitcher();
     this.renderSidebar();
     this.renderCurrentView();
   }
@@ -259,37 +260,7 @@ class AppEngine {
   renderTopNavTabs() {
     const container = document.getElementById('top-nav-tabs');
     if (!container) return;
-
-    let tabs = [];
-    const isJugalAdmin = this.currentUser && HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase());
-
-    if (isJugalAdmin) {
-      tabs = [
-        { id: 'admin', label: '🛡️ Admin', hash: '#admin-home' },
-        { id: 'faculty', label: '👨‍🏫 Faculty', hash: '#faculty-home' },
-        { id: 'student', label: '🎓 Student', hash: '#student-home' },
-        { id: 'nba', label: '🏛️ NBA Accreditation', hash: '#nba-institute' }
-      ];
-    } else if (this.currentRole === 'faculty') {
-      tabs = [
-        { id: 'faculty', label: '👨‍🏫 Faculty', hash: '#faculty-home' },
-        { id: 'nba', label: '🏛️ NBA Accreditation', hash: '#nba-institute' }
-      ];
-    } else {
-      tabs = [
-        { id: 'student', label: '🎓 Student Portal', hash: '#student-home' }
-      ];
-    }
-
-    container.innerHTML = `
-      <div class="top-nav-tabs-wrapper">
-        ${tabs.map(t => `
-          <button class="top-nav-tab-btn ${this.activeTabCategory === t.id ? 'active' : ''}" onclick="window.location.hash='${t.hash}'">
-            ${t.label}
-          </button>
-        `).join('')}
-      </div>
-    `;
+    container.innerHTML = '';
   }
 
   loadState() {
@@ -382,7 +353,9 @@ class AppEngine {
   }
 
   switchRole(newRole) {
-    if (this.currentUser && HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase())) {
+    if (!this.currentUser) return;
+    const isDual = this.currentUser.isDualRole || HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase());
+    if (isDual || this.currentUser.role === newRole) {
       this.currentRole = newRole;
       this.activeTabCategory = newRole;
       if (newRole === 'admin') window.location.hash = '#admin-home';
@@ -502,21 +475,28 @@ class AppEngine {
     }
 
     const isDual = this.currentUser.isDualRole || HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase());
+    const isNba = this.activeTabCategory === 'nba';
 
     if (isDual) {
       container.innerHTML = `
         <div class="role-switcher">
-          <button class="role-btn ${this.currentRole === 'admin' ? 'active' : ''}" onclick="app.switchRole('admin')">Admin</button>
-          <button class="role-btn ${this.currentRole === 'faculty' ? 'active' : ''}" onclick="app.switchRole('faculty')">Faculty</button>
-          <button class="role-btn ${this.currentRole === 'student' ? 'active' : ''}" onclick="app.switchRole('student')">Student</button>
+          <button class="role-btn ${!isNba && this.currentRole === 'admin' ? 'active' : ''}" onclick="app.switchRole('admin')">Admin</button>
+          <button class="role-btn ${!isNba && this.currentRole === 'faculty' ? 'active' : ''}" onclick="app.switchRole('faculty')">Faculty</button>
+          <button class="role-btn ${!isNba && this.currentRole === 'student' ? 'active' : ''}" onclick="app.switchRole('student')">Student</button>
+          <span class="role-switcher-divider"></span>
+          <button class="role-btn ${isNba ? 'active' : ''}" onclick="window.location.hash='#nba-institute'">NBA</button>
+        </div>
+      `;
+    } else if (this.currentUser.role === 'faculty') {
+      container.innerHTML = `
+        <div class="role-switcher">
+          <button class="role-btn ${!isNba ? 'active' : ''}" onclick="app.switchRole('faculty')">Faculty</button>
+          <span class="role-switcher-divider"></span>
+          <button class="role-btn ${isNba ? 'active' : ''}" onclick="window.location.hash='#nba-institute'">NBA</button>
         </div>
       `;
     } else {
-      container.innerHTML = `
-        <span class="tag tag-co" style="font-size:12px; font-weight:700; text-transform:uppercase;">
-          ${this.currentRole.toUpperCase()} ROLE
-        </span>
-      `;
+      container.innerHTML = '';
     }
 
     badgeContainer.innerHTML = `
