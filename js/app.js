@@ -58,6 +58,20 @@ class AppEngine {
     this.reconcileUserSession();
   }
 
+  getStudentsForDept(deptId) {
+    return (this.data.students || []).filter(s => {
+      const b = (s.branch || '').toLowerCase();
+      const y = (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase();
+      if (deptId === 'dept-fe') return y === 'FE';
+      if (deptId === 'dept-aids') return b.includes('artificial intelligence');
+      if (deptId === 'dept-civil') return b.includes('civil');
+      if (deptId === 'dept-comp') return b.includes('computer engineering');
+      if (deptId === 'dept-ecs') return b.includes('electronics');
+      if (deptId === 'dept-mech') return b.includes('mechanical');
+      return false;
+    });
+  }
+
   getNavFromHash() {
     const hash = (window.location.hash || '').replace('#', '').trim();
     if (!hash) return null;

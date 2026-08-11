@@ -80,15 +80,7 @@ const adminView = {
       <div class="dept-blocks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-bottom:28px;">
         ${HARDCODED_DEPARTMENTS.map(d => {
           const deptSubjects = (app.data.subjects || []).filter(s => s.departmentId === d.id);
-          const deptStudents = app.data.students.filter(s => {
-            const b = s.branch || '';
-            if (d.id === 'dept-aids') return b.includes('Artificial Intelligence');
-            if (d.id === 'dept-civil') return b.includes('Civil');
-            if (d.id === 'dept-comp') return b.includes('Computer Engineering');
-            if (d.id === 'dept-ecs') return b.includes('Electronics');
-            if (d.id === 'dept-mech') return b.includes('Mechanical');
-            return true;
-          });
+          const deptStudents = app.getStudentsForDept(d.id);
 
           const deptAsgs = (app.data.assignments || []).filter(a => deptSubjects.some(s => s.id === a.subjectId));
           const deptAsgSubs = (app.data.assignmentSubmissions || []).filter(as => deptAsgs.some(a => a.id === as.assignmentId));
@@ -204,15 +196,7 @@ const adminView = {
 
   renderDeptOverviewTab(dept) {
     const deptSubjects = (app.data.subjects || []).filter(s => s.departmentId === dept.id);
-    const deptStudents = app.data.students.filter(s => {
-      const b = s.branch || '';
-      if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
-      if (dept.id === 'dept-civil') return b.includes('Civil');
-      if (dept.id === 'dept-comp') return b.includes('Computer Engineering');
-      if (dept.id === 'dept-ecs') return b.includes('Electronics');
-      if (dept.id === 'dept-mech') return b.includes('Mechanical');
-      return true;
-    });
+    const deptStudents = app.getStudentsForDept(dept.id);
 
     const deptAsgs = (app.data.assignments || []).filter(a => deptSubjects.some(s => s.id === a.subjectId));
     const deptAsgSubs = (app.data.assignmentSubmissions || []).filter(as => deptAsgs.some(a => a.id === as.assignmentId));
@@ -359,16 +343,7 @@ const adminView = {
   },
 
   renderDeptStudentsTab(dept) {
-    const deptStudents = app.data.students.filter(s => {
-      if (dept.id === 'dept-fe') return (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase() === 'FE';
-      const b = s.branch || '';
-      if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
-      if (dept.id === 'dept-civil') return b.includes('Civil');
-      if (dept.id === 'dept-comp') return b.includes('Computer Engineering');
-      if (dept.id === 'dept-ecs') return b.includes('Electronics');
-      if (dept.id === 'dept-mech') return b.includes('Mechanical');
-      return true;
-    });
+    const deptStudents = app.getStudentsForDept(dept.id);
 
     return `
       <div class="card">
@@ -413,16 +388,7 @@ const adminView = {
     const q = (query || '').toLowerCase().trim();
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || { id: deptId };
 
-    const deptStudents = app.data.students.filter(s => {
-      if (dept.id === 'dept-fe') return (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase() === 'FE';
-      const b = s.branch || '';
-      if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
-      if (dept.id === 'dept-civil') return b.includes('Civil');
-      if (dept.id === 'dept-comp') return b.includes('Computer Engineering');
-      if (dept.id === 'dept-ecs') return b.includes('Electronics');
-      if (dept.id === 'dept-mech') return b.includes('Mechanical');
-      return true;
-    });
+    const deptStudents = app.getStudentsForDept(dept.id);
 
     const filtered = deptStudents.filter(s => {
       return (s.name || '').toLowerCase().includes(q) ||

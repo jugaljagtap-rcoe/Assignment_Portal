@@ -421,12 +421,15 @@ const facultyView = {
         </div>
       </div>
 
-      <div class="segmented-control print-hide" style="margin-bottom:20px;">
+      <div class="segmented-control print-hide" style="margin-bottom:20px; overflow-x:auto;">
         <button class="segmented-btn ${activeSubTab === 'co_modules' ? 'active' : ''}" onclick="facultyView.switchCOManagerSubTab('co_modules', '${sub ? sub.id : ''}')">
           🎯 Course Outcomes & Syllabus Modules
         </button>
         <button class="segmented-btn ${activeSubTab === 'co_po_matrix' ? 'active' : ''}" onclick="facultyView.switchCOManagerSubTab('co_po_matrix', '${sub ? sub.id : ''}')">
           📊 CO–PO–PSO Mapping Matrix
+        </button>
+        <button class="segmented-btn ${activeSubTab === 'co_bt_module' ? 'active' : ''}" onclick="facultyView.switchCOManagerSubTab('co_bt_module', '${sub ? sub.id : ''}')">
+          🧠 CO–BT–Module Mapping
         </button>
       </div>
 
@@ -475,7 +478,7 @@ const facultyView = {
             `}
           </div>
         </div>
-      ` : `
+      ` : activeSubTab === 'co_po_matrix' ? `
         <!-- SUB-TAB B: CO-PO-PSO MAPPING MATRIX -->
         <div class="card">
           <div style="margin-bottom:14px;">
@@ -533,6 +536,62 @@ const facultyView = {
                     }).join('')}
                   </tr>
                 </tfoot>
+              </table>
+            </div>
+          `}
+        </div>
+      ` : `
+        <!-- SUB-TAB C: CO-BT-MODULE MAPPING -->
+        <div class="card">
+          <div style="margin-bottom:14px;">
+            <h3 class="card-title">CO–BT Level & Primary Syllabus Module Mapping (${sub ? sub.code : ''})</h3>
+            <p class="card-subtitle" style="font-size:12px; color:var(--text-secondary);">Map Course Outcomes directly to Bloom's Taxonomy Cognitive Level, Primary Syllabus Module, and Target Assignment/Experiment</p>
+          </div>
+
+          ${courseOutcomes.length === 0 ? `<div class="empty-state">No Course Outcomes defined for this subject yet.</div>` : `
+            <div class="table-container">
+              <table class="custom-table" style="font-size:13px;">
+                <thead>
+                  <tr>
+                    <th style="width:90px;">CO Code</th>
+                    <th style="min-width:220px;">CO Statement</th>
+                    <th style="min-width:140px;">Bloom's Taxonomy Level</th>
+                    <th style="min-width:200px;">Primary Syllabus Module</th>
+                    <th style="min-width:200px;">Target Assessment / Experiment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${courseOutcomes.map(co => {
+                    const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
+                    const curBT = co.btLevel || co.bt_level || 'BT2';
+                    const curModId = co.moduleId || co.module_id || '';
+                    const curAsgId = co.assignmentId || co.assignment_id || '';
+
+                    return `
+                      <tr>
+                        <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${co.code}</td>
+                        <td style="font-size:12px; max-width:260px; white-space:normal; line-height:1.3;">${co.description}</td>
+                        <td>
+                          <select class="form-select btn-sm" onchange="facultyView.saveCODetailMapping('${co.id}', 'btLevel', this.value)" style="padding:4px 8px; font-size:12px; font-weight:700;">
+                            ${['BT1', 'BT2', 'BT3', 'BT4', 'BT5', 'BT6'].map(bt => `<option value="${bt}" ${curBT === bt ? 'selected' : ''}>${bt}</option>`).join('')}
+                          </select>
+                        </td>
+                        <td>
+                          <select class="form-select btn-sm" onchange="facultyView.saveCODetailMapping('${co.id}', 'moduleId', this.value)" style="padding:4px 8px; font-size:12px; max-width:220px;">
+                            <option value="">-- Select Module --</option>
+                            ${modules.map(m => `<option value="${m.id}" ${curModId === m.id ? 'selected' : ''}>${m.code || m.module_code || ''}: ${m.name || m.module_name || m.title || 'Module'}</option>`).join('')}
+                          </select>
+                        </td>
+                        <td>
+                          <select class="form-select btn-sm" onchange="facultyView.saveCODetailMapping('${co.id}', 'assignmentId', this.value)" style="padding:4px 8px; font-size:12px; max-width:220px;">
+                            <option value="">-- Select Assessment --</option>
+                            ${subAsgs.map(a => `<option value="${a.id}" ${curAsgId === a.id ? 'selected' : ''}>${a.code} — ${a.title}</option>`).join('')}
+                          </select>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
               </table>
             </div>
           `}
@@ -601,25 +660,44 @@ const facultyView = {
     app.renderCurrentView();
   },
 
-  async saveCOBTLevel(coId, newBtLevel) {
+  async saveCODetailMapping(coId, fieldKey, val) {
     const co = (app.data.courseOutcomes || []).find(c => c.id === coId);
     if (!co) return;
 
-    co.btLevel = newBtLevel;
-    co.bt_level = newBtLevel;
+    if (fieldKey === 'btLevel') {
+      co.btLevel = val;
+      co.bt_level = val;
+    } else if (fieldKey === 'moduleId') {
+      co.moduleId = val;
+      co.module_id = val;
+    } else if (fieldKey === 'assignmentId') {
+      co.assignmentId = val;
+      co.assignment_id = val;
+    }
+
     app.saveState();
 
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
       try {
         await supabaseClient.from('course_outcomes').upsert({
-          id: coId,
-          bt_level: newBtLevel
+          id: co.id,
+          code: co.code,
+          description: co.description,
+          type: co.type || 'CO',
+          subject_id: co.subjectId || co.subject_id,
+          bt_level: co.btLevel || co.bt_level || 'BT2',
+          module_id: co.moduleId || co.module_id || null,
+          assignment_id: co.assignmentId || co.assignment_id || null
         });
-      } catch(err) { console.warn('CO BT level upsert notice:', err); }
+      } catch(err) { console.warn('CO detail mapping upsert notice:', err); }
     }
 
-    writeAudit('updated', 'course_outcome', coId, { bt_level: newBtLevel });
-    app.showToast(`Updated Bloom's Taxonomy to ${newBtLevel}`, 'success');
+    writeAudit('updated', 'course_outcome', coId, { [fieldKey]: val });
+    app.showToast(`Updated CO mapping detail`, 'success');
+  },
+
+  async saveCOBTLevel(coId, newBtLevel) {
+    return this.saveCODetailMapping(coId, 'btLevel', newBtLevel);
   },
 
   async saveCOPOMapping(coId, targetPoCode, val, subjectId) {
