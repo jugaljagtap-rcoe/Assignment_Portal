@@ -116,17 +116,31 @@ class AppEngine {
       if (e.key === 'rizvi_fe_portal_data') {
         this.data = this.loadState();
         this.reconcileUserSession();
-        this.renderCurrentView();
+        if (this.currentUser) {
+          this.renderCurrentView();
+        }
       }
     });
   }
 
   handleHashChange() {
+    if (!this.currentUser) {
+      this.showLoginModal(false);
+      return;
+    }
     const hash = window.location.hash || '';
-    if (hash.startsWith('#admin')) this.activeTabCategory = 'admin';
-    else if (hash.startsWith('#faculty')) this.activeTabCategory = 'faculty';
-    else if (hash.startsWith('#student')) this.activeTabCategory = 'student';
-    else if (hash.startsWith('#nba')) this.activeTabCategory = 'nba';
+    if (hash.startsWith('#admin')) {
+      this.activeTabCategory = 'admin';
+      this.currentRole = 'admin';
+    } else if (hash.startsWith('#faculty')) {
+      this.activeTabCategory = 'faculty';
+      this.currentRole = 'faculty';
+    } else if (hash.startsWith('#student')) {
+      this.activeTabCategory = 'student';
+      this.currentRole = 'student';
+    } else if (hash.startsWith('#nba')) {
+      this.activeTabCategory = 'nba';
+    }
 
     if (hash === '#admin-home' || hash === '#faculty-home' || hash === '#student-home' || hash === '' || hash === '#home') {
       this.activeNav = 'dashboard';
@@ -561,6 +575,8 @@ class AppEngine {
 
     if (st) {
       this.currentUser.role = 'student';
+      this.currentRole = 'student';
+      this.activeTabCategory = 'student';
       this.currentUser.studentId = st.id;
       this.currentUser.name = st.name;
       this.activeStudentId = st.id;
@@ -660,6 +676,9 @@ class AppEngine {
   }
 
   renderCurrentView() {
+    if (!this.currentUser) {
+      return;
+    }
     const container = document.getElementById('main-content');
     if (!container) return;
 
@@ -739,7 +758,9 @@ class AppEngine {
 
   logout() {
     this.saveUserSession(null);
+    this.currentUser = null;
     this.currentRole = 'faculty';
+    this.activeTabCategory = 'faculty';
     this.showToast('Logged out successfully', 'info');
     window.location.hash = '#home';
     this.showLoginModal(false);
