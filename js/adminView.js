@@ -360,6 +360,7 @@ const adminView = {
 
   renderDeptStudentsTab(dept) {
     const deptStudents = app.data.students.filter(s => {
+      if (dept.id === 'dept-fe') return (s.yearOfStudy || 'FE').toUpperCase() === 'FE';
       const b = s.branch || '';
       if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
       if (dept.id === 'dept-civil') return b.includes('Civil');
@@ -1078,6 +1079,9 @@ const adminView = {
     };
     app.data.subjects.push(subRecord);
     app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try { await supabaseClient.from('subjects').upsert(subRecord); } catch(err) { console.warn(err); }
+    }
     writeAudit('created', 'subject', subRecord.id, subRecord);
     app.closeModal();
     app.showToast(`Created subject ${subRecord.code}`, 'success');

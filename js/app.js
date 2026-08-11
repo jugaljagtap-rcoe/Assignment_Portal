@@ -155,7 +155,7 @@ class AppEngine {
       if (studentsRes.data && studentsRes.data.length > 0) this.data.students = studentsRes.data;
       if (facultyRes.data && facultyRes.data.length > 0) this.data.faculty = facultyRes.data;
       if (subjectFacultyRes.data) this.data.subjectFaculty = subjectFacultyRes.data;
-      if (subjectsRes.data) this.data.subjects = subjectsRes.data;
+      if (subjectsRes.data && subjectsRes.data.length > 0) this.data.subjects = subjectsRes.data;
       if (assignmentsRes.data) this.data.assignments = assignmentsRes.data;
       if (submissionsRes.data) this.data.submissions = submissionsRes.data;
       if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;
