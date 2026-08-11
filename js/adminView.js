@@ -1173,6 +1173,12 @@ const adminView = {
   },
 
   openAddSubjectModal(deptId) {
+    const deptClasses = (INITIAL_DATA.academicClasses || []).filter(c => c.departmentId === deptId);
+    let semesterOptions = [...new Set(deptClasses.flatMap(c => c.semesters || []))];
+    if (semesterOptions.length === 0) {
+      semesterOptions = ['Semester I', 'Semester II'];
+    }
+
     app.showModal('Add New Subject Course', `
       <form onsubmit="adminView.saveNewSubject(event, '${deptId}')">
         <div class="form-group"><label class="form-label">Subject Code (e.g. VMD, EM)</label><input type="text" id="sub-code" class="form-input code-font" required></div>
@@ -1180,8 +1186,7 @@ const adminView = {
         <div class="form-group">
           <label class="form-label">Semester</label>
           <select id="sub-sem" class="form-select" required>
-            <option value="Semester I">Semester I</option>
-            <option value="Semester II">Semester II</option>
+            ${semesterOptions.map(s => `<option value="${s}">${s}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
