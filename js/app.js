@@ -177,8 +177,9 @@ class AppEngine {
       if (subjectsRes.data && subjectsRes.data.length > 0) {
         const dbSubjects = subjectsRes.data.map(s => ({
           ...s,
-          fullName: s.full_name || s.fullName || s.name,
-          departmentId: s.department_id || s.departmentId
+          fullName: s.full_name || s.fullName || '',
+          departmentId: s.department_id || s.departmentId || '',
+          className: s.class_name || s.className || ''
         }));
         const merged = [...dbSubjects];
         (this.data.subjects || []).forEach(localSub => {
@@ -193,11 +194,21 @@ class AppEngine {
       if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;
       if (studentVarsRes.data) this.data.studentVariables = studentVarsRes.data;
       if (studentAnswersRes.data) this.data.studentAnswers = studentAnswersRes.data;
-      if (courseOutcomesRes.data) this.data.courseOutcomes = courseOutcomesRes.data;
+      if (courseOutcomesRes.data) {
+        this.data.courseOutcomes = courseOutcomesRes.data.map(co => ({
+          ...co,
+          subjectId: co.subject_id || co.subjectId || '',
+          btLevel: co.bt_level || co.btLevel || '',
+          moduleId: co.module_id || co.moduleId || '',
+          assignmentId: co.assignment_id || co.assignmentId || ''
+        }));
+      }
       if (modulesRes.data) {
-        this.data.modules = modulesRes.data.filter((m, i, arr) =>
-          arr.findIndex(x => x.id === m.id) === i
-        );
+        this.data.modules = modulesRes.data.map(m => ({
+          ...m,
+          subjectId: m.subject_id || m.subjectId || '',
+          name: m.module_name || m.name || m.title || ''
+        })).filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
       }
       if (auditLogRes.data) this.data.auditLogs = auditLogRes.data;
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;

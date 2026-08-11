@@ -992,17 +992,33 @@ const facultyView = {
     `);
   },
 
-  saveNewCO(e, subCode) {
+  async saveNewCO(e, subCode) {
     e.preventDefault();
+    const sub = (app.data.subjects || []).find(s => s.code === subCode || s.id === subCode);
     const coRecord = {
       id: 'co-' + Date.now(),
       code: document.getElementById('co-code').value.trim(),
       description: document.getElementById('co-desc').value.trim(),
-      type: 'CO'
+      type: 'CO',
+      subjectId: sub?.id || '',
+      subject_id: sub?.id || ''
     };
     if (!app.data.courseOutcomes) app.data.courseOutcomes = [];
     app.data.courseOutcomes.push(coRecord);
     app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('course_outcomes').upsert({
+          id: coRecord.id,
+          code: coRecord.code,
+          description: coRecord.description,
+          type: coRecord.type,
+          subject_id: coRecord.subject_id
+        });
+      } catch(err) { console.warn('CO upsert notice:', err); }
+    }
+
     writeAudit('created', 'co', coRecord.id, coRecord);
     app.closeModal();
     app.showToast(`Created outcome ${coRecord.code}`, 'success');

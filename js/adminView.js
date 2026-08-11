@@ -1269,15 +1269,15 @@ const adminView = {
     app.data.subjects.push(subRecord);
     app.saveState();
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      const dbRecord = {
-        id: subRecord.id,
-        code: subRecord.code,
-        name: subRecord.name,
-        full_name: subRecord.fullName,
-        department_id: subRecord.departmentId,
-        semester: subRecord.semester
-      };
-      try { await supabaseClient.from('subjects').upsert(dbRecord); } catch(err) { console.warn('Subject upsert notice:', err); }
+      try {
+        await supabaseClient.from('subjects').upsert({
+          id: subRecord.id,
+          code: subRecord.code,
+          full_name: subRecord.fullName,
+          department_id: subRecord.departmentId,
+          semester: subRecord.semester
+        });
+      } catch(err) { console.warn('Subject upsert notice:', err); }
     }
     writeAudit('created', 'subject', subRecord.id, subRecord);
     app.closeModal();
