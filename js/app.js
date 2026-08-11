@@ -29,11 +29,26 @@ function parseJwtToken(token) {
   }
 }
 
+/* ==========================================================================
+   PART 2 — AUDIT HELPER (Fire-and-forget, never awaited)
+   ========================================================================== */
+function writeAudit(action, entityType, entityId, snapshot) {
+  if (!supabaseClient) return;
+  supabaseClient.from('audit_log').insert({
+    action: action,
+    entity_type: entityType,
+    entity_id: entityId,
+    changed_by: (window.app && window.app.currentUser) ? window.app.currentUser.email : 'system',
+    snapshot: snapshot || {}
+  }).then(() => {}).catch(err => console.warn('Audit insert notice:', err));
+}
+
 class AppEngine {
   constructor() {
     this.data = this.loadState();
     this.currentUser = this.loadUserSession();
     this.currentRole = this.currentUser ? this.currentUser.role : 'faculty'; // 'admin', 'faculty', 'student'
+    this.activeTabCategory = 'faculty'; // 'admin', 'faculty', 'student', 'nba'
     this.activeStudentId = this.currentUser && this.currentUser.studentId ? this.currentUser.studentId : (this.data.students.length > 0 ? this.data.students[0].id : null); 
     this.activeNav = this.getNavFromHash() || 'dashboard';
     const savedAsgId = localStorage.getItem('rizvi_fe_active_asg_id');
@@ -50,7 +65,7 @@ class AppEngine {
     return hash;
   }
 
-  showSpinner(message = 'Loading data…') {
+  showSpinner(message = 'Loading portal data…') {
     const overlay = document.getElementById('spinner-overlay');
     const msgEl = document.getElementById('spinner-message');
     if (msgEl) msgEl.textContent = message;
@@ -65,17 +80,22 @@ class AppEngine {
   init() {
     this.setupEventListeners();
     this.handleHashChange();
-    this.showSpinner('Synchronizing with Supabase Cloud…');
-    this.syncWithSupabase().finally(() => {
+    this.showSpinner('Loading portal data…');
+    this.loadAllFromSupabase().finally(() => {
       this.hideSpinner();
       if (!this.currentUser) this.showLoginModal(false);
-      else { this.renderRoleSwitcher(); this.renderSidebar(); this.renderCurrentView(); }
+      else {
+        this.renderTopNavTabs();
+        this.renderRoleSwitcher();
+        this.renderSidebar();
+        this.renderCurrentView();
+      }
     });
 
     // Hash-based routing listener
     window.addEventListener('hashchange', () => this.handleHashChange());
 
-    // Cross-tab and cross-window real-time data sync listener
+    // Cross-tab real-time data sync listener
     window.addEventListener('storage', (e) => {
       if (e.key === 'rizvi_fe_portal_data') {
         this.data = this.loadState();
@@ -86,931 +106,145 @@ class AppEngine {
   }
 
   handleHashChange() {
-    const nav = this.getNavFromHash();
-    if (nav && nav !== this.activeNav) {
-      this.activeNav = nav;
-      this.renderSidebar();
-      this.renderCurrentView();
-    }
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#admin')) this.activeTabCategory = 'admin';
+    else if (hash.startsWith('#faculty')) this.activeTabCategory = 'faculty';
+    else if (hash.startsWith('#student')) this.activeTabCategory = 'student';
+    else if (hash.startsWith('#nba')) this.activeTabCategory = 'nba';
+
+    this.renderTopNavTabs();
+    this.renderSidebar();
+    this.renderCurrentView();
   }
 
-  async syncWithSupabase() {
+  /* ==========================================================================
+     PART 2 — DATA LOADING ARCHITECTURE (Promise.all Parallel Sync)
+     ========================================================================== */
+  async loadAllFromSupabase() {
     if (!supabaseClient) {
       this.showToast('Running in offline mode — Supabase not connected. Data saved locally only.', 'warning');
       return;
     }
+
     try {
-      // Parallel Promise.all fetching pattern across all 10 core tables + audit_log
       const [
-        { data: stData, error: stErr },
-        { data: fcData, error: fcErr },
-        { data: subData, error: subErr },
-        { data: asgData, error: asgErr },
-        { data: submData, error: submErr },
-        { data: svarData, error: svarErr },
-        { data: ansData, error: ansErr },
-        { data: poData, error: poErr },
-        { data: tmplData, error: tmplErr },
-        { data: auditData, error: auditErr }
+        studentsRes, facultyRes, subjectFacultyRes, subjectsRes, assignmentsRes,
+        submissionsRes, assignmentSubmissionsRes, studentVarsRes, studentAnswersRes,
+        courseOutcomesRes, modulesRes, auditLogRes, templatesRes
       ] = await Promise.all([
         supabaseClient.from('students').select('*'),
         supabaseClient.from('faculty').select('*'),
+        supabaseClient.from('subject_faculty').select('*'),
         supabaseClient.from('subjects').select('*'),
         supabaseClient.from('assignments').select('*'),
         supabaseClient.from('submissions').select('*'),
+        supabaseClient.from('assignment_submissions').select('*'),
         supabaseClient.from('student_variables').select('*'),
         supabaseClient.from('student_answers').select('*'),
-        supabaseClient.from('program_outcomes').select('*'),
-        supabaseClient.from('assignment_templates').select('*'),
-        supabaseClient.from('audit_log').select('*').order('changed_at', { ascending: false }).limit(500)
+        supabaseClient.from('course_outcomes').select('*'),
+        supabaseClient.from('modules').select('*'),
+        supabaseClient.from('audit_log').select('*').order('changed_at', { ascending: false }).limit(500),
+        supabaseClient.from('assignment_templates').select('*')
       ]);
 
-      // Process Students
-      if (!stErr && stData && Array.isArray(stData)) {
-        this.data.students = stData.map(st => {
-          const stUin = (st.uin || (st.email ? st.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-          return {
-            id: 'st-' + stUin,
-            uin: st.uin || stUin.toUpperCase(),
-            name: st.name,
-            email: st.email,
-            academicYear: st.academic_year || '2026-27',
-            yearOfStudy: st.year_of_study || 'FE',
-            branch: st.branch || 'Mechanical Engineering',
-            division: st.division || 'A',
-            batch: st.batch || 'A1'
-          };
-        });
-      }
-
-      // Process Faculty
-      if (!fcErr && fcData && Array.isArray(fcData) && fcData.length > 0) {
-        this.data.faculty = fcData.map(fc => ({
-          id: fc.id,
-          name: fc.name,
-          email: fc.email,
-          departmentId: fc.department_id,
-          role: fc.role,
-          assignedSubjects: fc.assigned_subjects || [],
-          isDualRole: fc.is_dual_role || false
-        }));
-      }
-
-      // Process Subjects
-      if (!subErr && subData && Array.isArray(subData)) {
-        this.data.subjects = subData.map(sub => ({
-          id: sub.id, code: sub.code, shortName: sub.short_name, fullName: sub.full_name, departmentId: sub.department_id, className: sub.class_name, semester: sub.semester
-        }));
-      }
-
-      // Process POs
-      if (!poErr && poData && Array.isArray(poData) && poData.length > 0) {
-        this.data.programOutcomes = poData.map(po => ({
-          id: po.id, code: po.code, description: po.description
-        }));
-      }
-
-      // Process Assignments
-      if (!asgErr && asgData && Array.isArray(asgData)) {
-        this.data.assignments = asgData.filter(asg =>
-          asg.code !== 'VMD-EXP-01' && asg.code !== 'EM-EXP-01' && asg.id !== 'asg-vmd-001' && asg.id !== 'asg-em-001'
-        ).map(asg => {
-          const codeKey = (asg.code || 'asg').toLowerCase().replace(/[^a-z0-9_-]/g, '');
-          const cleanId = 'asg-' + codeKey;
-          let parsedSchedules = asg.schedules;
-          if (typeof parsedSchedules === 'string') { try { parsedSchedules = JSON.parse(parsedSchedules); } catch(e) { parsedSchedules = []; } }
-          let parsedQuestions = asg.questions;
-          if (typeof parsedQuestions === 'string') { try { parsedQuestions = JSON.parse(parsedQuestions); } catch(e) { parsedQuestions = []; } }
-
-          return {
-            id: cleanId,
-            originalId: asg.id,
-            code: asg.code,
-            subjectId: asg.subject_id,
-            facultyId: asg.faculty_id,
-            number: asg.number,
-            title: asg.title,
-            className: asg.class_name,
-            semester: asg.semester,
-            assessmentType: asg.assessment_type,
-            modulesCovered: asg.modules_covered,
-            outcomeCovered: asg.outcome_covered,
-            publishDate: asg.publish_date,
-            deadline: asg.deadline,
-            rubricPresetId: asg.rubric_preset_id,
-            createdAt: asg.created_at,
-            state: asg.state || (Array.isArray(parsedSchedules) && parsedSchedules.some(s => s.submissionsOpen) ? 'Published' : 'Draft'),
-            schedules: Array.isArray(parsedSchedules) ? parsedSchedules : [],
-            questions: Array.isArray(parsedQuestions) ? parsedQuestions : []
-          };
-        });
-      }
-
-      // Process Submissions
-      if (!submErr && submData && Array.isArray(submData)) {
-        this.data.submissions = submData.map(s => {
-          const formatted = {
-            id: s.id,
-            assignmentId: s.assignment_id,
-            studentId: s.student_id,
-            parameterId: s.parameter_id,
-            attemptNumber: s.attempt_number,
-            submittedValue: s.submitted_value,
-            submittedUnit: s.submitted_unit,
-            isCorrectValue: s.is_correct_value,
-            isCorrectUnit: s.is_correct_unit,
-            marksAwarded: s.marks_awarded,
-            attemptDeductionPct: s.attempt_deduction_pct || s.deduction_pct || 0,
-            latePenaltyPct: s.late_penalty_pct || 0,
-            deductionPct: s.deduction_pct || 0,
-            isLate: s.is_late || false,
-            submittedAt: s.submitted_at,
-            verificationStatus: s.verification_status || 'Pending',
-            verifiedBy: s.verified_by || null,
-            verifiedAt: s.verified_at || null
-          };
-          return this.normalizeSubmissionIds(formatted);
-        });
-      }
-
-      // Process Student Variables
-      if (!svarErr && svarData && Array.isArray(svarData)) {
-        this.data.studentVariables = svarData.map(v => {
-          const formatted = { id: v.id, studentId: v.student_id, assignmentId: v.assignment_id, key: v.key, value: v.value };
-          return this.normalizeSubmissionIds(formatted);
-        });
-      }
-
-      // Process Student Answers
-      if (!ansErr && ansData && Array.isArray(ansData)) {
-        this.data.studentAnswers = ansData.map(a => {
-          const formatted = { id: a.id || `ans-${a.student_id}-${a.parameter_id}`, assignmentId: a.assignment_id, studentId: a.student_id, parameterId: a.parameter_id, correctValue: a.correct_value, correctUnit: a.correct_unit };
-          return this.normalizeSubmissionIds(formatted);
-        });
-      }
-
-      // Process Assignment Templates
-      if (!tmplErr && tmplData && Array.isArray(tmplData)) {
-        this.data.assignmentTemplates = tmplData.map(t => ({
-          id: t.id, code: t.code, title: t.title, subjectCode: t.subject_code, questions: t.questions, rubricPresetId: t.rubric_preset_id, createdBy: t.created_by, createdAt: t.created_at
-        }));
-      }
-
-      // Process Audit Logs
-      if (!auditErr && auditData && Array.isArray(auditData)) {
-        this.data.auditLogs = auditData;
-      }
+      if (studentsRes.data && studentsRes.data.length > 0) this.data.students = studentsRes.data;
+      if (facultyRes.data && facultyRes.data.length > 0) this.data.faculty = facultyRes.data;
+      if (subjectFacultyRes.data) this.data.subjectFaculty = subjectFacultyRes.data;
+      if (subjectsRes.data) this.data.subjects = subjectsRes.data;
+      if (assignmentsRes.data) this.data.assignments = assignmentsRes.data;
+      if (submissionsRes.data) this.data.submissions = submissionsRes.data;
+      if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;
+      if (studentVarsRes.data) this.data.studentVariables = studentVarsRes.data;
+      if (studentAnswersRes.data) this.data.studentAnswers = studentAnswersRes.data;
+      if (courseOutcomesRes.data) this.data.courseOutcomes = courseOutcomesRes.data;
+      if (modulesRes.data) this.data.modules = modulesRes.data;
+      if (auditLogRes.data) this.data.auditLogs = auditLogRes.data;
+      if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
 
       this.lastSyncedAt = new Date();
       this.saveState();
       this.reconcileUserSession();
-      this.ensureActiveAssignment();
-      this.renderCurrentView();
     } catch (e) {
-      console.warn('Supabase cloud sync background notice:', e);
+      console.warn('loadAllFromSupabase fetch notice:', e);
     }
   }
 
-  async purgeGhostAssignmentsFromSupabase() {
-    if (!supabaseClient) return;
-    try {
-      await supabaseClient.from('assignments').delete().or('code.eq.VMD-EXP-01,code.eq.EM-EXP-01,id.eq.asg-vmd-001,id.eq.asg-em-001,id.eq.asg-vmd-custom-001,id.eq.asg-seed-placeholder-vmd');
-    } catch(e) {}
-  }
-
-  async syncSubjectToSupabase(subId) {
-    if (!supabaseClient || !subId) return;
-    const sub = (this.data.subjects || []).find(s => s.id === subId || s.code === subId);
-    if (!sub) return;
-    try {
-      await supabaseClient.from('subjects').upsert({
-        id: sub.id,
-        code: sub.code,
-        short_name: sub.shortName || sub.code,
-        full_name: sub.fullName || sub.shortName,
-        department_id: sub.departmentId || 'dept-mech',
-        class_name: sub.className || 'TE Mech',
-        semester: sub.semester || 'Semester V'
-      });
-    } catch(e) {}
-  }
-
-  async syncAllAssignmentsToSupabase() {
-    if (!supabaseClient || !this.data.assignments) return;
-    for (const asg of this.data.assignments) {
-      await this.syncAssignmentToSupabase(asg);
-    }
-  }
-
-  async syncAssignmentToSupabase(asg) {
-    if (!supabaseClient || !asg) return;
-    try {
-      if (asg.subjectId) {
-        await this.syncSubjectToSupabase(asg.subjectId);
-      }
-
-      const sanitizedQuestions = (asg.questions || []).map(q => ({ ...q, imageUrl: (q.imageUrl && q.imageUrl.startsWith('data:image/')) ? '' : (q.imageUrl || '') }));
-
-      const payload = {
-        id: asg.id,
-        code: asg.code,
-        subject_id: asg.subjectId,
-        faculty_id: asg.facultyId || (this.currentUser ? this.currentUser.email : 'admin'),
-        number: asg.number || 1,
-        title: asg.title,
-        class_name: asg.className || 'TE Mech',
-        semester: asg.semester || 'Semester V',
-        assessment_type: asg.assessmentType || 'Direct',
-        modules_covered: Array.isArray(asg.modulesCovered) ? asg.modulesCovered.join(', ') : (asg.modulesCovered || ''),
-        outcome_covered: Array.isArray(asg.outcomeCovered) ? asg.outcomeCovered.join(', ') : (asg.outcomeCovered || ''),
-        publish_date: asg.publishDate ? new Date(asg.publishDate).toISOString() : null,
-        deadline: asg.deadline ? new Date(asg.deadline).toISOString() : null,
-        rubric_preset_id: asg.rubricPresetId,
-        created_at: asg.createdAt ? new Date(asg.createdAt).toISOString() : new Date().toISOString(),
-        schedules: asg.schedules || [],
-        questions: sanitizedQuestions
-      };
-
-      let { error } = await supabaseClient.from('assignments').upsert(payload);
-      if (error) {
-        console.warn('Supabase assignment upsert notice, trying stringified JSON payload:', error);
-        payload.schedules = JSON.stringify(asg.schedules || []);
-        payload.questions = JSON.stringify(sanitizedQuestions);
-        const retry = await supabaseClient.from('assignments').upsert(payload);
-        if (retry.error) console.warn('Supabase assignment stringified retry notice:', retry.error);
-        else console.log('Successfully synced assignment (stringified JSON) to Supabase Cloud:', asg.code);
-      } else {
-        console.log('Successfully synced full assignment to Supabase Cloud:', asg.code);
-      }
-    } catch(e) {
-      console.warn('Supabase assignment sync error:', e);
-    }
-  }
-
-  async deleteAssignmentFromSupabase(asgId) {
-    if (!supabaseClient || !asgId) return;
-    try {
-      // Delete the assignment record
-      const { error: asgErr } = await supabaseClient
-        .from('assignments')
-        .delete()
-        .eq('id', asgId);
-      if (asgErr) console.warn('Supabase delete assignment notice:', asgErr);
-
-      // Also delete all submissions for this assignment
-      const { error: submErr } = await supabaseClient
-        .from('submissions')
-        .delete()
-        .eq('assignment_id', asgId);
-      if (submErr) console.warn('Supabase delete submissions notice:', submErr);
-
-      // Also delete all student variables for this assignment
-      const { error: svarErr } = await supabaseClient
-        .from('student_variables')
-        .delete()
-        .eq('assignment_id', asgId);
-      if (svarErr) console.warn('Supabase delete student_variables notice:', svarErr);
-
-      // Also delete all student answers for this assignment
-      const { error: ansErr } = await supabaseClient
-        .from('student_answers')
-        .delete()
-        .eq('assignment_id', asgId);
-      if (ansErr) console.warn('Supabase delete student_answers notice:', ansErr);
-
-    } catch(e) {
-      console.warn('Supabase delete assignment error:', e);
-    }
-  }
-
-  async syncSubmissionToSupabase(submission) {
-    if (!supabaseClient || !submission) return;
-    try {
-      const { error } = await supabaseClient.from('submissions').upsert({
-        id: submission.id,
-        assignment_id: submission.assignmentId,
-        student_id: submission.studentId,
-        parameter_id: submission.parameterId,
-        attempt_number: submission.attemptNumber,
-        submitted_value: submission.submittedValue,
-        submitted_unit: submission.submittedUnit,
-        is_correct_value: submission.isCorrectValue,
-        is_correct_unit: submission.isCorrectUnit,
-        marks_awarded: submission.marksAwarded,
-        deduction_pct: submission.deductionPct || 0,
-        attempt_deduction_pct: submission.attemptDeductionPct || submission.deductionPct || 0,
-        late_penalty_pct: submission.latePenaltyPct || 0,
-        is_late: submission.isLate || false,
-        submitted_at: submission.submittedAt
-      });
-      if (error) console.warn('Supabase submission sync notice:', error);
-    } catch(e) {
-      console.warn('Supabase submission sync error:', e);
-    }
-  }
-
-  async syncStudentsToSupabase() {
-    return this.syncAllStudentsToSupabase();
-  }
-
-  async syncAllStudentsToSupabase() {
-    if (!supabaseClient || !this.data.students || this.data.students.length === 0) return;
-    try {
-      for (const st of this.data.students) {
-        await this.syncStudentToSupabase(st);
-      }
-      console.log('Done syncing', this.data.students.length, 'students');
-    } catch(e) {
-      console.warn('Supabase syncAllStudents error:', e);
-    }
-  }
-
-  async syncStudentToSupabase(st) {
-    if (!supabaseClient || !st) return;
-    try {
-      const { error } = await supabaseClient.from('students').upsert({
-        id: st.id,
-        uin: st.uin,
-        name: st.name,
-        email: st.email,
-        academic_year: st.academicYear || '2026-27',
-        year_of_study: st.yearOfStudy || 'FE',
-        branch: st.branch,
-        division: st.division,
-        batch: st.batch
-      });
-      if (error) console.warn('Supabase student sync notice:', error);
-    } catch(e) {
-      console.warn('Supabase student sync error:', e);
-    }
-  }
-
-  async syncFacultyToSupabase(fc) {
-    if (!supabaseClient || !fc) return;
-    try {
-      const { error } = await supabaseClient.from('faculty').upsert({
-        id: fc.id,
-        name: fc.name,
-        email: fc.email,
-        department_id: fc.departmentId || 'dept-fe',
-        role: fc.role || 'faculty',
-        assigned_subjects: fc.assignedSubjects || [],
-        is_dual_role: fc.isDualRole || false
-      });
-      if (error) console.warn('Supabase faculty sync notice:', error);
-    } catch(e) {
-      console.warn('Supabase faculty sync error:', e);
-    }
-  }
-
-  async syncSubjectsToSupabase() {
-    if (!supabaseClient || !this.data.subjects) return;
-    try {
-      for (const sub of this.data.subjects) {
-        await this.syncSubjectToSupabase(sub.id);
-      }
-    } catch(e) {
-      console.warn('Supabase syncSubjects error:', e);
-    }
-  }
-
-  async syncPOsToSupabase() {
-    if (!supabaseClient || !this.data.programOutcomes) return;
-    try {
-      for (const po of this.data.programOutcomes) {
-        await supabaseClient.from('program_outcomes').upsert({
-          id: po.id,
-          code: po.code,
-          description: po.description
-        });
-      }
-    } catch(e) {
-      console.warn('Supabase syncPOs error:', e);
-    }
-  }
-
-  async syncStudentVariablesToSupabase(studentId, assignmentId) {
-    if (!supabaseClient) return;
-    try {
-      const vars = this.data.studentVariables.filter(
-        v => v.studentId === studentId && v.assignmentId === assignmentId
-      );
-      for (const v of vars) {
-        const { error } = await supabaseClient.from('student_variables').upsert({
-          id: v.id,
-          student_id: v.studentId,
-          assignment_id: v.assignmentId,
-          key: v.key,
-          value: v.value
-        });
-        if (error) console.warn('Supabase student_variables sync notice:', error);
-      }
-    } catch(e) {
-      console.warn('Supabase student_variables sync error:', e);
-    }
-  }
-
-  async syncStudentAnswersToSupabase(studentId, assignmentId) {
-    if (!supabaseClient) return;
-    try {
-      const answers = this.data.studentAnswers.filter(
-        a => a.studentId === studentId && a.assignmentId === assignmentId
-      );
-      for (const a of answers) {
-        const payload = {
-          assignment_id: a.assignmentId,
-          student_id: a.studentId,
-          parameter_id: a.parameterId,
-          correct_value: a.correctValue,
-          correct_unit: a.correctUnit
-        };
-        if (a.id) payload.id = a.id;
-        const { error } = await supabaseClient.from('student_answers').upsert(payload);
-        if (error) console.warn('Supabase student_answers sync notice:', error);
-      }
-    } catch(e) {
-      console.warn('Supabase student_answers sync error:', e);
-    }
-  }
-
-  loadUserSession() {
-    const saved = localStorage.getItem('rizvi_fe_portal_user');
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) { console.error('Failed to parse user session:', e); }
-    }
-    return null; // Default to null (logged out)
-  }
-
-  saveUserSession(user) {
-    if (user) {
-      localStorage.setItem('rizvi_fe_portal_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('rizvi_fe_portal_user');
-    }
-    this.currentUser = user;
-  }
-
-  login(emailInput, googlePayload = null) {
-    const email = (emailInput || '').trim().toLowerCase();
-    if (!email) return false;
-
-    let matchedUser = null;
-    let role = null;
-    let studentId = null;
-
-    if (HARDCODED_ADMIN_EMAILS.some(e => e.trim().toLowerCase() === email)) {
-      const foundFac = (this.data.faculty || []).find(f => (f.email || '').trim().toLowerCase() === email);
-      role = 'admin';
-      matchedUser = foundFac || { name: googlePayload ? googlePayload.name : 'Prof. Jugal Jagtap', email: email, department: 'First Year Engineering' };
-    } else {
-      const fac = (this.data.faculty || []).find(f => (f.email || '').trim().toLowerCase() === email);
-      if (fac) {
-        role = fac.role || 'faculty';
-        matchedUser = fac;
-      } else {
-        const st = (this.data.students || []).find(s => {
-          const sEmail = (s.email || '').trim().toLowerCase();
-          const sUin = (s.uin || '').trim().toLowerCase();
-          return (sEmail && sEmail === email) || (sEmail && email.startsWith(sEmail)) || (sUin && (email === sUin || email.startsWith(sUin)));
-        });
-        if (st) {
-          role = 'student';
-          matchedUser = st;
-          studentId = st.id;
-        }
-      }
-    }
-
-    if (matchedUser && role) {
-      const sessionUser = {
-        name: (googlePayload && googlePayload.name) || matchedUser.name || 'User',
-        email: matchedUser.email || email,
-        role: role,
-        studentId: studentId,
-        uin: matchedUser.uin || null,
-        branch: matchedUser.branch || null,
-        batch: matchedUser.batch || null,
-        picture: googlePayload ? googlePayload.picture : null,
-        loggedInAt: new Date().toISOString()
-      };
-      this.saveUserSession(sessionUser);
-      this.currentRole = role;
-      if (studentId) this.activeStudentId = studentId;
-      this.reconcileUserSession();
-      this.closeModal();
-      this.showToast(`Welcome back, ${sessionUser.name}! (${sessionUser.email})`, 'success');
-      this.renderRoleSwitcher();
-      this.renderSidebar();
-      this.renderCurrentView();
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  handleGoogleCredentialResponse(response) {
-    const feedback = document.getElementById('modal-login-feedback');
-    if (!response || !response.credential) {
-      if (feedback) feedback.innerHTML = `<div style="color:var(--danger); font-size:12px; font-weight:600;">⚠️ Google Sign-In failed. Please try again.</div>`;
-      return;
-    }
-
-    const payload = parseJwtToken(response.credential);
-    if (!payload || !payload.email) {
-      if (feedback) feedback.innerHTML = `<div style="color:var(--danger); font-size:12px; font-weight:600;">⚠️ Failed to process Google account data.</div>`;
-      return;
-    }
-
-    const email = payload.email.toLowerCase();
-    const domain = email.split('@')[1];
-
-    // Enforce Institutional Domain Restriction
-    if (domain !== 'eng.rizvi.edu.in' && payload.hd !== 'eng.rizvi.edu.in') {
-      if (feedback) {
-        feedback.innerHTML = `
-          <div style="background:#FEF2F2; border:1px solid #DC2626; padding:12px; border-radius:var(--radius-md); font-size:12px; color:#991B1B; margin-top:8px;">
-            <strong>⛔ INSTITUTIONAL ACCESS ONLY!</strong><br>
-            Signed in as <code>${email}</code>.<br>
-            Only official <strong>@eng.rizvi.edu.in</strong> Google Workspace accounts are permitted.
-          </div>
-        `;
-      }
-      return;
-    }
-
-    const success = this.login(email, payload);
-    if (!success && feedback) {
-      feedback.innerHTML = `
-        <div style="background:#FEF2F2; border:1px solid #DC2626; padding:12px; border-radius:var(--radius-md); font-size:12px; color:#991B1B; margin-top:8px;">
-          <strong>⛔ UNLISTED ACCOUNT!</strong><br>
-          • Authenticated via Google Workspace as <code>${email}</code>.<br>
-          • Account is not currently whitelisted in Student Master or Faculty Roster.<br>
-          • Contact System Administrator (<code style="color:#DC2626;">jugaljagtap@eng.rizvi.edu.in</code>).
-        </div>
-      `;
-    }
-  }
-
-  logout() {
-    this.saveUserSession(null);
-    this.showToast('Logged out of Rizvi FE Portal', 'info');
-    this.renderRoleSwitcher();
-    this.renderSidebar();
-    this.renderCurrentView();
-    this.showLoginModal(false);
-  }
-
-  showLoginModal(canClose = false) {
-    let overlay = document.getElementById('global-modal-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'global-modal-overlay';
-      overlay.className = 'modal-overlay';
-      document.body.appendChild(overlay);
-    }
-
-    const facultyOptions = this.data.faculty.map(f => `<option value="${f.email}">${f.name} (${f.email})</option>`).join('');
-    const studentOptions = this.data.students.map(s => `<option value="${s.email}">${s.uin} - ${s.name} (${s.branch} - ${s.batch})</option>`).join('');
-
-    const isPlaceholderClientId = GOOGLE_CLIENT_ID.includes('YOUR_GOOGLE_CLIENT_ID');
-
-    overlay.innerHTML = `
-      <div class="modal-card" style="max-width:540px; border-radius:var(--radius-xl); border:1px solid var(--border-strong); box-shadow:var(--shadow-level-4);">
-        <div class="modal-header" style="background:var(--bg-subtle); border-bottom:1px solid var(--border-default); padding:16px 20px;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="width:36px; height:36px; background:var(--accent-blue); color:white; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px;">R</div>
-            <div>
-              <h3 class="modal-title" style="font-size:16px; font-weight:700;">Google Workspace Sign-In</h3>
-              <div style="font-size:12px; color:var(--text-secondary);">Restricted to <code style="color:var(--accent-blue); font-weight:600;">@eng.rizvi.edu.in</code></div>
-            </div>
-          </div>
-          ${canClose ? '<button class="close-btn" aria-label="Close modal" onclick="app.closeModal()">✕</button>' : ''}
-        </div>
-        <div class="modal-body" style="padding:20px;">
-          <div style="background:var(--accent-blue-subtle); border:1px solid rgba(0,102,204,0.2); padding:12px 14px; border-radius:var(--radius-md); font-size:12px; color:var(--accent-blue); margin-bottom:18px;">
-            <strong>🔒 Whitelist Policy Enforced:</strong> Official Google Workspace accounts with <code class="code-font">@eng.rizvi.edu.in</code> domain are authenticated automatically.
-          </div>
-
-          <!-- Official Google Identity Services OAuth Container -->
-          <div style="margin-bottom:20px; text-align:center;">
-            <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:10px; letter-spacing:0.5px;">Official Google Authentication</label>
-            <div id="google-signin-btn-container" style="display:flex; justify-content:center; min-height:44px; align-items:center;"></div>
-            ${isPlaceholderClientId ? `
-              <div style="margin-top:8px; font-size:11px; color:#D97706; background:#FEF3C7; padding:8px; border-radius:6px;">
-                💡 <strong>Developer Tip:</strong> Update <code>GOOGLE_CLIENT_ID</code> in <code>js/app.js</code> with your Google Cloud Console Client ID to activate live Google Sign-In.
-              </div>
-            ` : ''}
-          </div>
-
-          <!-- Collapsible Roster Test Bypass -->
-          <details style="border-top:1px solid var(--border-default); padding-top:14px; margin-top:14px;">
-            <summary style="font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; user-select:none;">
-              ⚙️ Local Testing / Roster Quick-Select (Dev Bypass)
-            </summary>
-            <div style="margin-top:12px; padding-top:8px;">
-              <div style="display:flex; gap:8px; margin-bottom:10px;">
-                <button class="btn btn-primary" onclick="app.login('jugaljagtap@eng.rizvi.edu.in')" style="flex:1; justify-content:center; padding:9px; font-weight:600; font-size:12px;">
-                  ⚡ Sign In as Admin & Faculty
-                </button>
-                <button class="btn btn-secondary" onclick="app.login('test_student')" style="flex:1; justify-content:center; padding:9px; font-weight:600; font-size:12px; border-color:var(--accent-blue); color:var(--accent-blue);">
-                  🎓 Sign In as Test Student
-                </button>
-              </div>
-
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
-                <div>
-                  <label style="display:block; font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">👨‍🏫 Faculty Roster:</label>
-                  <select id="quick-faculty-select" class="form-control" style="font-size:12px;" onchange="if(this.value) app.login(this.value)">
-                    <option value="">-- Select Faculty --</option>
-                    ${facultyOptions}
-                  </select>
-                </div>
-
-                <div>
-                  <label style="display:block; font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">🎓 Student Master (${this.data.students.length}):</label>
-                  <select id="quick-student-select" class="form-control" style="font-size:12px;" onchange="if(this.value) app.login(this.value)">
-                    <option value="">-- Select Student --</option>
-                    ${studentOptions}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style="display:block; font-size:11px; font-weight:600; margin-bottom:4px;">Enter Institutional Email:</label>
-                <div style="display:flex; gap:8px;">
-                  <input type="email" id="modal-login-email" class="form-control" placeholder="user@eng.rizvi.edu.in" style="flex:1; font-size:12px;" value="jugaljagtap@eng.rizvi.edu.in">
-                  <button class="btn btn-secondary" onclick="app.handleCustomLogin()" style="font-size:12px; font-weight:600; white-space:nowrap;">
-                    🔑 Test Login
-                  </button>
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <div id="modal-login-feedback" style="margin-top:10px;"></div>
-        </div>
-      </div>
-    `;
-
-    setTimeout(() => {
-      overlay.classList.add('active');
-      this.initGoogleAuth();
-    }, 10);
-  }
-
-  initGoogleAuth() {
-    if (window.google && window.google.accounts) {
-      try {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (response) => this.handleGoogleCredentialResponse(response),
-          auto_select: false,
-          hd: 'eng.rizvi.edu.in'
-        });
-
-        const container = document.getElementById('google-signin-btn-container');
-        if (container) {
-          window.google.accounts.id.renderButton(container, {
-            theme: 'outline',
-            size: 'large',
-            type: 'standard',
-            shape: 'rectangular',
-            text: 'continue_with',
-            logo_alignment: 'left',
-            width: 300
-          });
-        }
-
-        // Trigger Google One-Tap popup prompt
-        window.google.accounts.id.prompt();
-      } catch (e) {
-        console.warn('Google Identity Services initialization failed or missing Client ID:', e);
-      }
-    }
-  }
-
-  handleCustomLogin() {
-    const input = document.getElementById('modal-login-email');
-    const feedback = document.getElementById('modal-login-feedback');
-    if (!input || !feedback) return;
-
-    const email = input.value.trim();
-    if (!email) {
-      feedback.innerHTML = `<div style="color:var(--danger); font-size:12px; font-weight:600;">⚠️ Please enter your @eng.rizvi.edu.in email address.</div>`;
-      return;
-    }
-
-    const success = this.login(email);
-    if (!success) {
-      feedback.innerHTML = `
-        <div style="background:#FEF2F2; border:1px solid #DC2626; padding:12px; border-radius:var(--radius-md); font-size:12px; color:#991B1B; margin-top:8px;">
-          <strong>⛔ LOGIN DENIED: UNLISTED ACCOUNT!</strong><br>
-          • <strong>Status:</strong> Authenticated as <code>${email}</code> via Google Workspace.<br>
-          • <strong>Whitelist Status:</strong> NOT listed in Student Master, Faculty Roster, or Admin list.<br>
-          • <strong>Access Result:</strong> Access is strictly blocked. Contact System Admin (<code style="color:#DC2626;">jugaljagtap@eng.rizvi.edu.in</code>).
-        </div>
-      `;
-    }
-  }
-
-  loadState() {
-    let state = null;
-    const saved = localStorage.getItem('rizvi_fe_portal_data');
-    if (saved) {
-      try { state = JSON.parse(saved); } catch(e) { console.error('Failed to parse state:', e); }
-    }
-
-    if (!state) {
-      state = JSON.parse(JSON.stringify(INITIAL_DATA));
-    }
-
-    if (!state.students) state.students = [];
-    
-    // Standardize all student IDs to deterministic format (st-{uin}) and merge seed data
-    const uniqueStMap = new Map();
-    (state.students || []).forEach(st => {
-      const uinKey = (st.uin || (st.email ? st.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-      st.id = 'st-' + uinKey;
-      uniqueStMap.set(uinKey, st);
-    });
-    (INITIAL_DATA.students || []).forEach(seedSt => {
-      const seedKey = (seedSt.uin || seedSt.email.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-      if (!uniqueStMap.has(seedKey)) {
-        uniqueStMap.set(seedKey, seedSt);
-      } else {
-        const existing = uniqueStMap.get(seedKey);
-        if (seedSt.yearOfStudy === 'TE' && (!existing.yearOfStudy || existing.yearOfStudy === 'FE')) {
-          existing.yearOfStudy = 'TE';
-          existing.branch = seedSt.branch;
-          existing.batch = seedSt.batch;
-        }
-      }
-    });
-    state.students = Array.from(uniqueStMap.values());
-    if (!state.faculty) state.faculty = JSON.parse(JSON.stringify(INITIAL_DATA.faculty));
-    if (!state.courseOutcomes) state.courseOutcomes = [];
-    if (!state.programSpecificOutcomes) state.programSpecificOutcomes = JSON.parse(JSON.stringify(INITIAL_DATA.programSpecificOutcomes));
-    state.academicClasses = JSON.parse(JSON.stringify(INITIAL_DATA.academicClasses));
-    state.rubricPresets = JSON.parse(JSON.stringify(INITIAL_DATA.rubricPresets));
-    if (!state.assignments) state.assignments = [];
-    if (!state.submissions) state.submissions = [];
-    if (!state.studentVariables) state.studentVariables = [];
-    if (!state.studentAnswers) state.studentAnswers = [];
-    if (!state.modules) state.modules = [];
-
-    if (!state.subjects) state.subjects = [];
-
-    // Force strict 6 Hardcoded Departments
-    state.departments = JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS));
-
-    // Ensure backwards compatibility for COs/LOs
-    state.courseOutcomes.forEach(co => {
-      if (!co.type) co.type = (co.code && co.code.includes('.LO')) ? 'LO' : 'CO';
-      if (!co.poIds) co.poIds = co.poId ? [co.poId] : ['PO1'];
-      if (!co.psoIds) co.psoIds = [];
-      if (!co.moduleIds) co.moduleIds = [];
-      if (!co.experimentIds) co.experimentIds = [];
-    });
-
-    // Backwards compatibility for submission records saved before late penalty fields were added
-    (state.submissions || []).forEach(s => {
-      if (s.attemptDeductionPct === undefined) s.attemptDeductionPct = s.deductionPct || 0;
-      if (s.latePenaltyPct === undefined) s.latePenaltyPct = 0;
-      if (s.isLate === undefined) s.isLate = false;
-    });
-
-    return state;
-  }
-
-  getDepartmentShortName(deptId) {
-    const dept = (this.data.departments || []).find(d => d.id === deptId);
-    if (!dept) return 'FE';
-    if (dept.shortName) return dept.shortName;
-    if (dept.id === 'dept-fe') return 'FE';
-    if (dept.id === 'dept-aids') return 'AI&DS';
-    if (dept.id === 'dept-civil') return 'Civil';
-    if (dept.id === 'dept-comp') return 'Comp';
-    if (dept.id === 'dept-ecs') return 'ECS';
-    if (dept.id === 'dept-mech') return 'Mech';
-    return 'FE';
-  }
-
-  saveState() {
-    localStorage.setItem('rizvi_fe_portal_data', JSON.stringify(this.data));
-  }
-
-  resetState() {
-    this.data = JSON.parse(JSON.stringify(INITIAL_DATA));
-    this.saveState();
-    this.reconcileUserSession();
-    this.showToast('Database reset to default seed state', 'success');
-    this.renderCurrentView();
-  }
-
-  reconcileUserSession() {
-    if (!this.currentUser) return;
-
-    const email = (this.currentUser.email || '').trim().toLowerCase();
-    const uin = (this.currentUser.uin || '').trim().toLowerCase();
-    const studentId = this.currentUser.studentId;
-
-    let matchedStudent = (this.data.students || []).find(s =>
-      (email && s.email && s.email.trim().toLowerCase() === email) ||
-      (uin && s.uin && s.uin.trim().toLowerCase() === uin) ||
-      (studentId && s.id === studentId)
-    );
-
-    if (matchedStudent) {
-      this.currentUser.role = 'student';
-      this.currentUser.studentId = matchedStudent.id;
-      this.currentUser.branch = matchedStudent.branch;
-      this.currentUser.batch = matchedStudent.batch;
-      this.currentUser.uin = matchedStudent.uin;
-      if (!this.currentUser.name || this.currentUser.name === 'User') {
-        this.currentUser.name = matchedStudent.name;
-      }
-      this.currentRole = 'student';
-      this.activeStudentId = matchedStudent.id;
-      this.saveUserSession(this.currentUser);
-    }
-  }
-
-  normalizeSubmissionIds(record) {
-    if (!record) return record;
-    // Normalize assignmentId
-    if (record.assignmentId) {
-      const asgMatch = this.data.assignments.find(a =>
-        a.id === record.assignmentId ||
-        a.originalId === record.assignmentId ||
-        ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === record.assignmentId
-      );
-      if (asgMatch) record.assignmentId = asgMatch.id;
-    }
-    // Normalize studentId
-    if (record.studentId) {
-      const stMatch = this.data.students.find(s =>
-        s.id === record.studentId ||
-        ('st-' + (s.uin || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === record.studentId
-      );
-      if (stMatch) record.studentId = stMatch.id;
-    }
-    return record;
-  }
-
-  getAssignmentSchedule(asgId, batchName) {
-    const asg = this.data.assignments.find(a =>
-      a.id === asgId || a.originalId === asgId ||
-      ('asg-' + (a.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === asgId
-    ) || this.data.assignments[0];
-    if (asg && asg.schedules && asg.schedules.length > 0) {
-      const match = asg.schedules.find(s => (s.scopeValue || '').toUpperCase().trim() === (batchName || '').toUpperCase().trim());
-      if (match) return match;
-      return asg.schedules[0];
-    }
+  /* ==========================================================================
+     PART 10 — SUBMISSION COUNTING HELPER (Student Counts)
+     ========================================================================== */
+  getAssignmentCompletionStatus(assignmentId) {
+    const asg = (this.data.assignments || []).find(a => a.id === assignmentId);
+    if (!asg) return { totalStudents: 0, submitted: 0, partial: 0, notStarted: 0, late: 0 };
+    const records = (this.data.assignmentSubmissions || []).filter(r => r.assignment_id === assignmentId || r.assignmentId === assignmentId);
     return {
-      publishDate: asg ? asg.publishDate : "2026-08-01T09:00",
-      deadline: asg ? asg.deadline : "2026-08-10T23:59",
-      submissionsOpen: true,
-      gradesReleased: true,
-      latePenaltyValue: 10,
-      lateMaxCap: 30
+      totalStudents: records.length,
+      submitted: records.filter(r => r.status === 'submitted').length,
+      partial: records.filter(r => r.status === 'partial').length,
+      notStarted: records.filter(r => r.status === 'not_started').length,
+      late: records.filter(r => r.status === 'late').length,
     };
   }
 
-  async writeAudit(action, entityType, entityId, snapshot = {}) {
-    const entry = {
-      action: action,
-      entity_type: entityType,
-      entity_id: String(entityId || ''),
-      changed_by: this.currentUser ? this.currentUser.email : 'system',
-      changed_at: new Date().toISOString(),
-      snapshot: snapshot
-    };
-    if (!this.data.auditLogs) this.data.auditLogs = [];
-    this.data.auditLogs.unshift(entry);
-    if (this.data.auditLogs.length > 500) this.data.auditLogs.pop();
-
-    if (supabaseClient) {
-      try {
-        supabaseClient.from('audit_log').insert(entry).then(() => {}).catch(e => console.warn('Audit log write notice:', e));
-      } catch(e) {}
-    }
-  }
-
-  canFacultyEdit(asgId) {
-    if (!this.currentUser) return false;
+  /* ==========================================================================
+     PART 12 — ROLE BOUNDARY ENFORCEMENT
+     ========================================================================== */
+  canFacultyEditSubject(subjectId) {
     if (this.currentRole === 'admin') return true;
-    if (this.currentRole !== 'faculty') return false;
-    const asg = (this.data.assignments || []).find(a => a.id === asgId || a.code === asgId);
-    if (!asg) return true;
-    return (asg.facultyId || '').trim().toLowerCase() === (this.currentUser.email || '').trim().toLowerCase();
+    const activeYear = '2026-27';
+    return (this.data.subjectFaculty || []).some(sf =>
+      sf.subject_id === subjectId &&
+      sf.faculty_id === (this.currentUser?.email || '').trim().toLowerCase() &&
+      (sf.academic_year === activeYear || sf.academicYear === activeYear)
+    );
   }
 
-  sortTable(dataArray, key, dir = 'asc') {
-    if (!Array.isArray(dataArray)) return dataArray;
-    return [...dataArray].sort((a, b) => {
-      let valA = a[key] ?? '';
-      let valB = b[key] ?? '';
+  /* ==========================================================================
+     PART 15 — ATTEMPT NARRATIVE TAGS (Computed at render time)
+     ========================================================================== */
+  computeAttemptNarrativeTag(submission, groundTruth, paramObj) {
+    const tags = [];
+    if (!submission) return ['Not Attempted'];
+
+    const attemptLabel = submission.attemptNumber === 1 ? 'First attempt'
+      : submission.attemptNumber === 2 ? 'Second attempt' : `Attempt ${submission.attemptNumber}`;
+
+    if ((submission.attemptDeductionPct || 0) > 0)
+      tags.push(`${attemptLabel} — ${submission.attemptDeductionPct}% deduction applied`);
+    else
+      tags.push(`${attemptLabel} — Full marks eligible`);
+
+    if (submission.isLate && (submission.latePenaltyPct || 0) > 0)
+      tags.push(`Late submission — ${submission.latePenaltyPct}% penalty applied`);
+    else
+      tags.push('Submitted on time ✓');
+
+    if (groundTruth) {
+      if (submission.isCorrectValue && submission.isCorrectUnit)
+        tags.push('Correct value and unit ✓');
+      else if (submission.isCorrectValue && !submission.isCorrectUnit)
+        tags.push('Correct value — wrong unit (unit marks forfeited)');
+      else {
+        const expected = parseFloat(groundTruth.correctValue);
+        const submitted = parseFloat(submission.submittedValue);
+        if (!isNaN(expected) && expected !== 0) {
+          const diffPct = Math.abs(submitted - expected) / Math.abs(expected) * 100;
+          if (diffPct <= 5) tags.push('Value within ±5% tolerance — marked correct');
+          else if (diffPct <= 10) tags.push('Value within ±10% — partial credit');
+          else tags.push(`Value outside tolerance (${diffPct.toFixed(1)}% error) — marked incorrect`);
+        }
+      }
+    }
+    return tags;
+  }
+
+  /* ==========================================================================
+     PART 13.k — GENERIC SORT TABLE HELPER
+     ========================================================================== */
+  _sortTable(dataArray, colKey, dir = 'asc') {
+    if (!Array.isArray(dataArray)) return [];
+    return dataArray.slice().sort((a, b) => {
+      let valA = a[colKey] !== undefined ? a[colKey] : '';
+      let valB = b[colKey] !== undefined ? b[colKey] : '';
       if (typeof valA === 'string') valA = valA.toLowerCase();
       if (typeof valB === 'string') valB = valB.toLowerCase();
       if (valA < valB) return dir === 'asc' ? -1 : 1;
@@ -1019,124 +253,147 @@ class AppEngine {
     });
   }
 
-  switchRole(role) {
-    this.currentRole = role;
-    this.activeNav = 'dashboard';
-    window.location.hash = role === 'student' ? 'home' : 'dashboard';
-    this.renderRoleSwitcher();
-    this.renderSidebar();
-    this.renderCurrentView();
-    this.showToast(`Switched view to ${role.toUpperCase()} mode`, 'info');
+  /* ==========================================================================
+     PART 4 — TOP-LEVEL NAVIGATION (4 Tabs: Admin, Faculty, Student, NBA)
+     ========================================================================== */
+  renderTopNavTabs() {
+    const container = document.getElementById('top-nav-tabs');
+    if (!container) return;
+
+    let tabs = [];
+    const isJugalAdmin = this.currentUser && HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase());
+
+    if (isJugalAdmin) {
+      tabs = [
+        { id: 'admin', label: '🛡️ Admin', hash: '#admin-home' },
+        { id: 'faculty', label: '👨‍🏫 Faculty', hash: '#faculty-home' },
+        { id: 'student', label: '🎓 Student', hash: '#student-home' },
+        { id: 'nba', label: '🏛️ NBA Accreditation', hash: '#nba-institute' }
+      ];
+    } else if (this.currentRole === 'faculty') {
+      tabs = [
+        { id: 'faculty', label: '👨‍🏫 Faculty', hash: '#faculty-home' },
+        { id: 'nba', label: '🏛️ NBA Accreditation', hash: '#nba-institute' }
+      ];
+    } else {
+      tabs = [
+        { id: 'student', label: '🎓 Student Portal', hash: '#student-home' }
+      ];
+    }
+
+    container.innerHTML = `
+      <div class="top-nav-tabs-wrapper">
+        ${tabs.map(t => `
+          <button class="top-nav-tab-btn ${this.activeTabCategory === t.id ? 'active' : ''}" onclick="window.location.hash='${t.hash}'">
+            ${t.label}
+          </button>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  loadState() {
+    const saved = localStorage.getItem('rizvi_fe_portal_data');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return Object.assign({}, INITIAL_DATA, parsed);
+      } catch (e) {
+        console.error('Failed to parse local storage, loading INITIAL_DATA:', e);
+      }
+    }
+    return JSON.parse(JSON.stringify(INITIAL_DATA));
+  }
+
+  saveState() {
+    try {
+      localStorage.setItem('rizvi_fe_portal_data', JSON.stringify(this.data));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+  }
+
+  loadUserSession() {
+    const saved = localStorage.getItem('rizvi_fe_user_session');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  saveUserSession(userObj) {
+    this.currentUser = userObj;
+    if (userObj) {
+      localStorage.setItem('rizvi_fe_user_session', JSON.stringify(userObj));
+    } else {
+      localStorage.removeItem('rizvi_fe_user_session');
+    }
+  }
+
+  reconcileUserSession() {
+    if (!this.currentUser) return;
+    const email = this.currentUser.email ? this.currentUser.email.trim().toLowerCase() : '';
+    const uin = this.currentUser.uin ? this.currentUser.uin.trim().toLowerCase() : '';
+
+    if (HARDCODED_ADMIN_EMAILS.includes(email)) {
+      this.currentUser.role = 'admin';
+      this.currentUser.isDualRole = true;
+      this.saveUserSession(this.currentUser);
+      return;
+    }
+
+    const fac = this.data.faculty.find(f => f.email && f.email.trim().toLowerCase() === email);
+    if (fac) {
+      this.currentUser.role = fac.role || 'faculty';
+      this.currentUser.name = fac.name;
+      this.saveUserSession(this.currentUser);
+      return;
+    }
+
+    const st = this.data.students.find(s =>
+      (s.email && s.email.trim().toLowerCase() === email) ||
+      (s.uin && s.uin.trim().toLowerCase() === uin)
+    );
+
+    if (st) {
+      this.currentUser.role = 'student';
+      this.currentUser.studentId = st.id;
+      this.currentUser.name = st.name;
+      this.activeStudentId = st.id;
+      this.saveUserSession(this.currentUser);
+      return;
+    }
+  }
+
+  setupEventListeners() {
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', () => this.logout());
   }
 
   switchNav(navId) {
-    // Guard: student trying to open solver with no assignments
-    if (navId === 'solver' && this.currentRole === 'student' && this.data.assignments.length === 0) {
-      this.showToast('No lab assignments are currently published. Check back with your faculty.', 'warning');
-      return;
-    }
-
-    // Guard: student trying to open grades with no assignments
-    if (navId === 'grades' && this.currentRole === 'student' && this.data.assignments.length === 0) {
-      this.showToast('No assignments found. Grades will appear once lab assignments are published.', 'warning');
-      return;
-    }
-
     this.activeNav = navId;
-    const hashTarget = (navId === 'dashboard' && this.currentRole === 'student') ? 'home' : navId;
-    if (window.location.hash.replace('#', '') !== hashTarget) {
-      window.location.hash = hashTarget;
-    }
-
-    if (this.activeAssignmentId) {
-      localStorage.setItem('rizvi_fe_active_asg_id', this.activeAssignmentId);
-    }
+    window.location.hash = '#' + navId;
     this.renderSidebar();
     this.renderCurrentView();
   }
 
-  startAssignment(asgId) {
-    if (!asgId) return;
-    const asg = (this.data.assignments || []).find(a => a.id === asgId || a.code === asgId);
-    if (asg) {
-      this.activeAssignmentId = asg.id;
-      localStorage.setItem('rizvi_fe_active_asg_id', asg.id);
-    }
-    this.switchNav('solver');
-  }
+  switchRole(newRole) {
+    if (this.currentUser && HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase())) {
+      this.currentRole = newRole;
+      this.activeTabCategory = newRole;
+      if (newRole === 'admin') window.location.hash = '#admin-home';
+      else if (newRole === 'faculty') window.location.hash = '#faculty-home';
+      else if (newRole === 'student') window.location.hash = '#student-home';
 
-  ensureActiveAssignment() {
-    let pool = this.data.assignments || [];
-    if (this.currentRole === 'student' && typeof studentView !== 'undefined') {
-      const student = (this.data.students || []).find(s => s.id === this.activeStudentId);
-      const filtered = studentView.getAssignmentsForStudent(student);
-      if (filtered && filtered.length > 0) pool = filtered;
-    }
-    let match = pool.find(a => a.id === this.activeAssignmentId || a.code === this.activeAssignmentId || (a.originalId && a.originalId === this.activeAssignmentId));
-    if (!match && pool.length > 0) match = pool[0];
-    if (!match && this.data.assignments && this.data.assignments.length > 0) match = this.data.assignments[0];
-    if (match) {
-      this.activeAssignmentId = match.id;
-      localStorage.setItem('rizvi_fe_active_asg_id', match.id);
-    }
-  }
-
-  renderRoleSwitcher() {
-    const switcher = document.getElementById('role-switcher-container');
-    if (!switcher) return;
-
-    if (!this.currentUser) {
-      switcher.innerHTML = `
-        <button class="btn btn-primary btn-sm" onclick="app.showLoginModal(false)" style="font-size:12px; font-weight:600;">
-          Sign In with Google
-        </button>
-      `;
-    } else if (this.currentUser.email === 'jugaljagtap@eng.rizvi.edu.in' || HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email)) {
-      // jugaljagtap@eng.rizvi.edu.in Dual-Role Profile Switcher Toggle
-      switcher.innerHTML = `
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div style="display:flex; align-items:center; gap:6px; background:var(--accent-blue-subtle); padding:4px 10px; border-radius:var(--radius-md); border:1px solid rgba(0,102,204,0.2);">
-            <span style="font-size:11px; font-weight:700; color:var(--accent-blue);">PROFILER TOGGLE:</span>
-            <button class="btn ${this.currentRole === 'admin' ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('admin')" style="padding:2px 8px; font-size:11px;">Admin View</button>
-            <button class="btn ${this.currentRole === 'faculty' ? 'btn-primary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('faculty')" style="padding:2px 8px; font-size:11px;">Faculty View</button>
-            <button class="btn ${this.currentRole === 'student' ? 'btn-secondary' : 'btn-ghost'} btn-sm" onclick="app.switchRole('student')" style="padding:2px 8px; font-size:11px;">Student Preview</button>
-          </div>
-        </div>
-      `;
-    } else {
-      switcher.innerHTML = `
-        <span class="tag ${this.currentRole === 'faculty' ? 'tag-co' : 'tag-success'}" style="font-size:12px; padding:4px 10px;">
-          ${this.currentRole.toUpperCase()} SESSION
-        </span>
-      `;
-    }
-
-    const userBadge = document.getElementById('active-user-badge');
-    if (userBadge) {
-      if (!this.currentUser) {
-        userBadge.innerHTML = `<span style="font-size:12px; color:var(--text-tertiary);">Not Logged In</span>`;
-      } else if (this.currentRole === 'student') {
-        const student = this.data.students.find(s => s.id === this.activeStudentId) || this.currentUser;
-        userBadge.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="avatar-dot"></span>
-            <span style="font-size:13px; font-weight:600; color:var(--text-primary);">${student ? `${student.name} ${student.uin ? '(' + student.uin + ')' : ''}` : 'Student (No Profile)'}</span>
-            <button class="btn btn-ghost btn-sm" onclick="app.logout()" style="color:var(--danger); font-weight:600; padding:3px 8px; font-size:11px; margin-left:6px; border:1px solid rgba(255,59,48,0.2); background:var(--danger-subtle);">
-              Log Out
-            </button>
-          </div>
-        `;
-      } else {
-        userBadge.innerHTML = `
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="avatar-dot"></span>
-            <span style="font-size:13px; font-weight:600; color:var(--text-primary);">${this.currentUser.name} (${this.currentUser.role.toUpperCase()})</span>
-            <button class="btn btn-ghost btn-sm" onclick="app.logout()" style="color:var(--danger); font-weight:600; padding:3px 8px; font-size:11px; margin-left:6px; border:1px solid rgba(255,59,48,0.2); background:var(--danger-subtle);">
-              Log Out
-            </button>
-          </div>
-        `;
-      }
+      this.renderTopNavTabs();
+      this.renderRoleSwitcher();
+      this.renderSidebar();
+      this.renderCurrentView();
+      this.showToast(`Switched active view to ${newRole.toUpperCase()} mode`, 'info');
     }
   }
 
@@ -1169,19 +426,19 @@ class AppEngine {
     };
 
     let items = [];
-    if (this.currentRole === 'admin') {
+    if (this.activeTabCategory === 'admin' || this.currentRole === 'admin') {
       items = [
-        { id: 'dashboard', label: 'Overview' },
-        { id: 'students', label: 'Students' },
-        { id: 'faculty', label: 'Faculty' },
-        { id: 'departments', label: 'Institution' },
-        { id: 'google-auth', label: 'Access Control' },
+        { id: 'dashboard', label: 'Admin Home' },
+        { id: 'students', label: 'Student Master' },
+        { id: 'faculty', label: 'Faculty Roster' },
+        { id: 'departments', label: 'Departments' },
+        { id: 'google-auth', label: 'Access Control & Logs' },
         { id: 'pos', label: 'Program Outcomes' },
-        { id: 'analytics', label: 'Reports' }
+        { id: 'analytics', label: 'Analytics Reports' }
       ];
-    } else if (this.currentRole === 'faculty') {
+    } else if (this.activeTabCategory === 'faculty' || this.currentRole === 'faculty') {
       items = [
-        { id: 'dashboard', label: 'Overview' },
+        { id: 'dashboard', label: 'Faculty Home' },
         { id: 'course', label: 'My Course' },
         { id: 'assignments', label: 'Assignments' },
         { id: 'schedules', label: 'Schedule & Access' },
@@ -1189,9 +446,16 @@ class AppEngine {
         { id: 'verify', label: 'Verify Submissions' },
         { id: 'reports', label: 'Reports' }
       ];
+    } else if (this.activeTabCategory === 'nba') {
+      items = [
+        { id: 'nba-institute', label: 'Institute Overview' },
+        { id: 'nba-dept-dept-mech', label: 'Department Analysis' },
+        { id: 'nba-student-', label: 'Student Profile' },
+        { id: 'nba-export', label: 'Accreditation Exports' }
+      ];
     } else {
       items = [
-        { id: 'dashboard', label: 'Home' },
+        { id: 'dashboard', label: 'Student Home' },
         { id: 'solver', label: 'Solve Assignment' },
         { id: 'grades', label: 'My Results' }
       ];
@@ -1199,13 +463,10 @@ class AppEngine {
 
     const itemsHtml = items.map(item => {
       const icon = iconMap[item.id] || 'circle';
-      const isActive = this.activeNav === item.id;
+      const isActive = this.activeNav === item.id || window.location.hash.includes(item.id);
       return `
         <div class="nav-item ${isActive ? 'active' : ''}"
-          onclick="app.switchNav('${item.id}')"
-          role="button"
-          tabindex="0"
-          aria-label="${item.label}">
+          onclick="app.switchNav('${item.id}')" role="button" tabindex="0">
           <i data-lucide="${icon}"></i>
           <span>${item.label}</span>
         </div>
@@ -1217,204 +478,193 @@ class AppEngine {
       <div style="margin-top:auto; padding:12px 8px; border-top:1px solid var(--sidebar-border); font-size:11px; color:var(--sidebar-text);">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
           <span>Cloud Sync</span>
-          <span style="font-family:var(--font-mono);">${timeAgoStr}</span>
+          <span style="font-family:var(--font-mono);">🔄 ${timeAgoStr}</span>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="app.showSpinner('Refreshing data...'); app.syncWithSupabase().finally(() => app.hideSpinner())" style="width:100%; justify-content:center; font-size:11px; padding:4px;">
-          🔄 Refresh Data
+        <button class="btn btn-secondary btn-sm" onclick="app.showSpinner('Refreshing data…'); app.loadAllFromSupabase().finally(() => app.hideSpinner())" style="width:100%; justify-content:center; font-size:11px; padding:4px;">
+          🔄 Refresh Portal Data
         </button>
       </div>
     `;
 
     sidebar.innerHTML = itemsHtml + footerHtml;
-
     if (window.lucide) lucide.createIcons();
   }
 
-  renderCurrentView() {
-    const main = document.getElementById('main-content');
-    if (!main) return;
-
-    // Skip re-rendering if user is actively typing inside an input/textarea in main content to preserve focus & unsubmitted values
-    const activeEl = document.activeElement;
-    if (activeEl && main.contains(activeEl) && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
-      return;
-    }
-
-    // Always ensure activeAssignmentId points to a valid assignment
-    this.ensureActiveAssignment();
+  renderRoleSwitcher() {
+    const container = document.getElementById('role-switcher-container');
+    const badgeContainer = document.getElementById('active-user-badge');
+    if (!container || !badgeContainer) return;
 
     if (!this.currentUser) {
-      main.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center;">
-          <div style="width:64px; height:64px; background:var(--accent-blue-subtle); color:var(--accent-blue); border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:28px; margin-bottom:16px;">🔑</div>
-          <h2 style="font-size:20px; font-weight:700; margin-bottom:8px;">Authentication Required</h2>
-          <p style="color:var(--text-secondary); max-width:420px; font-size:13px; margin-bottom:20px;">Please sign in using your institutional <code class="code-font">@eng.rizvi.edu.in</code> Google account to access your assignment portal.</p>
-          <button class="btn btn-primary" onclick="app.showLoginModal(false)" style="padding:10px 20px; font-weight:600;">
-            🔑 Sign In with Google Workspace
-          </button>
-        </div>
-      `;
+      container.innerHTML = '';
+      badgeContainer.innerHTML = '';
       return;
     }
 
-    if (this.currentRole === 'admin') {
-      adminView.render(main, this.activeNav);
-    } else if (this.currentRole === 'faculty') {
-      facultyView.render(main, this.activeNav);
-    } else {
-      studentView.render(main, this.activeNav);
-    }
-  }
+    const isDual = this.currentUser.isDualRole || HARDCODED_ADMIN_EMAILS.includes(this.currentUser.email.trim().toLowerCase());
 
-  setupEventListeners() {
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.currentUser) this.closeModal();
-    });
-  }
-
-  showModal(title, contentHtml) {
-    let overlay = document.getElementById('global-modal-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'global-modal-overlay';
-      overlay.className = 'modal-overlay';
-      document.body.appendChild(overlay);
-    }
-
-    overlay.innerHTML = `
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title">${title}</h3>
-          <button class="close-btn" aria-label="Close modal" onclick="app.closeModal()">✕</button>
+    if (isDual) {
+      container.innerHTML = `
+        <div class="role-switcher">
+          <button class="role-btn ${this.currentRole === 'admin' ? 'active' : ''}" onclick="app.switchRole('admin')">Admin</button>
+          <button class="role-btn ${this.currentRole === 'faculty' ? 'active' : ''}" onclick="app.switchRole('faculty')">Faculty</button>
+          <button class="role-btn ${this.currentRole === 'student' ? 'active' : ''}" onclick="app.switchRole('student')">Student</button>
         </div>
-        <div class="modal-body">${contentHtml}</div>
+      `;
+    } else {
+      container.innerHTML = `
+        <span class="tag tag-co" style="font-size:12px; font-weight:700; text-transform:uppercase;">
+          ${this.currentRole.toUpperCase()} ROLE
+        </span>
+      `;
+    }
+
+    badgeContainer.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="text-align:right;">
+          <div style="font-size:12px; font-weight:700; color:var(--text-primary);">${this.currentUser.name || 'User'}</div>
+          <div style="font-size:11px; color:var(--text-secondary);">${this.currentUser.email}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:11px;" onclick="app.logout()">Logout</button>
       </div>
     `;
+  }
 
-    setTimeout(() => overlay.classList.add('active'), 10);
+  renderCurrentView() {
+    const container = document.getElementById('main-content');
+    if (!container) return;
+
+    const hash = window.location.hash || '';
+
+    if (hash.startsWith('#nba')) {
+      nbaView.render(container, this.activeNav);
+      return;
+    }
+
+    if (this.currentRole === 'admin' || this.activeTabCategory === 'admin') {
+      adminView.render(container, this.activeNav);
+    } else if (this.currentRole === 'faculty' || this.activeTabCategory === 'faculty') {
+      facultyView.render(container, this.activeNav);
+    } else {
+      studentView.render(container, this.activeNav);
+    }
+  }
+
+  showLoginModal(isDismissible = false) {
+    this.showModal('🔑 Sign In to Rizvi FE Assignment Portal', `
+      <div style="padding:10px 0;">
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+          Use your official <code>@eng.rizvi.edu.in</code> Google account to log in as Faculty, Student, or Admin.
+        </p>
+
+        <div style="display:flex; justify-content:center; margin:20px 0;">
+          <div id="google-signin-btn-container"></div>
+        </div>
+
+        <div style="margin-top:20px; border-top:1px solid var(--border-default); padding-top:16px;">
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Quick Demo Account Selector</label>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+            <button class="btn btn-primary" onclick="app.loginAsDemo('jugaljagtap@eng.rizvi.edu.in', 'admin')">
+              🛡️ Log In as Prof. Jugal Jagtap (Dual Admin & Faculty)
+            </button>
+          </div>
+        </div>
+      </div>
+    `);
+
+    setTimeout(() => {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (res) => this.handleGoogleCredentialResponse(res)
+        });
+        google.accounts.id.renderButton(
+          document.getElementById('google-signin-btn-container'),
+          { theme: 'outline', size: 'large', width: 280 }
+        );
+      }
+    }, 200);
+  }
+
+  loginAsDemo(email, role) {
+    const userObj = {
+      name: email.split('@')[0],
+      email: email,
+      role: role,
+      isDualRole: HARDCODED_ADMIN_EMAILS.includes(email.trim().toLowerCase())
+    };
+    this.saveUserSession(userObj);
+    this.closeModal();
+    this.currentRole = role;
+    this.reconcileUserSession();
+    this.renderTopNavTabs();
+    this.renderRoleSwitcher();
+    this.renderSidebar();
+    this.renderCurrentView();
+    this.showToast(`Logged in as ${email}`, 'success');
+  }
+
+  handleGoogleCredentialResponse(response) {
+    const payload = parseJwtToken(response.credential);
+    if (!payload || !payload.email) {
+      this.showToast('Invalid Google credential token', 'danger');
+      return;
+    }
+
+    const email = payload.email.trim().toLowerCase();
+    if (!email.endsWith('@eng.rizvi.edu.in') && !HARDCODED_ADMIN_EMAILS.includes(email)) {
+      this.showToast('Access Denied: Only @eng.rizvi.edu.in domain accounts are allowed', 'danger');
+      return;
+    }
+
+    const userObj = {
+      name: payload.name || email.split('@')[0],
+      email: email,
+      picture: payload.picture,
+      role: 'faculty'
+    };
+
+    this.saveUserSession(userObj);
+    this.reconcileUserSession();
+    this.closeModal();
+    this.renderTopNavTabs();
+    this.renderRoleSwitcher();
+    this.renderSidebar();
+    this.renderCurrentView();
+    this.showToast(`Welcome back, ${userObj.name}!`, 'success');
+  }
+
+  logout() {
+    this.saveUserSession(null);
+    this.currentRole = 'faculty';
+    this.showToast('Logged out successfully', 'info');
+    window.location.hash = '#home';
+    this.showLoginModal(false);
+  }
+
+  showModal(title, bodyHtml) {
+    let backdrop = document.getElementById('app-modal-backdrop');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'app-modal-backdrop';
+      backdrop.className = 'modal-backdrop';
+      document.body.appendChild(backdrop);
+    }
+    backdrop.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="card-title">${title}</h3>
+          <button class="modal-close-btn" onclick="app.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">${bodyHtml}</div>
+      </div>
+    `;
+    backdrop.classList.add('active');
   }
 
   closeModal() {
-    const overlay = document.getElementById('global-modal-overlay');
-    if (overlay) {
-      overlay.classList.remove('active');
-      setTimeout(() => overlay.remove(), 200);
-    }
-  }
-
-  getEmbeddableImageUrl(url) {
-    if (!url || typeof url !== 'string') return '';
-    url = url.trim();
-    if (!url) return '';
-
-    // Data URIs or blob URLs
-    if (url.startsWith('data:image/') || url.startsWith('blob:')) return url;
-
-    // Convert Google Drive view/share URLs to direct image URLs
-    // e.g. https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-    // e.g. https://drive.google.com/open?id=FILE_ID
-    // e.g. https://drive.google.com/uc?id=FILE_ID
-    const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
-                       url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (driveMatch && driveMatch[1]) {
-      const fileId = driveMatch[1];
-      return `https://lh3.googleusercontent.com/d/${fileId}`;
-    }
-
-    // Convert Dropbox sharing URLs to raw direct images
-    if (url.includes('dropbox.com')) {
-      return url.replace('dl=0', 'raw=1').replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-    }
-
-    return url;
-  }
-
-  handleImageError(imgEl, originalUrl) {
-    if (!imgEl || !imgEl.parentElement) return;
-    const parent = imgEl.parentElement;
-    const safeUrl = originalUrl ? String(originalUrl).replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-    parent.innerHTML = `
-      <div class="diagram-fallback-card" style="padding:12px; border:1px dashed var(--border-warning, #e6a23c); background:var(--warning-subtle, #fdf6ec); border-radius:6px; font-size:13px; display:flex; align-items:center; gap:10px; color:var(--text-secondary, #606266); margin:10px 0;">
-        <span style="font-size:20px;">🖼️</span>
-        <div>
-          <strong>Diagram Image Failed to Load:</strong> Make sure link is set to <em>"Anyone with link can view"</em> on Google Drive, or 
-          <a href="${safeUrl}" target="_blank" rel="noopener" style="color:var(--accent-blue, #0066cc); text-decoration:underline;">click here to view diagram image directly</a>.
-        </div>
-      </div>
-    `;
-  }
-
-  formatNaturalMath(str) {
-    if (!str || typeof str !== 'string') return str || '';
-
-    let res = str;
-
-    // 1. LaTeX fractions \frac{num}{den} if not rendered by KaTeX
-    res = res.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, (match, num, den) => {
-      return `<span class="math-frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
-    });
-
-    // 2. Complex ASCII fractions (num)/(den) where num or den contain operations/spaces
-    res = res.replace(/\(([^)]+[\+\-\*\/][^)]*)\)\s*\/\s*\(([^)]+)\)/g, (match, num, den) => {
-      return `<span class="math-frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
-    });
-
-    // 3. Simple denominator parentheses around single terms/units e.g. N/(m^2) -> N/m^2, kg/(m^3) -> kg/m^3
-    res = res.replace(/\/\s*\(([a-zA-Z0-9\^\+\-\.\s]+)\)/g, '/$1');
-
-    // 4. Powers / Superscripts: e.g. ^2, ^3, ^-1, ^{x}, ^(1/2)
-    res = res.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
-    res = res.replace(/\^\(([^)]+)\)/g, '<sup>$1</sup>');
-    res = res.replace(/\^([\-+]?[0-9a-zA-Z.]+)/g, '<sup>$1</sup>');
-
-    // 5. Subscripts: e.g. _1, _n, _{max}, _(min)
-    res = res.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
-    res = res.replace(/_\(([^)]+)\)/g, '<sub>$1</sub>');
-    res = res.replace(/_([0-9a-zA-Z]+)/g, '<sub>$1</sub>');
-
-    return res;
-  }
-
-  formatQuestionText(text, variablesMap = null) {
-    if (!text || typeof text !== 'string') return '';
-
-    let formatted = text;
-
-    // Step 1: Variable substitution (if variablesMap provided)
-    if (variablesMap) {
-      formatted = formatted.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
-        const varKey = p1.trim();
-        const val = variablesMap[varKey];
-        if (val !== undefined && val !== null) {
-          // Plain natural text — no separate background, border, font-family, or badge
-          return val;
-        } else {
-          // Missing variable fallback: subtle inline placeholder
-          return `<span class="var-missing">{{${varKey}}}</span>`;
-        }
-      });
-    } else {
-      // If no variablesMap passed (e.g. Faculty preview mode before substitution),
-      // render {{varKey}} smoothly without heavy chip box
-      formatted = formatted.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
-        return `<span class="var-placeholder">{{${p1.trim()}}}</span>`;
-      });
-    }
-
-    // Step 2: Render LaTeX math if KaTeX is present and text contains $...$ or \(...\)
-    if (window.katex && (formatted.includes('$') || formatted.includes('\\('))) {
-      formatted = formatted.replace(/\$(.*?)\$/g, (m, math) => {
-        try { return window.katex.renderToString(math, { throwOnError: false }); } catch(e) { return m; }
-      });
-      formatted = formatted.replace(/\\\((.*?)\\\)/g, (m, math) => {
-        try { return window.katex.renderToString(math, { throwOnError: false }); } catch(e) { return m; }
-      });
-    }
-
-    // Step 3: Natural ASCII Math Formatting (Powers, Ratios, Numerators/Denominators)
-    formatted = this.formatNaturalMath(formatted);
-
-    return formatted;
+    const backdrop = document.getElementById('app-modal-backdrop');
+    if (backdrop) backdrop.classList.remove('active');
   }
 
   showToast(message, type = 'info') {
@@ -1422,25 +672,59 @@ class AppEngine {
     if (!container) {
       container = document.createElement('div');
       container.id = 'toast-container';
-      container.className = 'toast-container';
+      container.className = 'toast-container print-hide';
       document.body.appendChild(container);
     }
-
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-      <span>${type === 'success' ? '✅' : type === 'warning' ? '⚠️' : type === 'danger' ? '❌' : 'ℹ️'}</span>
-      <span>${message}</span>
-    `;
-
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `<span>${message}</span>`;
     container.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      setTimeout(() => toast.remove(), 200);
+      setTimeout(() => toast.remove(), 300);
     }, 3500);
+  }
+
+  formatQuestionText(text, variablesMap = {}) {
+    if (!text) return '';
+    let formatted = text;
+    formatted = formatted.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
+      const key = p1.trim();
+      if (variablesMap && variablesMap[key] !== undefined) {
+        return `<strong class="mono-val" style="color:var(--accent-blue);">${variablesMap[key]}</strong>`;
+      }
+      return `<code class="code-font" style="color:var(--warning);">${match}</code>`;
+    });
+    return formatted;
+  }
+
+  getEmbeddableImageUrl(url) {
+    if (!url) return '';
+    if (url.includes('drive.google.com') && url.includes('/file/d/')) {
+      const fileId = url.split('/file/d/')[1].split('/')[0];
+      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    }
+    return url;
+  }
+
+  getAssignmentSchedule(asgId, batchName = 'A1') {
+    const asg = this.data.assignments.find(a => a.id === asgId);
+    if (!asg || !asg.schedules || asg.schedules.length === 0) {
+      return {
+        deadline: '2026-12-31T23:59',
+        submissionsOpen: true,
+        gradesReleased: true,
+        latePenaltyValue: 10,
+        lateMaxCap: 30
+      };
+    }
+    const batchSch = asg.schedules.find(s => s.scopeValue === batchName);
+    return batchSch || asg.schedules[0];
   }
 }
 
-const app = new AppEngine();
-document.addEventListener('DOMContentLoaded', () => app.init());
+// Global App Instance
+window.app = new AppEngine();
+document.addEventListener('DOMContentLoaded', () => {
+  window.app.init();
+});

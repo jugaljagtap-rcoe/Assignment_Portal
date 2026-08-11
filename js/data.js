@@ -1,5 +1,26 @@
 /* ==========================================================================
    Rizvi College of Engineering - Data Store & Seed Datasets
+   ==========================================================================
+   SUPABASE SCHEMAS REFERENCE:
+
+   1. subject_faculty (pk: id)
+      - id TEXT, subject_id TEXT, faculty_id TEXT, academic_year TEXT, assigned_by TEXT, assigned_at TIMESTAMPTZ
+
+   2. assignment_submissions (pk: id)
+      - id TEXT, assignment_id TEXT, student_id TEXT, status TEXT, parameters_completed INT, parameters_total INT,
+        total_marks_awarded NUMERIC, first_attempt_at TIMESTAMPTZ, last_attempt_at TIMESTAMPTZ, is_late BOOLEAN
+
+   3. audit_log (pk: id)
+      - id UUID, action TEXT, entity_type TEXT, entity_id TEXT, changed_by TEXT, changed_at TIMESTAMPTZ, snapshot JSONB
+
+   4. assignment_templates (pk: id)
+      - id TEXT, title TEXT, subject_code TEXT, questions JSONB, rubric_preset_id TEXT, created_by TEXT, created_at TIMESTAMPTZ
+
+   5. submissions additions:
+      - verification_status TEXT ('pending'|'verified'|'flagged'), verified_by TEXT, verified_at TIMESTAMPTZ
+
+   6. assignments additions:
+      - lifecycle_status TEXT ('draft'|'published'|'locked')
    ========================================================================== */
 
 const HARDCODED_BRANCHES = [
@@ -85,11 +106,13 @@ const HARDCODED_ADMIN_EMAILS = [
   "jugaljagtap@eng.rizvi.edu.in"
 ];
 
+const ACADEMIC_YEARS = [
+  { id: "ay-2026-27", label: "2026-27", active: true },
+  { id: "ay-2025-26", label: "2025-26", active: false }
+];
+
 const INITIAL_DATA = {
-  academicYears: [
-    { id: "ay-2026-27", label: "2026-27", active: true },
-    { id: "ay-2025-26", label: "2025-26", active: false }
-  ],
+  academicYears: JSON.parse(JSON.stringify(ACADEMIC_YEARS)),
   
   departments: JSON.parse(JSON.stringify(HARDCODED_DEPARTMENTS)),
 
@@ -124,23 +147,23 @@ const INITIAL_DATA = {
   ],
 
   programOutcomes: [
-    { id: "PO1", code: "PO1", description: "Engineering Knowledge: Apply math, science, and engineering fundamentals." },
-    { id: "PO2", code: "PO2", description: "Problem Analysis: Identify and formulate complex engineering problems." },
-    { id: "PO3", code: "PO3", description: "Design/Development of Solutions: Design components or processes." },
-    { id: "PO4", code: "PO4", description: "Conduct Investigations of Complex Problems: Use research-based methods." },
-    { id: "PO5", code: "PO5", description: "Modern Tool Usage: Select and apply appropriate techniques and tools." },
-    { id: "PO6", code: "PO6", description: "The Engineer and Society: Apply contextual reasoning to societal issues." },
-    { id: "PO7", code: "PO7", description: "Environment and Sustainability: Understand sustainable development." },
-    { id: "PO8", code: "PO8", description: "Ethics: Apply ethical principles and commit to professional ethics." },
-    { id: "PO9", code: "PO9", description: "Individual and Team Work: Function effectively as an individual and in teams." },
-    { id: "PO10", code: "PO10", description: "Communication: Communicate effectively on complex engineering activities." },
-    { id: "PO11", code: "PO11", description: "Project Management and Finance: Apply engineering management principles." },
-    { id: "PO12", code: "PO12", description: "Life-long Learning: Engage in independent and life-long learning." }
+    { id: "PO1", code: "PO1", title: "Engineering Knowledge", description: "Apply knowledge of mathematics, science, engineering fundamentals, and an engineering specialization to the solution of complex engineering problems." },
+    { id: "PO2", code: "PO2", title: "Problem Analysis", description: "Identify, formulate, review research literature, and analyze complex engineering problems reaching substantiated conclusions using first principles of mathematics, natural sciences, and engineering sciences." },
+    { id: "PO3", code: "PO3", title: "Design/Development of Solutions", description: "Design solutions for complex engineering problems and design system components or processes that meet the specified needs with appropriate consideration for the public health and safety, and the cultural, societal, and environmental considerations." },
+    { id: "PO4", code: "PO4", title: "Conduct Investigations of Complex Problems", description: "Use research-based knowledge and research methods including design of experiments, analysis and interpretation of data, and synthesis of the information to provide valid conclusions." },
+    { id: "PO5", code: "PO5", title: "Modern Tool Usage", description: "Create, select, and apply appropriate techniques, resources, and modern engineering and IT tools including prediction and modeling to complex engineering activities with an understanding of the limitations." },
+    { id: "PO6", code: "PO6", title: "The Engineer and Society", description: "Apply reasoning informed by the contextual knowledge to assess societal, health, safety, legal and cultural issues and the consequent responsibilities relevant to the professional engineering practice." },
+    { id: "PO7", code: "PO7", title: "Environment and Sustainability", description: "Understand the impact of the professional engineering solutions in societal and environmental contexts, and demonstrate the knowledge of, and need for sustainable development." },
+    { id: "PO8", code: "PO8", title: "Ethics", description: "Apply ethical principles and commit to professional ethics and responsibilities and norms of the engineering practice." },
+    { id: "PO9", code: "PO9", title: "Individual and Team Work", description: "Function effectively as an individual, and as a member or leader in diverse teams, and in multidisciplinary settings." },
+    { id: "PO10", code: "PO10", title: "Communication", description: "Communicate effectively on complex engineering activities with the engineering community and with society at large, such as, being able to comprehend and write effective reports and design documentation, make effective presentations, and give and receive clear instructions." },
+    { id: "PO11", code: "PO11", title: "Project Management and Finance", description: "Demonstrate knowledge and understanding of the engineering and management principles and apply these to one's own work, as a member and leader in a team, to manage projects and in multidisciplinary environments." },
+    { id: "PO12", code: "PO12", title: "Life-long Learning", description: "Recognize the need for, and have the preparation and ability to engage in independent and life-long learning in the broadest context of technological change." }
   ],
 
   programSpecificOutcomes: [
-    { id: "PSO1", code: "PSO1", description: "Domain Modeling & Simulation: Apply modern engineering software tools to solve domain-specific problems." },
-    { id: "PSO2", code: "PSO2", description: "Practical & Laboratory Competency: Design, execute, and analyze real-world laboratory experiments." }
+    { id: "PSO1", code: "PSO1", title: "Domain Modeling & Simulation", description: "Apply modern engineering software tools and computational methodologies to model, analyze, and optimize domain-specific engineering systems." },
+    { id: "PSO2", code: "PSO2", title: "Practical & Laboratory Competency", description: "Design, execute, and analyze real-world laboratory experiments, synthesizing experimental data to draw valid engineering conclusions." }
   ],
 
   modules: [],
@@ -233,11 +256,15 @@ const INITIAL_DATA = {
     { id: "fac-admin-jugal", name: "Prof. Jugal Jagtap", email: "jugaljagtap@eng.rizvi.edu.in", departmentId: "dept-fe", role: "admin", assignedSubjects: [], isDualRole: true }
   ],
 
+  subjectFaculty: [],
+
   subjects: [],
 
   courseOutcomes: [],
 
   assignments: [],
+
+  assignmentSubmissions: [],
 
   studentVariables: [],
 

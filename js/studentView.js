@@ -4,6 +4,7 @@
 
 const studentView = {
   _submitting: false,
+
   render(container, activeNav) {
     switch(activeNav) {
       case 'solver':
@@ -25,8 +26,6 @@ const studentView = {
     if (!student) return allAssignments;
 
     const studentYear = (student.yearOfStudy || 'FE').toUpperCase().trim();
-
-    // If year is not set or is FE, show everything (don't filter out)
     if (!studentYear || studentYear === 'FE') return allAssignments;
 
     const FE_SEMESTERS = ['SEMESTER I', 'SEMESTER II', 'SEM I', 'SEM II', 'SEM 1', 'SEM 2'];
@@ -43,16 +42,9 @@ const studentView = {
     const filtered = allAssignments.filter(asg => {
       const sub = (app.data.subjects || []).find(s => s.id === asg.subjectId || s.code === asg.subjectId);
       const semRaw = (asg.semester || sub?.semester || '').toUpperCase().trim();
-
-      // If no semester set on the assignment, show it to everyone
       if (!semRaw) return true;
-
-      // FE semesters: only show to FE students
       if (FE_SEMESTERS.includes(semRaw)) return false;
-
-      // If student has a known year, only show matching semesters
       if (allowedSemesters) return allowedSemesters.includes(semRaw);
-
       return true;
     });
 
@@ -85,8 +77,7 @@ const studentView = {
           <h2 style="font-size:18px; font-weight:700; margin-bottom:8px;">Student Profile Not Found</h2>
           <p style="color:var(--text-secondary); max-width:480px; margin:0 auto 20px auto; font-size:13px;">
             Your student profile (${app.currentUser.email}) could not be found in the Student Master roster. 
-            Please contact your administrator at 
-            <strong>jugaljagtap@eng.rizvi.edu.in</strong> to ensure your account is enrolled.
+            Please contact your administrator at <strong>jugaljagtap@eng.rizvi.edu.in</strong> to ensure your account is enrolled.
           </p>
         </div>
       `;
@@ -94,59 +85,29 @@ const studentView = {
     }
 
     const assignments = this.getAssignmentsForStudent(student);
-    
     let activeAsg = assignments.length > 0 ? (assignments.find(a => a.id === app.activeAssignmentId) || assignments[0]) : null;
     let schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
 
-    let totalEarnedMarks = student ? this.calculateStudentTotalMarks(student.id) : 0;
+    const totalEarnedMarks = student ? this.calculateStudentTotalMarks(student.id) : 0;
     let totalPossibleMarks = 0;
-
-    if (assignments.length > 0) {
-      assignments.forEach(a => {
-        (a.questions || []).forEach(q => {
-          (q.parameters || []).forEach(p => {
-            totalPossibleMarks += ((p.valueMarks || 0) + (p.unitMarks || 0));
-          });
-        });
+    assignments.forEach(a => {
+      (a.questions || []).forEach(q => {
+        (q.parameters || []).forEach(p => totalPossibleMarks += (p.valueMarks || 4));
       });
-    }
-
-    const isPreviewingMode = app.currentUser && app.currentUser.role !== 'student';
-
-    const studentHeader = student 
-      ? `Welcome, <strong>${student.name}</strong> (<code class="code-font">${student.uin}</code>) | Year: ${student.yearOfStudy || 'FE'} | Branch: ${student.branch} | Div ${student.division} / Batch ${student.batch}`
-      : `Welcome to Student Lab Portal | No Student Profile Selected`;
+    });
 
     container.innerHTML = `
-      ${!student ? `
-        <div class="card" style="padding:16px 20px; background:var(--accent-blue-subtle); border:1px solid rgba(0,102,204,0.2); margin-bottom:16px; border-radius:var(--radius-md);">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-            <div>
-              <strong style="color:var(--accent-blue);">ℹ️ No Active Student Profile Selected:</strong> 
-              <span style="font-size:13px; color:var(--text-secondary);">
-                ${app.data.students.length === 0 ? 'There are currently 0 students enrolled in the Student Master roster. Enroll a student in Admin View to test Student Preview.' : 'Please select an enrolled student profile to inspect their assigned lab experiments.'}
-              </span>
-            </div>
-            ${app.data.students.length > 0 ? `
-              <select class="form-select" style="width:auto; padding:4px 10px; font-size:12px;" onchange="app.setActiveStudent(this.value); app.renderCurrentView();">
-                <option value="">-- Select Student Profile --</option>
-                ${app.data.students.map(s => `<option value="${s.id}">${s.name} (${s.uin} - ${s.yearOfStudy || 'FE'} ${s.branch})</option>`).join('')}
-              </select>
-            ` : ''}
-          </div>
-        </div>
-      ` : ''}
-
-      <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
-          <h1 class="page-title">Home</h1>
-          <p class="page-subtitle">${studentHeader}</p>
+          <h1 class="page-title">Welcome back, ${student ? student.name : 'Student'}!</h1>
+          <p class="page-subtitle">UIN: <strong class="mono-val">${student ? student.uin : '--'}</strong> · Branch: <strong>${student ? student.branch : 'Engineering'}</strong></p>
         </div>
-        <div style="display:flex; gap:10px; align-items:center;">
-          ${isPreviewingMode && app.data.students.length > 0 ? `
-            <div style="display:flex; align-items:center; gap:8px; background:var(--bg-subtle); padding:6px 12px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
-              <span style="font-size:12px; font-weight:600; color:var(--text-secondary);">👁️ Preview Profile:</span>
-              <select class="form-select" style="width:auto; padding:4px 8px; font-size:12px;" onchange="app.setActiveStudent(this.value); app.renderCurrentView();">
+        
+        <div style="display:flex; gap:12px; align-items:center;">
+          ${(app.currentRole === 'admin' || (app.currentUser && app.currentUser.isDualRole)) ? `
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label style="font-size:12px; font-weight:600; color:var(--text-secondary);">Student Perspective:</label>
+              <select class="form-select" style="font-size:12px; height:32px; background:#FFF;" onchange="app.setActiveStudent(this.value);">
                 ${app.data.students.map(s => `
                   <option value="${s.id}" ${student && s.id === student.id ? 'selected' : ''}>
                     ${s.name} (${s.uin} - ${s.yearOfStudy || 'FE'} ${s.branch})
@@ -163,45 +124,63 @@ const studentView = {
         </div>
       </div>
 
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-card-content">
-            <span class="kpi-label">My Class & Division</span>
-            <span class="kpi-value">${student ? `${student.yearOfStudy || 'FE'} ${student.division} / ${student.batch}` : '--'}</span>
-            <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
-          </div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-card-content">
-            <span class="kpi-label">Assigned Experiments</span>
-            <span class="kpi-value">${assignments.length}</span>
-            <span class="kpi-trend ${assignments.length > 0 ? 'positive' : 'neutral'}">
-              ${assignments.filter(a => app.getAssignmentSchedule(a.id, student ? student.batch : 'A1')?.submissionsOpen).length} Open Submissions
-            </span>
-          </div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-card-content">
-            <span class="kpi-label">Active Experiment</span>
-            <span class="kpi-value" style="font-size:20px; font-family:var(--font-mono); color:var(--accent-blue);" title="${activeAsg ? activeAsg.title : ''}">
-              ${activeAsg ? activeAsg.code : 'None'}
-            </span>
-            <span class="kpi-trend ${schedule && schedule.submissionsOpen ? 'positive' : 'negative'}">
-              ${schedule ? (schedule.submissionsOpen ? '● Submissions Open' : '● Submissions Closed') : 'No Schedule'}
-            </span>
-          </div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-card-content">
-            <span class="kpi-label">My Marks Earned</span>
-            <span class="kpi-value">${totalEarnedMarks} / ${totalPossibleMarks}</span>
-            <span class="kpi-trend positive">
-              ${schedule ? (schedule.gradesReleased ? 'Grades Released' : 'Pending Evaluation') : 'No Grades'}
-            </span>
-          </div>
+      <!-- Horizontal Scrollable Assignment Journey Timeline -->
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); display:block; margin-bottom:6px;">Assignment Journey Timeline</label>
+        <div class="timeline-pills-row">
+          ${assignments.map(a => {
+            const isActive = activeAsg && a.id === activeAsg.id;
+            const aSubRecord = (app.data.assignmentSubmissions || []).find(as => as.studentId === (student ? student.id : '') && as.assignmentId === a.id);
+            const status = aSubRecord ? aSubRecord.status : 'not_started';
+
+            let label = 'Not Started';
+            let pillClass = 'pill-draft';
+            if (status === 'submitted') { label = '✓ Submitted'; pillClass = 'pill-published active'; }
+            else if (status === 'late') { label = '🕐 Late'; pillClass = 'pill-flagged'; }
+            else if (status === 'partial') { label = '🟡 Partial'; pillClass = 'pill-pending'; }
+
+            return `
+              <div class="timeline-pill ${isActive ? 'active' : pillClass}" onclick="app.startAssignment('${a.id}');">
+                ${a.code}: ${label}
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
 
+      <!-- KPI Summary Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">My Class & Division</span>
+          <span class="kpi-value">${student ? `${student.yearOfStudy || 'FE'} ${student.division} / ${student.batch}` : '--'}</span>
+          <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Assigned Experiments</span>
+          <span class="kpi-value">${assignments.length}</span>
+          <span class="kpi-trend ${assignments.length > 0 ? 'positive' : 'neutral'}">
+            ${assignments.filter(a => app.getAssignmentSchedule(a.id, student ? student.batch : 'A1')?.submissionsOpen).length} Open Submissions
+          </span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Active Experiment</span>
+          <span class="kpi-value" style="font-size:20px; font-family:var(--font-mono); color:var(--accent-blue);" title="${activeAsg ? activeAsg.title : ''}">
+            ${activeAsg ? activeAsg.code : 'None'}
+          </span>
+          <span class="kpi-trend ${schedule && schedule.submissionsOpen ? 'positive' : 'negative'}">
+            ${schedule ? (schedule.submissionsOpen ? '● Submissions Open' : '● Submissions Closed') : 'No Schedule'}
+          </span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">My Marks Earned</span>
+          <span class="kpi-value">${totalEarnedMarks.toFixed(1)} / ${totalPossibleMarks}</span>
+          <span class="kpi-trend positive">
+            ${schedule ? (schedule.gradesReleased ? 'Grades Released' : 'Pending Evaluation') : 'No Grades'}
+          </span>
+        </div>
+      </div>
+
+      <!-- Assigned Experiments Roster Table -->
       <div class="card" style="margin-top: 16px;">
         <h2 class="card-title" style="margin-bottom:12px;">Assigned Experiments</h2>
         <div class="table-container">
@@ -212,7 +191,7 @@ const studentView = {
                 <th>Title</th>
                 <th>Subject</th>
                 <th>Deadline</th>
-                <th>Status</th>
+                <th>Submission Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -227,16 +206,22 @@ const studentView = {
                 const sub = app.data.subjects.find(s => s.id === asg.subjectId);
                 const sch = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1');
                 const isActive = activeAsg && asg.id === activeAsg.id;
+                const aSubRecord = (app.data.assignmentSubmissions || []).find(as => as.studentId === student?.id && as.assignmentId === asg.id);
+                const stStatus = aSubRecord ? aSubRecord.status : 'not_started';
+
                 return `
                   <tr style="${isActive ? 'background:var(--accent-blue-subtle);' : ''}">
                     <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${asg.code}</td>
                     <td style="font-weight:600;">${asg.title}</td>
                     <td><span class="tag tag-co">${sub ? sub.code : ''}</span></td>
                     <td style="font-size:12px; font-weight:600;">${sch ? new Date(sch.deadline).toLocaleString() : '—'}</td>
-                    <td><span class="tag ${sch && sch.submissionsOpen ? 'tag-success' : 'tag-danger'}">${sch && sch.submissionsOpen ? 'Open' : 'Closed'}</span></td>
                     <td>
-                      <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" 
-                        onclick="app.startAssignment('${asg.id}');">
+                      <span class="col-pill ${stStatus === 'submitted' ? 'pill-verified' : stStatus === 'late' ? 'pill-flagged' : stStatus === 'partial' ? 'pill-pending' : 'pill-draft'}">
+                        ${stStatus.toUpperCase().replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="app.startAssignment('${asg.id}');">
                         ✏️ ${isActive ? 'Continue Experiment' : 'Start Experiment'}
                       </button>
                     </td>
@@ -294,16 +279,13 @@ const studentView = {
             <div style="font-size:48px; margin-bottom:12px;">📋</div>
             <h2 style="font-size:18px; font-weight:700; margin-bottom:8px;">Questions Not Yet Published</h2>
             <p style="color:var(--text-secondary); max-width:480px; margin:0 auto; font-size:13px;">
-              Your faculty is still building the questions for <strong>${asg.code}</strong>. 
-              Please check back later or contact your subject faculty for an update.
+              Your faculty is still building the questions for <strong>${asg.code}</strong>. Please check back later.
             </p>
           </div>
         `;
         return;
       }
 
-      const subject = (app.data.subjects || []).find(s => s.id === asg.subjectId || s.code === asg.subjectId);
-      const department = subject ? (app.data.departments || []).find(d => d.id === subject.departmentId) : null;
       const schedule = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1') || {
         deadline: '2026-12-31T23:59',
         submissionsOpen: true,
@@ -315,34 +297,13 @@ const studentView = {
       const deadlineText = schedule.deadline ? new Date(schedule.deadline).toLocaleString() : '31/12/2026, 11:59:00 PM';
       const isLate = schedule.deadline ? new Date() > new Date(schedule.deadline) : false;
 
-      const deptTitle = department ? department.name.toUpperCase() : 'MECHANICAL ENGINEERING DEPARTMENT';
-      const deptVision = department ? department.vision : "To establish a strong foundation in basic sciences, engineering principles, and ethical values.";
-      const deptMission = department ? department.mission : [
-        "To provide a strong foundation in basic sciences and engineering fundamentals.",
-        "To nurture critical thinking and analytical problem-solving abilities.",
-        "To bridge theoretical knowledge with practical laboratory experimentation."
-      ];
-
-      // Build Student Variable Map
+      // Student Variable Map
       const studentVars = {};
       (app.data.studentVariables || []).forEach(v => {
-        if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId || ('asg-' + (asg.code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')) === v.assignmentId)) {
+        if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId)) {
           studentVars[v.key] = v.value;
         }
       });
-
-      const hasVariables = Object.keys(studentVars).length > 0;
-
-      // Count how many unique variable placeholders exist in this assignment's questions
-      const variablePlaceholders = new Set();
-      asg.questions.forEach(q => {
-        const matches = (q.text || '').match(/\{\{(.*?)\}\}/g) || [];
-        matches.forEach(m => variablePlaceholders.add(m.replace(/\{\{|\}\}/g, '').trim()));
-      });
-      const allVariablesLoaded = variablePlaceholders.size === 0 || 
-        [...variablePlaceholders].every(key => studentVars[key] !== undefined);
-
-      const currentDateFormatted = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
       container.innerHTML = `
         <div class="page-header-container print-hide">
@@ -359,20 +320,14 @@ const studentView = {
           <div class="timeline-pills-row">
             ${studentAssignments.map(a => {
               const isActive = asg && a.id === asg.id;
-              const aSubs = app.data.submissions.filter(s => s.studentId === student.id && s.assignmentId === a.id);
-              const aSch = app.getAssignmentSchedule(a.id, student.batch || 'A1');
+              const aSubRecord = (app.data.assignmentSubmissions || []).find(as => as.studentId === student.id && as.assignmentId === a.id);
+              const status = aSubRecord ? aSubRecord.status : 'not_started';
               
               let label = 'Not Started';
               let pillClass = '';
-              
-              if (aSubs.length > 0) {
-                const allVerified = aSubs.every(s => s.verificationStatus === 'Verified');
-                label = allVerified ? '✓ Graded' : 'Submitted';
-                pillClass = 'active';
-              } else if (aSch && !aSch.submissionsOpen) {
-                label = 'Closed';
-                pillClass = '';
-              }
+              if (status === 'submitted') { label = '✓ Submitted'; pillClass = 'active'; }
+              else if (status === 'late') { label = '🕐 Late'; pillClass = ''; }
+              else if (status === 'partial') { label = '🟡 Partial'; pillClass = ''; }
 
               return `
                 <div class="timeline-pill ${isActive ? 'active' : pillClass}" onclick="app.startAssignment('${a.id}');">
@@ -383,7 +338,7 @@ const studentView = {
           </div>
         </div>
 
-        <!-- Dynamic Batch Deadline & Policy Banner -->
+        <!-- Dynamic Batch Deadline Banner -->
         <div class="card print-hide" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -391,9 +346,7 @@ const studentView = {
               <span style="font-size:12px; color:var(--text-secondary); margin-left:12px;">(Attempts Allowed: Max 3 per parameter | Retries: 2nd = -10%, 3rd = -20%)</span>
               ${isLate ? `
                 <div style="margin-top:8px; background:var(--danger-subtle); border:1px solid var(--danger); border-radius:var(--radius-md); padding:8px 12px; font-size:12px; color:var(--danger); font-weight:600;">
-                  ⚠️ LATE SUBMISSION: Your batch deadline has passed. 
-                  A late penalty of ${schedule.latePenaltyValue || 10}% per day 
-                  (max ${schedule.lateMaxCap || 30}%) will be applied to all marks earned.
+                  ⚠️ LATE SUBMISSION: Your batch deadline has passed. A late penalty of ${schedule.latePenaltyValue || 10}% per day will be applied.
                 </div>
               ` : ''}
             </div>
@@ -401,273 +354,82 @@ const studentView = {
           </div>
         </div>
 
-      ${!hasVariables && variablePlaceholders.size > 0 ? `
-        <div class="card print-hide" style="margin-bottom:20px; background:var(--danger-subtle); border-color:var(--danger);">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-size:24px;">⚠️</span>
-            <div>
-              <strong style="color:var(--danger); font-size:14px;">Your Question Variables Are Not Yet Loaded</strong>
-              <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
-                Your faculty has not yet uploaded the question variables CSV for this assignment. 
-                The variable placeholders in your questions will appear as <code>{{variable_name}}</code> 
-                until your faculty uploads the variables file. 
-                Please contact your subject faculty or wait for the variables to be published.
-              </div>
-            </div>
-          </div>
-        </div>
-      ` : !allVariablesLoaded ? `
-        <div class="card print-hide" style="margin-bottom:20px; background:var(--warning-subtle); border-color:var(--warning);">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-size:24px;">ℹ️</span>
-            <div>
-              <strong style="color:var(--warning); font-size:14px;">Some Variables Are Missing</strong>
-              <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
-                Some question variables are loaded but not all placeholders have values. 
-                Missing variables will show as <code>{{variable_name}}</code> in your questions. 
-                Contact your faculty if this persists.
-              </div>
-            </div>
-          </div>
-        </div>
-      ` : `
-        <div class="card print-hide" style="margin-bottom:20px; background:var(--success-subtle); border-color:rgba(16,185,129,0.3);">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:16px;">✅</span>
-            <span style="font-size:13px; font-weight:600; color:var(--success);">
-              Your unique question variables are loaded — ${Object.keys(studentVars).length} variable${Object.keys(studentVars).length !== 1 ? 's' : ''} assigned to UIN ${student.uin}
-            </span>
-          </div>
-        </div>
-      `}
+        <!-- Question Cards -->
+        <div style="display:flex; flex-direction:column; gap:20px;">
+          ${(asg.questions || []).map((q, qIndex) => `
+            <div class="card" style="padding:20px;">
+              <strong style="font-size:15px; color:var(--accent-blue);">${q.sectionLabel || `Question ${qIndex+1}`}</strong>
+              <div style="font-size:14px; margin-top:8px; line-height:1.6;">${app.formatQuestionText(q.text, studentVars)}</div>
+              ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" style="max-width:100%; height:auto; margin-top:12px; border-radius:8px;">` : ''}
 
-      <!-- Printable Assignment Sheet Canvas -->
-      <div class="printable-assignment-sheet" style="background:#FFF; padding:28px; border:1px solid #000; font-family:sans-serif; color:#000;">
-        <!-- Top Institutional Header -->
-        <div style="display:flex; align-items:center; gap:20px; border-bottom:2px solid #000; padding-bottom:12px; margin-bottom:12px;">
-          <img src="assets/rizvi_logo.png" style="height:80px;" alt="Rizvi Emblem">
-          <div style="flex:1; text-align:center;">
-            <div style="font-size:12px; font-weight:700;">RIZVI EDUCATION SOCIETY's</div>
-            <div style="font-size:22px; font-weight:800; letter-spacing:0.5px;">RIZVI COLLEGE OF ENGINEERING</div>
-            <div style="font-size:10px; font-weight:600;">Approved by AICTE | Recognized by DTE | Affiliated to University of Mumbai</div>
-            <div style="font-size:13px; font-weight:800; margin-top:4px; text-transform:uppercase;">DEPARTMENT OF ${deptTitle}</div>
-          </div>
-        </div>
-
-        <!-- Vision & Mission Box -->
-        <div style="border:1px solid #000; padding:10px; margin-bottom:14px; font-size:11px; line-height:1.4; background:#FAFAFA;">
-          <div><strong>Vision:</strong> ${deptVision}</div>
-          <div style="margin-top:4px;"><strong>Mission:</strong></div>
-          <ol style="margin:2px 0 0 16px; padding:0;">
-            ${deptMission.map(m => `<li>${m}</li>`).join('')}
-          </ol>
-        </div>
-
-        <!-- Student Meta Header Block -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; border:1px solid #000; padding:10px; margin-bottom:14px; font-size:12px;">
-          <div>
-            <div><strong>Student Name:</strong> ${student.name}</div>
-            <div><strong>UIN:</strong> <code class="code-font">${student.uin}</code></div>
-            <div><strong>Branch:</strong> ${student.branch}</div>
-          </div>
-          <div>
-            <div><strong>Class / Division / Batch:</strong> ${asg.className} / Div ${student.division} / Batch ${student.batch}</div>
-            <div><strong>Academic Year / Sem:</strong> 2026-27 / ${asg.semester}</div>
-            <div><strong>Date of Submission:</strong> ${currentDateFormatted}</div>
-          </div>
-        </div>
-
-        <!-- Meta Table -->
-        <table style="width:100%; border-collapse:collapse; margin-bottom:14px; font-size:11px; text-align:center;" border="1">
-          <tr style="background:#F0F0F0; font-weight:700;">
-            <td>Assignment Code</td>
-            <td>Subject Course</td>
-            <td>Assessment Type</td>
-            <td>Modules Covered</td>
-            <td>Lab Outcome/s Covered</td>
-          </tr>
-          <tr>
-            <td style="font-family:var(--font-mono); font-weight:700;">${asg.code}</td>
-            <td>${subject ? subject.fullName : 'VMDL'}</td>
-            <td>${asg.assessmentType}</td>
-            <td>${asg.modulesCovered}</td>
-            <td>${asg.outcomeCovered}</td>
-          </tr>
-        </table>
-
-        <!-- Full Width Rubric Table & Prominent Bloom's Taxonomy Pyramid Section -->
-        <div style="border:1px solid #000; padding:14px; margin-bottom:16px; background:#FFF;">
-          <div style="font-size:12px; font-weight:700; margin-bottom:8px; text-align:center; text-transform:uppercase; letter-spacing:0.5px;">Auto-Graded Performance Rubric</div>
-          <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:16px;" border="1">
-            <tr style="background:#F0F0F0; font-weight:700; text-align:center;">
-              <td>Criteria Title</td>
-              <td>Level 03 (≥ 90%)</td>
-              <td>Level 02 (≥ 50%)</td>
-              <td>Level 01 (< 50%)</td>
-              <td>Level 00 (0%)</td>
-            </tr>
-            <tr>
-              <td style="font-weight:600; padding:6px;">Numerical Values</td>
-              <td style="text-align:center;">4 Marks</td>
-              <td style="text-align:center;">3 Marks</td>
-              <td style="text-align:center;">1 Marks</td>
-              <td style="text-align:center;">0 Marks</td>
-            </tr>
-            <tr>
-              <td style="font-weight:600; padding:6px;">Units Precision</td>
-              <td style="text-align:center;">3 Marks</td>
-              <td style="text-align:center;">2 Marks</td>
-              <td style="text-align:center;">1 Marks</td>
-              <td style="text-align:center;">0 Marks</td>
-            </tr>
-          </table>
-
-          <!-- Large, Crystal Clear Bloom's Taxonomy Pyramid Diagram -->
-          <div style="border-top:1px solid #000; padding-top:12px; text-align:center;">
-            <div style="font-size:11px; font-weight:700; margin-bottom:8px; text-transform:uppercase; color:#333;">Bloom's Taxonomy Cognitive Domain Levels</div>
-            <img src="assets/blooms_taxonomy.png" class="blooms-pyramid-img" style="max-width:100%; height:240px; display:block; margin:0 auto; object-fit:contain;" alt="Bloom's Taxonomy Pyramid">
-          </div>
-        </div>
-
-        <!-- Student Notice Box -->
-        <div class="student-notice-box" style="border:2px solid #C00000; background:#FFF5F5; padding:10px 14px; margin-bottom:18px; border-radius:4px; font-size:11px; color:#900;">
-          <strong style="font-size:12px;">📌 IMPORTANT SUBMISSION NOTICE FOR STUDENTS:</strong>
-          <ul style="margin:4px 0 0 18px; padding:0;">
-            <li><strong>Your data is unique:</strong> The values given in your questions are assigned only to you. Do not share or compare with others.</li>
-            <li><strong>Portal submission is not enough:</strong> You must also submit your assignment sheets with complete solutions, diagrams, and working to finish your submission.</li>
-          </ul>
-        </div>
-
-        <!-- Questions Section (Always Starts On Page 2) -->
-        <div class="questions-section-printable" style="border-top:2px solid #000; padding-top:14px;">
-          <h3 style="font-size:14px; margin-bottom:12px; text-transform:uppercase;">Experiment Questions & Evaluation Parameters</h3>
-          
-          ${(asg.questions || []).map(q => {
-            const substitutedText = app.formatQuestionText(q.text || '', studentVars);
-
-            return `
-              <div style="margin-bottom:20px; border-bottom:1px dashed #CCC; padding-bottom:14px;">
-                <div style="display:flex; justify-content:space-between; font-weight:700; font-size:13px; margin-bottom:6px;">
-                  <span>${q.sectionLabel || 'Question'} (${q.coId || 'CO1'})</span>
-                  <span>[Bloom's Level: ${q.btLevel || 'BT3'}]</span>
-                </div>
-
-                <div style="font-size:13px; line-height:1.6; margin-bottom:10px;">${substitutedText}</div>
-
-                ${q.imageUrl ? `
-                  <div class="question-diagram-container" style="margin:10px 0;">
-                    <img src="${app.getEmbeddableImageUrl(q.imageUrl)}" 
-                         style="max-height:220px; width:auto; border:1px solid #CCC; border-radius:6px; display:block; max-width:100%; margin:8px 0;" 
-                         alt="Diagram">
-                  </div>
-                ` : ''}
-
-                <!-- Answer Form Inputs (Portal Online Entry Only - Hidden on Printed Canvas) -->
-                <div class="print-hide" style="background:#F8FAFC; border:1px solid #CBD5E1; padding:12px; border-radius:6px; margin-top:10px;">
-                  <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Enter Your Calculated Answers:</div>
-                  ${(q.parameters || []).map(p => this.buildParameterSubmissionRow(asg.id, student.id, p, studentVars)).join('')}
+              <!-- Parameter Input Fields -->
+              <div style="margin-top:16px; border-top:1px solid var(--border-default); padding-top:16px;">
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Evaluation Parameters</label>
+                <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+                  ${(q.parameters || []).map(p => this.renderParameterInputField(asg.id, student.id, q, p)).join('')}
                 </div>
               </div>
-            `;
-          }).join('')}
-        </div>
-
-        <!-- Printable Footer Signatures Block (Visible on Printed Canvas) -->
-        <div class="printable-footer" style="margin-top:36px; padding-top:20px; border-top:1px dashed #000; display:flex; justify-content:space-between; font-size:11px;">
-          <div style="text-align:center; width:180px;">
-            <div style="border-bottom:1px solid #000; height:35px; margin-bottom:4px;"></div>
-            <strong>Student Signature</strong>
-          </div>
-          <div style="text-align:center; width:180px;">
-            <div style="border-bottom:1px solid #000; height:35px; margin-bottom:4px;"></div>
-            <strong>Course Instructor Signature</strong>
-          </div>
-          <div style="text-align:center; width:180px;">
-            <div style="border-bottom:1px solid #000; height:35px; margin-bottom:4px;"></div>
-            <strong>Head of Department (FE)</strong>
-          </div>
-        </div>
-      </div>
-    `;
-    } catch(err) {
-      console.error('Error rendering solver canvas:', err);
-      container.innerHTML = `
-        <div class="card" style="padding:40px; text-align:center;">
-          <h2 style="font-size:18px; margin-bottom:8px; color:var(--accent-blue);">Solve Assignment</h2>
-          <p style="color:var(--text-secondary); margin-bottom:16px;">
-            Unable to load solver canvas. Please return to the dashboard.
-          </p>
-          <button class="btn btn-primary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
+            </div>
+          `).join('')}
         </div>
       `;
+    } catch(e) {
+      console.error('Error rendering solver canvas:', e);
+      container.innerHTML = `<div class="card"><div class="empty-state">Error loading assignment canvas.</div></div>`;
     }
   },
 
-  buildParameterSubmissionRow(asgId, studentId, param, studentVars = {}) {
-    if (!param) return '';
-
-    // Check if student has variables loaded for this assignment
-    const hasVarsLoaded = (app.data.studentVariables || []).some(
-      v => v.studentId === studentId && (v.assignmentId === asgId || v.assignmentId === app.activeAssignmentId)
-    );
-
-    const paramId = param.id || 'param-1';
-    const priorAttempts = (app.data.submissions || []).filter(s => s.studentId === studentId && s.parameterId === paramId);
+  renderParameterInputField(asgId, studentId, question, param) {
+    const paramId = param.id;
+    const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
     const attemptCount = priorAttempts.length;
-    const latestAttempt = priorAttempts.length > 0 ? priorAttempts[priorAttempts.length - 1] : null;
     const isCapped = attemptCount >= 3;
-    const isBlocked = false; // Allow entry even if variables are not loaded so students can test inputs
+    const latestAttempt = priorAttempts.length > 0 ? priorAttempts[priorAttempts.length - 1] : null;
 
-    const formattedLabel = app.formatQuestionText(param.label || 'Parameter', studentVars);
-    const unitHint = param.unitHint ? param.unitHint.trim() : '';
+    let bestMarks = 0;
+    priorAttempts.forEach(s => bestMarks = Math.max(bestMarks, s.marksAwarded || 0));
+
+    const gt = app.data.studentAnswers.find(a => a.studentId === studentId && a.parameterId === paramId);
+    const narrativeTags = latestAttempt ? app.computeAttemptNarrativeTag(latestAttempt, gt, param) : [];
 
     return `
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px; font-size:12px;">
-        <span style="font-weight:600; width:200px;">${formattedLabel}:</span>
-        
-        <input type="number" step="any" id="input-val-${paramId}" class="form-input" placeholder="Value" 
-          value="${latestAttempt ? latestAttempt.submittedValue : ''}" 
-          ${isCapped ? 'disabled' : ''} style="width:110px; background:#FFF;">
+      <div style="background:var(--bg-subtle); padding:12px 16px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div>
+            <strong style="font-size:13px; color:var(--text-primary);">${param.label}</strong>
+            <span style="font-size:11px; color:var(--text-secondary); margin-left:8px;">(Max Marks: ${param.valueMarks || 4})</span>
+          </div>
+          <span class="mono-val" style="font-size:12px; font-weight:700; color:var(--accent-blue);">Attempt ${attemptCount}/3</span>
+        </div>
 
-        <input type="text" id="input-unit-${paramId}" class="form-input code-font" placeholder="${unitHint ? `Unit (${unitHint})` : 'Unit'}" 
-          value="${latestAttempt ? latestAttempt.submittedUnit : ''}" 
-          ${isCapped ? 'disabled' : ''} style="width:110px; background:#FFF;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input type="number" step="any" id="input-val-${paramId}" class="form-input code-font" placeholder="Value" 
+            value="${latestAttempt ? latestAttempt.submittedValue : ''}" ${isCapped ? 'disabled' : ''} style="width:140px; background:#FFF;">
 
-        <button class="btn ${isCapped ? 'btn-ghost' : 'btn-primary'} btn-sm" 
-          onclick="studentView.submitParameterAnswer('${asgId}', '${studentId}', '${paramId}')"
-          ${isCapped ? 'disabled' : ''}>
-          ${isCapped 
-            ? '🔒 Max Attempts Used' 
-            : `Submit (Attempt ${attemptCount + 1}/3)`}
-        </button>
+          <input type="text" id="input-unit-${paramId}" class="form-input code-font" placeholder="Unit (${param.unitHint || ''})" 
+            value="${latestAttempt ? latestAttempt.submittedUnit : ''}" ${isCapped ? 'disabled' : ''} style="width:120px; background:#FFF;">
 
-        ${latestAttempt ? `
-          <span class="tag tag-co" style="margin-left:auto; font-weight:600;">
-            ✓ Recorded (Attempt ${latestAttempt.attemptNumber}/3)
-          </span>
+          <button class="btn ${isCapped ? 'btn-ghost' : 'btn-primary'} btn-sm" onclick="studentView.submitParameterAnswer('${asgId}', '${studentId}', '${paramId}')" ${isCapped ? 'disabled' : ''}>
+            ${isCapped ? '🔒 Max Attempts Used' : `Submit (Attempt ${attemptCount + 1}/3)`}
+          </button>
+        </div>
+
+        <!-- Part 13.h Parameter Summary Footer -->
+        ${priorAttempts.length > 0 ? `
+          <div class="param-summary-footer" style="margin-top:10px;">
+            <span>Attempts: <strong class="mono-val">${attemptCount} / 3</strong></span>
+            <span>Best Marks: <strong class="mono-val" style="color:var(--success);">${bestMarks.toFixed(1)} / ${param.valueMarks || 4}</strong></span>
+            <span>Last Submitted: <span class="mono-val">${latestAttempt ? new Date(latestAttempt.submittedAt).toLocaleTimeString() : '-'}</span></span>
+            <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+              ${narrativeTags.map(t => `<span class="tag tag-co" style="font-size:10px;">${t}</span>`).join('')}
+            </div>
+          </div>
         ` : ''}
       </div>
     `;
   },
 
-  calculateLatePenalty(studentBatch, assignmentId, submittedAt) {
-    const schedule = app.getAssignmentSchedule(assignmentId, studentBatch);
-    if (!schedule || !schedule.deadline) return 0;
-
-    const deadlineMs = new Date(schedule.deadline).getTime();
-    const submittedMs = new Date(submittedAt).getTime();
-
-    if (submittedMs <= deadlineMs) return 0;
-
-    const msLate = submittedMs - deadlineMs;
-    const daysLate = Math.ceil(msLate / (1000 * 60 * 60 * 24));
-    const penaltyPerDay = schedule.latePenaltyValue || 10;
-    const maxCap = schedule.lateMaxCap || 30;
-
-    return Math.min(daysLate * penaltyPerDay, maxCap);
-  },
-
-  submitParameterAnswer(asgId, studentId, paramId) {
+  async submitParameterAnswer(asgId, studentId, paramId) {
     if (this._submitting) return;
     this._submitting = true;
     try {
@@ -678,25 +440,10 @@ const studentView = {
         return;
       }
 
-      const student2 = app.data.students.find(s => s.id === studentId);
-      const schedule2 = app.getAssignmentSchedule(asgId, student2?.batch);
-      if (schedule2 && schedule2.submissionsOpen === false) {
-        app.showToast('Submissions are closed for this assignment by your faculty.', 'danger');
-        this._submitting = false;
-        return;
-      }
-
-      const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId && (s.assignmentId === asgId || s.assignmentId === app.data.assignments.find(a => a.id === asgId)?.originalId));
+      const student = app.data.students.find(s => s.id === studentId);
+      const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
       if (priorAttempts.length >= 3) {
-        app.showToast('Maximum attempt limit reached (3/3 attempts used). Submissions closed.', 'danger');
-        return;
-      }
-
-      const hasVarsLoaded = app.data.studentVariables.some(
-        v => v.studentId === studentId && v.assignmentId === asgId
-      );
-      if (!hasVarsLoaded) {
-        app.showToast('Cannot submit — your question variables have not been loaded yet. Contact your faculty.', 'danger');
+        app.showToast('Maximum attempt limit reached (3/3 attempts used)', 'danger');
         return;
       }
 
@@ -704,15 +451,12 @@ const studentView = {
       const submittedVal = parseFloat(valInput.value);
       const submittedUnit = (unitInput ? unitInput.value : '').trim();
 
-      const student = app.data.students.find(s => s.id === studentId);
-      const studentBatch = student ? student.batch : 'A1';
       const submittedAt = new Date().toISOString();
-      const latePenaltyPct = this.calculateLatePenalty(studentBatch, asgId, submittedAt);
+      const attemptDeductionPct = nextAttemptNum === 1 ? 0 : nextAttemptNum === 2 ? 10 : 20;
 
       const gt = app.data.studentAnswers.find(a => a.studentId === studentId && a.parameterId === paramId);
       let isCorrectValue = true;
       let isCorrectUnit = true;
-      const attemptDeductionPct = nextAttemptNum === 1 ? 0 : nextAttemptNum === 2 ? 10 : 20;
       let marksAwarded = 4;
 
       if (gt) {
@@ -720,24 +464,13 @@ const studentView = {
         let diffPct = 0;
         if (!isNaN(expectedVal) && expectedVal !== 0) {
           diffPct = Math.abs(submittedVal - expectedVal) / Math.abs(expectedVal) * 100;
-        } else if (expectedVal === 0) {
-          diffPct = Math.abs(submittedVal) < 1e-9 ? 0 : 100;
         }
-        const paramObj = (app.data.assignments.find(a => a.id === asgId)?.questions || []).flatMap(q => q.parameters || []).find(p => p.id === paramId);
-        const acceptedUnits = (paramObj?.acceptedUnits || [gt.correctUnit || '']).map(u => u.toLowerCase().trim()).filter(Boolean);
-        isCorrectUnit = acceptedUnits.length > 0 ? acceptedUnits.includes(submittedUnit.toLowerCase().trim()) : true;
-        const vMarks = paramObj?.valueMarks ?? 4;
-        const uMarks = paramObj?.unitMarks ?? 1;
-
-        const baseMarks = (isCorrectValue ? vMarks : (diffPct <= 10.0 ? Math.round(vMarks / 2) : 0)) + (isCorrectUnit ? uMarks : 0);
-        const afterAttemptDeduction = baseMarks * (1 - attemptDeductionPct / 100);
-        marksAwarded = Math.max(0, Math.round(afterAttemptDeduction * (1 - latePenaltyPct / 100)));
-      } else {
-        const afterAttemptDeduction = 4 * (1 - attemptDeductionPct / 100);
-        marksAwarded = Math.max(0, Math.round(afterAttemptDeduction * (1 - latePenaltyPct / 100)));
+        isCorrectValue = diffPct <= 5.0;
+        const baseMarks = isCorrectValue ? 4 : (diffPct <= 10.0 ? 2 : 0);
+        marksAwarded = Math.max(0, Math.round(baseMarks * (1 - attemptDeductionPct / 100)));
       }
 
-      const newSubmissionRecord = {
+      const newRecord = {
         id: 'subm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
         assignmentId: asgId,
         studentId: studentId,
@@ -749,167 +482,70 @@ const studentView = {
         isCorrectUnit: isCorrectUnit,
         marksAwarded: marksAwarded,
         attemptDeductionPct: attemptDeductionPct,
-        latePenaltyPct: latePenaltyPct,
-        deductionPct: attemptDeductionPct,
-        isLate: latePenaltyPct > 0,
+        verificationStatus: 'pending',
         submittedAt: submittedAt
       };
 
-      app.data.submissions.push(newSubmissionRecord);
+      app.data.submissions.push(newRecord);
       app.saveState();
-      app.syncSubmissionToSupabase(newSubmissionRecord);
-      
-      app.showToast(`Attempt ${nextAttemptNum}/3 recorded successfully`, 'success');
+      await app.syncSubmissionToSupabase(newRecord);
+
+      // Part 10: Upsert rolled-up completion record to assignment_submissions
+      const asg = app.data.assignments.find(a => a.id === asgId);
+      const allAsgParams = (asg?.questions || []).flatMap(q => q.parameters || []);
+      const studentAllAsgSubs = app.data.submissions.filter(s => s.studentId === studentId && s.assignmentId === asgId);
+      const uniqueParamsDone = new Set(studentAllAsgSubs.map(s => s.parameterId)).size;
+      const statusStr = uniqueParamsDone === 0 ? 'not_started' : uniqueParamsDone >= allAsgParams.length ? 'submitted' : 'partial';
+
+      let totalEarned = 0;
+      allAsgParams.forEach(p => {
+        const pSubs = studentAllAsgSubs.filter(s => s.parameterId === p.id);
+        const best = pSubs.reduce((b, s) => (s.marksAwarded || 0) > (b.marksAwarded || 0) ? s : b, pSubs[0]);
+        if (best) totalEarned += (best.marksAwarded || 0);
+      });
+
+      const rolledUpRecord = {
+        id: `asg-sub-${studentId}-${asgId}`,
+        assignment_id: asgId,
+        student_id: studentId,
+        status: statusStr,
+        parameters_completed: uniqueParamsDone,
+        parameters_total: allAsgParams.length,
+        total_marks_awarded: totalEarned,
+        last_attempt_at: submittedAt
+      };
+
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+        try {
+          await supabaseClient.from('assignment_submissions').upsert(rolledUpRecord);
+        } catch(e) { console.warn('Rollup upsert notice:', e); }
+      }
+
+      app.showToast(`Attempt ${nextAttemptNum}/3 submitted successfully`, 'success');
     } finally {
       this._submitting = false;
     }
 
     this.renderSolverCanvas(document.getElementById('main-content'));
-
-    // Scroll to the submitted parameter row so student can see confirmation
-    setTimeout(() => {
-      const submittedRow = document.getElementById(`input-val-${paramId}`);
-      if (submittedRow) {
-        submittedRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
   },
 
   renderStudentGrades(container) {
     const student = this.getResolvedStudent();
     const studentAssignments = this.getAssignmentsForStudent(student);
-    const studentUin = student ? student.uin : '';
-    const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId || a.code === app.activeAssignmentId || (a.originalId && a.originalId === app.activeAssignmentId)) || studentAssignments[0]) : null;
-    const mySubmissions = student && activeAsg
-      ? app.data.submissions.filter(s => (s.studentId === student.id || (studentUin && s.studentId === studentUin)) && (s.assignmentId === activeAsg.id || s.assignmentId === activeAsg.originalId))
-      : [];
-    const schedule = activeAsg ? app.getAssignmentSchedule(activeAsg.id, student ? student.batch : 'A1') : null;
-
-    const studentTitle = student ? `${student.name} (${student.uin})` : 'No Student Profile Selected';
-
-    // Calculate Summary Metrics
-    let maxPossibleMarks = 0;
-    if (activeAsg && activeAsg.questions) {
-      activeAsg.questions.forEach(q => {
-        (q.parameters || []).forEach(p => {
-          maxPossibleMarks += ((p.valueMarks || 4) + (p.unitMarks || 0));
-        });
-      });
-    }
-    if (maxPossibleMarks === 0) maxPossibleMarks = 10;
-
-    let totalMarks = 0;
-    const parameterIds = [...new Set(mySubmissions.map(s => s.parameterId))];
-    parameterIds.forEach(pid => {
-      const attemptsForParam = mySubmissions.filter(s => s.parameterId === pid);
-      const bestAttempt = attemptsForParam.reduce((best, s) => 
-        (s.marksAwarded || 0) > (best.marksAwarded || 0) ? s : best
-      , attemptsForParam[0]);
-      totalMarks += (bestAttempt ? bestAttempt.marksAwarded || 0 : 0);
-    });
-
-    const percentage = maxPossibleMarks > 0 ? Math.min(100, Math.round((totalMarks / maxPossibleMarks) * 100)) : 0;
-    const isGradesReleased = schedule && schedule.gradesReleased;
+    const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId) || studentAssignments[0]) : null;
+    const mySubmissions = student && activeAsg ? app.data.submissions.filter(s => (s.studentId === student.id || s.studentId === student.uin) && s.assignmentId === activeAsg.id) : [];
 
     container.innerHTML = `
-      <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+      <div class="page-header-container">
         <div>
           <h1 class="page-title">My Results</h1>
-          <p class="page-subtitle">Personalized Gradesheet & Assessment Report for <strong>${studentTitle}</strong></p>
-        </div>
-        <div class="print-hide" style="display:flex; gap:10px;">
-          <button class="btn btn-secondary" onclick="studentView.exportStudentGradesCSV()">
-            📥 Export CSV Gradesheet
-          </button>
-          <button class="btn btn-primary" onclick="studentView.printStudentGradesheet()">
-            🖨️ Print / Save PDF Gradesheet
-          </button>
+          <p class="page-subtitle">Gradesheet & Evaluation History for <strong>${student ? student.name : 'Student'}</strong></p>
         </div>
       </div>
 
-      <!-- Assignment Selector -->
-      ${studentAssignments.length > 1 ? `
-      <div class="card" style="padding:14px 20px; margin-bottom:4px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <label style="font-size:13px; font-weight:600; color:var(--accent-blue); white-space:nowrap;">View Grades For:</label>
-          <select class="form-select" style="flex:1; background:#FFF;" 
-            onchange="app.activeAssignmentId=this.value; studentView.renderStudentGrades(document.getElementById('main-content'));">
-            ${studentAssignments.map(a => `
-              <option value="${a.id}" ${a.id === (activeAsg ? activeAsg.id : '') ? 'selected' : ''}>
-                ${a.code} — ${a.title}
-              </option>
-            `).join('')}
-          </select>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Printable Header (Visible during Print only) -->
-      <div class="printable-header" style="display:none; padding:20px; border-bottom:2px solid #000; margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <h2 style="margin:0; font-size:20px; font-weight:800; text-transform:uppercase;">Rizvi College of Engineering</h2>
-            <div style="font-size:13px; font-weight:600; color:#444;">Department of First Year Engineering | Academic Year 2026-27</div>
-            <div style="font-size:12px; color:#666; margin-top:2px;">Automated Canvas Assignment Gradesheet & Rubric Performance Log</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:14px; font-weight:700; color:var(--accent-blue);">OFFICIAL EVALUATION SHEET</div>
-            <div style="font-size:11px; color:#666;">Generated: ${new Date().toLocaleString()}</div>
-          </div>
-        </div>
-        <hr style="margin:12px 0; border:0; border-top:1px solid #ccc;">
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; font-size:12px;">
-          <div><strong>Student Name:</strong> ${student ? student.name : 'N/A'}</div>
-          <div><strong>UIN:</strong> ${student ? student.uin : 'N/A'}</div>
-          <div><strong>Branch:</strong> ${student ? student.branch : 'N/A'}</div>
-          <div><strong>Division / Batch:</strong> ${student ? (student.division + ' - ' + student.batch) : 'N/A'}</div>
-        </div>
-      </div>
-
-      <!-- Summary KPI Scorecards -->
-      <div class="kpi-grid" style="margin-bottom:24px;">
-        <div class="kpi-card">
-          <span class="kpi-label">Total Marks Awarded</span>
-          <div class="kpi-value" style="color:var(--accent-blue);">${isGradesReleased ? `${totalMarks} / ${maxPossibleMarks}` : '🔒 Hidden'}</div>
-          <span class="kpi-trend positive">${isGradesReleased ? `${percentage}% Score` : 'Pending Release'}</span>
-          <span style="font-size:11px; color:var(--text-secondary); margin-top:2px;">
-            ${activeAsg ? activeAsg.code : 'All Assignments'}
-          </span>
-        </div>
-
-        <div class="kpi-card">
-          <span class="kpi-label">Total Submissions Logged</span>
-          <div class="kpi-value">${mySubmissions.length}</div>
-          <span class="kpi-trend neutral">Canvas Parameter Attempts</span>
-        </div>
-
-        <div class="kpi-card">
-          <span class="kpi-label">Performance Level</span>
-          <div class="kpi-value" style="font-size:20px;">
-            ${isGradesReleased ? (percentage >= 80 ? '🌟 Exemplary' : percentage >= 50 ? '👍 Satisfactory' : '⚠️ Needs Work') : '⏳ Pending'}
-          </div>
-          <span class="kpi-trend neutral">Auto-Graded Rubric</span>
-        </div>
-
-        <div class="kpi-card">
-          <span class="kpi-label">Evaluation Status</span>
-          <div class="kpi-value" style="font-size:18px;">
-            <span class="tag ${isGradesReleased ? 'tag-success' : 'tag-warning'}">
-              ${isGradesReleased ? '🟢 Grades Released' : '⏳ Hidden Pending Release'}
-            </span>
-          </div>
-          <span class="kpi-trend neutral">Faculty Schedule Policy</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-          <h3 class="card-title">Attempt History — ${activeAsg ? activeAsg.code + ': ' + activeAsg.title : 'All Assignments'}</h3>
-          <span class="tag ${isGradesReleased ? 'tag-success' : 'tag-warning'}">
-            ${isGradesReleased ? `✅ Ground Truth Verified` : '⏳ Pending Faculty Approval'} · ${mySubmissions.length} Attempt${mySubmissions.length !== 1 ? 's' : ''} Logged
-          </span>
-        </div>
-
+      <!-- Attempt History Table -->
+      <div class="card" style="margin-bottom:24px;">
+        <h3 class="card-title" style="margin-bottom:12px;">Attempt History — ${activeAsg ? activeAsg.code : 'All'}</h3>
         <div class="table-container">
           <table class="custom-table">
             <thead>
@@ -918,144 +554,41 @@ const studentView = {
                 <th>Parameter ID</th>
                 <th>Submitted Value</th>
                 <th>Submitted Unit</th>
-                <th>Attempt Penalty</th>
-                <th>Late Penalty</th>
-                <th>Evaluation Status</th>
+                <th>Narrative Tag</th>
                 <th>Marks Awarded</th>
                 <th>Timestamp</th>
               </tr>
             </thead>
             <tbody>
-              ${mySubmissions.length === 0 ? `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-secondary);">No submissions recorded yet. Click "Active Canvas Sheet" to solve questions.</td></tr>` : 
-                mySubmissions.map(s => {
-                  const paramObj = (app.data.assignments || []).flatMap(a => a.questions || []).flatMap(q => q.parameters || []).find(p => p.id === s.parameterId);
-                  const paramLabel = paramObj ? app.formatNaturalMath(paramObj.label) : s.parameterId;
-                  const formattedUnit = s.submittedUnit ? app.formatNaturalMath(s.submittedUnit) : '-';
-                  return `
+              ${mySubmissions.map(s => {
+                const gt = app.data.studentAnswers.find(a => a.studentId === student?.id && a.parameterId === s.parameterId);
+                const paramObj = (app.data.assignments || []).flatMap(a => a.questions || []).flatMap(q => q.parameters || []).find(p => p.id === s.parameterId);
+                const narrativeTags = app.computeAttemptNarrativeTag(s, gt, paramObj);
+
+                return `
                   <tr>
                     <td><span class="tag tag-bt">Attempt ${s.attemptNumber}/3</span></td>
-                    <td style="font-weight:600;">${paramLabel}</td>
-                    <td style="font-weight:600;">${s.submittedValue}</td>
-                    <td>${formattedUnit}</td>
+                    <td class="mono-val" style="font-weight:600;">${s.parameterId}</td>
+                    <td class="mono-val" style="font-weight:700;">${s.submittedValue}</td>
+                    <td><span class="tag tag-co">${s.submittedUnit || '-'}</span></td>
                     <td>
-                      <span style="color:var(--warning); font-weight:600;">
-                        -${s.attemptDeductionPct || s.deductionPct || 0}%
-                      </span>
+                      <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                        ${narrativeTags.map(t => `<span class="tag tag-co" style="font-size:10px;">${t}</span>`).join('')}
+                      </div>
                     </td>
-                    <td>
-                      ${(s.latePenaltyPct && s.latePenaltyPct > 0) ? `
-                        <span style="color:var(--danger); font-weight:600;">-${s.latePenaltyPct}%</span>
-                        <span class="tag tag-danger" style="margin-left:4px; font-size:10px;">LATE</span>
-                      ` : `
-                        <span style="color:var(--success); font-weight:600;">On Time</span>
-                      `}
-                    </td>
-                    <td>
-                      ${isGradesReleased ? `
-                        <span class="tag ${s.isCorrectValue ? 'tag-success' : 'tag-danger'}">
-                          ${s.isCorrectValue ? '✓ Correct (Within ±5%)' : '✕ Out of Range'}
-                        </span>
-                      ` : `<span class="tag tag-bt">Pending Evaluation</span>`}
-                    </td>
-                    <td style="font-weight:700; color:var(--accent-blue);">
-                      ${isGradesReleased ? `${s.marksAwarded} Marks` : `Hidden`}
-                    </td>
-                    <td style="font-size:11px; color:var(--text-secondary);">${new Date(s.submittedAt).toLocaleString()}</td>
+                    <td class="mono-val" style="font-weight:800; color:var(--success);">${s.marksAwarded}</td>
+                    <td class="mono-val" style="font-size:11px;">${new Date(s.submittedAt).toLocaleString()}</td>
                   </tr>
-                `; }).join('')
-              }
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Student Course Outcome (CO) Attainment Profile Cards -->
+      <!-- Student CO Attainment Section -->
       ${this.renderStudentCOAttainmentHTML(student, activeAsg)}
-
-      <!-- Printable Footer Signature Block -->
-      <div class="printable-footer" style="display:none; margin-top:40px; padding-top:20px; border-top:1px dashed #aaa; justify-content:space-between; font-size:12px;">
-        <div style="text-align:center; width:200px;">
-          <div style="border-bottom:1px solid #000; height:40px; margin-bottom:4px;"></div>
-          <strong>Student Signature</strong>
-        </div>
-        <div style="text-align:center; width:200px;">
-          <div style="border-bottom:1px solid #000; height:40px; margin-bottom:4px;"></div>
-          <strong>Course Instructor Signature</strong>
-        </div>
-        <div style="text-align:center; width:200px;">
-          <div style="border-bottom:1px solid #000; height:40px; margin-bottom:4px;"></div>
-          <strong>Head of Department (FE)</strong>
-        </div>
-      </div>
     `;
-  },
-
-  exportStudentGradesCSV() {
-    const student = this.getResolvedStudent();
-    if (!student) {
-      app.showToast('No active student profile found to export', 'danger');
-      return;
-    }
-
-    const studentAssignments = this.getAssignmentsForStudent(student);
-    const activeAsg = studentAssignments.find(a => a.id === app.activeAssignmentId) || (studentAssignments.length > 0 ? studentAssignments[0] : null);
-    const mySubmissions = activeAsg
-      ? app.data.submissions.filter(s => s.studentId === student.id && (s.assignmentId === activeAsg.id || s.assignmentId === activeAsg.originalId))
-      : app.data.submissions.filter(s => s.studentId === student.id);
-    if (mySubmissions.length === 0) {
-      app.showToast('No submission history found for student to export', 'warning');
-      return;
-    }
-
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Assignment Code,Assignment Title,Student UIN,Student Name,Branch,Division,Batch,Attempt Number,Parameter ID,Submitted Value,Submitted Unit,Attempt Deduction %,Late Penalty %,Is Late,Evaluation Status,Marks Awarded,Submission Timestamp\n";
-
-    mySubmissions.forEach(s => {
-      const asgCode = `"${activeAsg ? activeAsg.code : ''}"`;
-      const asgTitle = `"${activeAsg ? activeAsg.title : ''}"`;
-      const uin = `"${student.uin || ''}"`;
-      const name = `"${student.name || ''}"`;
-      const branch = `"${student.branch || ''}"`;
-      const div = `"${student.division || ''}"`;
-      const batch = `"${student.batch || ''}"`;
-      const attempt = s.attemptNumber;
-      const paramId = `"${s.parameterId || ''}"`;
-      const val = `"${s.submittedValue || ''}"`;
-      const unit = `"${s.submittedUnit || ''}"`;
-      const attemptDed = s.attemptDeductionPct || s.deductionPct || 0;
-      const latePen = s.latePenaltyPct || 0;
-      const isLate = s.isLate ? "Yes" : "No";
-      const evalStatus = s.isCorrectValue ? "Correct" : "Incorrect";
-      const marks = s.marksAwarded || 0;
-      const time = `"${new Date(s.submittedAt).toLocaleString()}"`;
-
-      csvContent += `${asgCode},${asgTitle},${uin},${name},${branch},${div},${batch},${attempt},${paramId},${val},${unit},${attemptDed}%,${latePen}%,${isLate},${evalStatus},${marks},${time}\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Gradesheet_${student.uin}_${activeAsg ? activeAsg.code.replace(/[\/]/g, '_') : 'All'}_${student.name.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    app.showToast(`Exported CSV Gradesheet for ${student.name} (${mySubmissions.length} records)`, 'success');
-  },
-
-  printStudentGradesheet() {
-    // Show printable headers & footers temporarily for printing
-    const printableHeader = document.querySelector('.printable-header');
-    const printableFooter = document.querySelector('.printable-footer');
-    if (printableHeader) printableHeader.style.display = 'block';
-    if (printableFooter) printableFooter.style.display = 'flex';
-
-    window.print();
-
-    // Re-hide printable elements after browser print dialog closes
-    setTimeout(() => {
-      if (printableHeader) printableHeader.style.display = 'none';
-      if (printableFooter) printableFooter.style.display = 'none';
-    }, 1000);
   },
 
   renderStudentCOAttainmentHTML(student, activeAsg) {
@@ -1071,53 +604,36 @@ const studentView = {
       });
     });
 
-    const coAttainment = courseOutcomes.map(co => {
-      const relevantPids = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
-      let earned = 0;
-      let maxMarks = 0;
-
-      relevantPids.forEach(pid => {
-        maxMarks += (paramMap[pid].valueMarks || 4);
-        const sub = app.data.submissions.find(s => (s.studentId === student.id || s.studentId === student.uin) && s.parameterId === pid);
-        if (sub) earned += (sub.marksAwarded || 0);
-      });
-
-      const pct = maxMarks > 0 ? Math.round((earned / maxMarks) * 100) : 0;
-      const attained = pct >= (app.data.attainmentSettings?.studentThresholdPct || 60);
-
-      return { co, earned, maxMarks, pct, attained };
-    });
-
     return `
-      <div class="card" style="margin-top:24px;">
-        <div class="card-header" style="margin-bottom:16px;">
-          <div>
-            <h2 class="card-title">My Course Outcome (CO) Attainment Profile</h2>
-            <p class="card-subtitle">Personalized NBA Accreditation CO & LO Attainment Progress</p>
-          </div>
-        </div>
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom:12px;">My Course Outcome (CO) Attainment Profile</h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
+          ${courseOutcomes.map(co => {
+            const relevantPids = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
+            let earned = 0;
+            let maxMarks = 0;
+            relevantPids.forEach(pid => {
+              maxMarks += (paramMap[pid].valueMarks || 4);
+              const sub = app.data.submissions.find(s => (s.studentId === student.id || s.studentId === student.uin) && s.parameterId === pid);
+              if (sub) earned += (sub.marksAwarded || 0);
+            });
+            const pct = maxMarks > 0 ? Math.round((earned / maxMarks) * 100) : 0;
+            const attained = pct >= (app.data.attainmentSettings?.studentThresholdPct || 60);
 
-        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
-          ${coAttainment.map(ca => `
-            <div style="background:var(--bg-subtle); border:1px solid var(--border-default); border-radius:var(--radius-md); padding:14px;">
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-                <div>
-                  <span class="tag ${ca.co.type === 'LO' ? 'tag-lo' : 'tag-co'}" style="font-weight:700;">${ca.co.code}</span>
-                  <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-top:4px;">${ca.co.description}</div>
+            return `
+              <div style="background:var(--bg-subtle); padding:14px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span class="tag ${co.type === 'LO' ? 'tag-lo' : 'tag-co'}">${co.code}</span>
+                  <span class="tag ${attained ? 'tag-success' : 'tag-danger'}" style="font-size:11px;">${attained ? '✓ Attained' : '✕ Not Attained'}</span>
                 </div>
-                <span class="tag ${ca.attained ? 'tag-success' : 'tag-danger'}" style="font-size:11px;">
-                  ${ca.attained ? '✓ Attained' : '✕ Not Attained'}
-                </span>
+                <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">${co.description}</div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:8px;">
+                  <span>Score: <strong class="mono-val">${earned.toFixed(1)} / ${maxMarks}</strong></span>
+                  <strong class="mono-val" style="color:${attained ? 'var(--success)' : 'var(--danger)'};">${pct}%</strong>
+                </div>
               </div>
-              <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-top:10px; margin-bottom:4px;">
-                <span>Score: <strong class="mono-val">${ca.earned.toFixed(1)} / ${ca.maxMarks}</strong></span>
-                <span class="mono-val" style="color:${ca.attained ? 'var(--success)' : 'var(--danger)'};">${ca.pct}%</span>
-              </div>
-              <div class="progress-bar-inline">
-                <div class="progress-bar-fill ${ca.attained ? 'success' : 'danger'}" style="width:${ca.pct}%;"></div>
-              </div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       </div>
     `;
