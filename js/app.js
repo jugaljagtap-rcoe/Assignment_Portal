@@ -112,6 +112,10 @@ class AppEngine {
     else if (hash.startsWith('#student')) this.activeTabCategory = 'student';
     else if (hash.startsWith('#nba')) this.activeTabCategory = 'nba';
 
+    if (hash === '#admin-home' || hash === '#faculty-home' || hash === '#student-home' || hash === '' || hash === '#home') {
+      this.activeNav = 'dashboard';
+    }
+
     this.renderTopNavTabs();
     this.renderRoleSwitcher();
     this.renderSidebar();

@@ -860,7 +860,39 @@ const adminView = {
     `;
   },
 
-  renderDepartments(container) { this.renderAdminHome(container); },
-  renderPOAccreditation(container) { nbaView.renderInstituteView(container); },
-  renderGoogleAuthSettings(container) { analyticsView.renderReportsTab(container); }
+  renderDepartments(container) {
+    this.renderAdminHome(container);
+    const breadcrumbHtml = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="#admin-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Admin Home</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Departments</span>
+      </div>
+    `;
+    container.insertAdjacentHTML('afterbegin', breadcrumbHtml);
+  },
+
+  renderPOAccreditation(container) {
+    nbaView.renderInstituteView(container);
+    const breadcrumbHtml = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="#admin-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Admin Home</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Program Outcomes</span>
+      </div>
+    `;
+    container.insertAdjacentHTML('afterbegin', breadcrumbHtml);
+  },
+
+  renderGoogleAuthSettings(container) {
+    analyticsView.renderReportsTab(container);
+    const breadcrumbHtml = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="#admin-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Admin Home</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Access Control & Logs</span>
+      </div>
+    `;
+    container.insertAdjacentHTML('afterbegin', breadcrumbHtml);
+  }
 };
