@@ -226,10 +226,12 @@ const facultyView = {
         this.renderVerificationLayer(targetEl, sub);
         break;
       case 'reports':
-        this.renderReportsView(targetEl, sub);
+        analyticsView.render(targetEl);
         break;
+      case 'overview':
       default:
-        this.renderOverviewTab(targetEl, sub);
+        targetEl.innerHTML = this.renderSubjectOverviewTab(sub);
+        break;
     }
   },
 

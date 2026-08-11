@@ -214,11 +214,110 @@ class AppEngine {
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
       if (coPoRes && coPoRes.data) this.data.coPOMapping = coPoRes.data;
 
+      if (!localStorage.getItem('rizvi_supabase_migrated')) {
+        await this.migrateLocalStorageToSupabase();
+        localStorage.setItem('rizvi_supabase_migrated', '1');
+      }
+
       this.lastSyncedAt = new Date();
       this.saveState();
       this.reconcileUserSession();
     } catch (e) {
       console.warn('loadAllFromSupabase fetch notice:', e);
+    }
+  }
+
+  cleanDuplicateModules() {
+    const modules = this.data.modules || [];
+    const grouped = {};
+    modules.forEach(m => {
+      const code = (m.code || m.module_code || m.id || '').trim();
+      if (!grouped[code]) grouped[code] = [];
+      grouped[code].push(m);
+    });
+
+    const cleaned = [];
+    Object.values(grouped).forEach(group => {
+      if (group.length === 1) {
+        cleaned.push(group[0]);
+      } else {
+        const preferred = group.find(m => (m.subjectId || m.subject_id) === 'sub-24051181') || group[0];
+        cleaned.push(preferred);
+      }
+    });
+
+    this.data.modules = cleaned;
+    this.saveState();
+    return cleaned;
+  }
+
+  async migrateLocalStorageToSupabase() {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+
+    this.showToast('Migrating local data to Supabase...', 'info');
+
+    // 1. Clean duplicate modules
+    this.cleanDuplicateModules();
+
+    // 2. Fix ESL101 LO subjectId mismatch
+    if (Array.isArray(this.data.courseOutcomes)) {
+      const esl = (this.data.subjects || []).find(s => s.code === 'ESL101');
+      this.data.courseOutcomes.forEach(co => {
+        if (co.subjectId === 'sub-esl101' || co.subject_id === 'sub-esl101') {
+          if (esl) {
+            co.subjectId = esl.id;
+            co.subject_id = esl.id;
+          }
+        }
+      });
+      this.saveState();
+    }
+
+    try {
+      // Upsert course Outcomes
+      if (Array.isArray(this.data.courseOutcomes) && this.data.courseOutcomes.length > 0) {
+        for (const co of this.data.courseOutcomes) {
+          await supabaseClient.from('course_outcomes').upsert({
+            id: co.id,
+            code: co.code,
+            description: co.description,
+            type: co.type || 'CO',
+            subject_id: co.subjectId || co.subject_id || '',
+            bt_level: co.btLevel || co.bt_level || 'BT2',
+            module_id: co.moduleId || co.module_id || null,
+            assignment_id: co.assignmentId || co.assignment_id || null
+          });
+        }
+      }
+
+      // Upsert modules
+      if (Array.isArray(this.data.modules) && this.data.modules.length > 0) {
+        for (const m of this.data.modules) {
+          await supabaseClient.from('modules').upsert({
+            id: m.id,
+            code: m.code || m.module_code || '',
+            name: m.name || m.module_name || m.title || '',
+            topics: m.topics || '',
+            subject_id: m.subjectId || m.subject_id || ''
+          });
+        }
+      }
+
+      // Upsert subject_faculty
+      if (Array.isArray(this.data.subjectFaculty) && this.data.subjectFaculty.length > 0) {
+        for (const sf of this.data.subjectFaculty) {
+          await supabaseClient.from('subject_faculty').upsert({
+            id: sf.id,
+            faculty_id: sf.faculty_id || sf.facultyId,
+            subject_id: sf.subject_id || sf.subjectId,
+            academic_year: sf.academic_year || sf.academicYear || '2025-2026'
+          });
+        }
+      }
+
+      this.showToast('Migration complete!', 'success');
+    } catch(err) {
+      console.warn('Migration warning:', err);
     }
   }
 
