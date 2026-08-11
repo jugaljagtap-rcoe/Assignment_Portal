@@ -155,6 +155,12 @@ const facultyView = {
 
     const canEdit = app.canFacultyEditSubject(sub.id);
 
+    const subClass = (INITIAL_DATA.academicClasses || []).find(c =>
+      c.departmentId === sub.departmentId &&
+      (c.semesters || []).includes(sub.semester)
+    );
+    const classLabel = subClass ? subClass.code : (sub.className || sub.class_name || '—');
+
     container.innerHTML = `
       <div class="breadcrumb-container print-hide" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
         <a href="#faculty-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Faculty Home</a>
@@ -173,7 +179,7 @@ const facultyView = {
       <div class="page-header-container">
         <div>
           <h1 class="page-title">${sub.code}: ${sub.fullName || sub.name}</h1>
-          <p class="page-subtitle">Class: <strong>${sub.className || 'FE'}</strong> · Semester: <strong>${sub.semester || 'Semester I'}</strong></p>
+          <p class="page-subtitle">Class: <strong>${classLabel}</strong> · Semester: <strong>${sub.semester || 'Semester I'}</strong></p>
         </div>
       </div>
 
@@ -220,12 +226,10 @@ const facultyView = {
         this.renderVerificationLayer(targetEl, sub);
         break;
       case 'reports':
-        analyticsView.render(targetEl);
+        this.renderReportsView(targetEl, sub);
         break;
-      case 'overview':
       default:
-        targetEl.innerHTML = this.renderSubjectOverviewTab(sub);
-        break;
+        this.renderOverviewTab(targetEl, sub);
     }
   },
 
@@ -334,10 +338,13 @@ const facultyView = {
      FULL WORKING RESTORED FACULTY TABS (No Stubs!)
      ========================================================================== */
 
-  /* 1. Course Outcomes & Modules Manager */
   renderCOAndModulesManager(container, sub) {
-    const courseOutcomes = app.data.courseOutcomes || [];
-    const modules = app.data.modules || [];
+    const courseOutcomes = (app.data.courseOutcomes || []).filter(co =>
+      !sub || co.subjectId === sub?.id || co.subject_id === sub?.id
+    );
+    const modules = (app.data.modules || []).filter(m =>
+      !sub || m.subjectId === sub.id || m.subject_id === sub.id
+    );
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -376,7 +383,7 @@ const facultyView = {
             <div style="display:flex; flex-direction:column; gap:8px;">
               ${modules.map(m => `
                 <div style="padding:10px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
-                  <strong style="font-size:13px; color:var(--text-primary);">${m.code}: ${m.name}</strong>
+                  <strong style="font-size:13px; color:var(--text-primary);">${m.code || m.module_code || ''}: ${m.name || m.module_name || m.title || 'Unnamed Module'}</strong>
                   <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${m.topics || ''}</div>
                 </div>
               `).join('')}

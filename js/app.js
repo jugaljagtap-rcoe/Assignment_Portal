@@ -179,7 +179,11 @@ class AppEngine {
       if (studentVarsRes.data) this.data.studentVariables = studentVarsRes.data;
       if (studentAnswersRes.data) this.data.studentAnswers = studentAnswersRes.data;
       if (courseOutcomesRes.data) this.data.courseOutcomes = courseOutcomesRes.data;
-      if (modulesRes.data) this.data.modules = modulesRes.data;
+      if (modulesRes.data) {
+        this.data.modules = modulesRes.data.filter((m, i, arr) =>
+          arr.findIndex(x => x.id === m.id) === i
+        );
+      }
       if (auditLogRes.data) this.data.auditLogs = auditLogRes.data;
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
 
