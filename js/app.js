@@ -125,7 +125,8 @@ class AppEngine {
 
   handleHashChange() {
     if (!this.currentUser) {
-      this.showLoginModal(false);
+      const mc = document.getElementById('main-content');
+      if (mc) mc.innerHTML = '';
       return;
     }
     const hash = window.location.hash || '';
@@ -487,6 +488,10 @@ class AppEngine {
   renderTopNavTabs() {
     const container = document.getElementById('top-nav-tabs');
     if (!container) return;
+    if (!this.currentUser) {
+      container.innerHTML = '';
+      return;
+    }
     container.innerHTML = '';
   }
 
@@ -677,6 +682,8 @@ class AppEngine {
 
   renderCurrentView() {
     if (!this.currentUser) {
+      const mc = document.getElementById('main-content');
+      if (mc) mc.innerHTML = '';
       return;
     }
     const container = document.getElementById('main-content');
@@ -758,11 +765,12 @@ class AppEngine {
 
   logout() {
     this.saveUserSession(null);
+    const mc = document.getElementById('main-content');
+    if (mc) mc.innerHTML = '';
     this.currentUser = null;
     this.currentRole = 'faculty';
     this.activeTabCategory = 'faculty';
     this.showToast('Logged out successfully', 'info');
-    window.location.hash = '#home';
     this.showLoginModal(false);
   }
 
