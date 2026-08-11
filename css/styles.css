@@ -1628,3 +1628,425 @@ sub {
   color: var(--text-secondary);
   transition: transform 0.2s ease;
 }
+
+/* ==========================================================================
+   RESULT ANALYSIS DESIGN SYSTEM PATTERNS
+   ========================================================================== */
+
+/* a) Left Accent Bar for card-title */
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 14px;
+  background: var(--accent-blue);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* b) Filter-Group Labeled Dropdowns */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filter-group select, .filter-group input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  font-size: 12.5px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* c) Session-Strip Assignment Cards */
+.session-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-level-1);
+  transition: all var(--transition-fast);
+  gap: 16px;
+}
+
+.session-strip:hover {
+  box-shadow: var(--shadow-level-2);
+  border-color: var(--border-strong);
+}
+
+.session-strip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.session-strip-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.session-strip-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.session-strip-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* d) Stat Cards without icons */
+.stat-card-clean {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow-level-1);
+}
+
+.stat-card-clean .num {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent-blue);
+  line-height: 1;
+}
+
+.stat-card-clean .lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+/* e) col-pill Toggle Pills */
+.col-pill {
+  border: 1.5px solid var(--border-strong);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.col-pill.active {
+  background: var(--accent-blue-subtle);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* f) Progress Bars Inline */
+.progress-bar-inline {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-blue);
+  transition: width 0.3s ease;
+}
+
+.progress-bar-fill.success { background: var(--success); }
+.progress-bar-fill.warning { background: var(--warning); }
+.progress-bar-fill.danger { background: var(--danger); }
+
+/* g) UNIFIED EMPTY STATE */
+.empty-state {
+  padding: 40px 24px;
+  text-align: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.empty-state-emoji {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.empty-state-subtitle {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  max-width: 400px;
+}
+
+/* h) Parameter Summary Footer */
+.parameter-summary-footer {
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+/* i) DM Mono / JetBrains Mono font uniform enforcement */
+.mono-val, .code-font, .uin-tag {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* j) Segmented Control for Mode Switchers */
+.segmented-control {
+  display: inline-flex;
+  background: var(--bg-subtle);
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  gap: 2px;
+}
+
+.segmented-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.segmented-btn.active {
+  background: white;
+  color: var(--accent-blue);
+  font-weight: 700;
+  box-shadow: var(--shadow-level-1);
+}
+
+/* k) Sortable Table Headers */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+th.sortable::after {
+  content: ' ↕';
+  opacity: 0.4;
+  font-size: 10px;
+}
+
+th.sortable.asc::after {
+  content: ' ↑';
+  opacity: 1;
+  color: var(--accent-blue);
+}
+
+th.sortable.desc::after {
+  content: ' ↓';
+  opacity: 1;
+  color: var(--accent-blue);
+}
+
+/* l) Roster Status Pills Strip */
+.roster-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Assignment Lifecycle Pills */
+.pill-draft {
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+}
+
+.pill-published {
+  background: var(--success-subtle);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.pill-locked {
+  background: var(--purple-subtle);
+  color: var(--purple);
+  border: 1px solid var(--purple);
+}
+
+/* Verification Status Pills */
+.pill-pending {
+  background: var(--warning-subtle);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
+.pill-verified {
+  background: var(--success-subtle);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.pill-flagged {
+  background: var(--danger-subtle);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* Full-Screen Spinner Overlay */
+.spinner-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.spinner-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.spinner-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-level-4);
+  border: 1px solid var(--border-default);
+  min-width: 240px;
+}
+
+.spinner-icon {
+  width: 36px;
+  height: 36px;
+  border: 3.5px solid var(--accent-blue-subtle);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin-overlay 0.8s linear infinite;
+}
+
+@keyframes spin-overlay {
+  to { transform: rotate(360deg); }
+}
+
+.spinner-message {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+/* Timeline Pills for Student Journey */
+.timeline-pills-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+
+.timeline-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.timeline-pill.active {
+  border-color: var(--accent-blue);
+  background: var(--accent-blue-subtle);
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+

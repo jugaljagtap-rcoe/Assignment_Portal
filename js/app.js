@@ -35,19 +35,45 @@ class AppEngine {
     this.currentUser = this.loadUserSession();
     this.currentRole = this.currentUser ? this.currentUser.role : 'faculty'; // 'admin', 'faculty', 'student'
     this.activeStudentId = this.currentUser && this.currentUser.studentId ? this.currentUser.studentId : (this.data.students.length > 0 ? this.data.students[0].id : null); 
-    this.activeNav = 'dashboard';
+    this.activeNav = this.getNavFromHash() || 'dashboard';
     const savedAsgId = localStorage.getItem('rizvi_fe_active_asg_id');
     const firstAsgId = this.data.assignments.length > 0 ? this.data.assignments[0].id : null;
     this.activeAssignmentId = savedAsgId || firstAsgId || null;
+    this.lastSyncedAt = null;
     this.reconcileUserSession();
+  }
+
+  getNavFromHash() {
+    const hash = (window.location.hash || '').replace('#', '').trim();
+    if (!hash) return null;
+    if (hash === 'home') return 'dashboard';
+    return hash;
+  }
+
+  showSpinner(message = 'Loading data…') {
+    const overlay = document.getElementById('spinner-overlay');
+    const msgEl = document.getElementById('spinner-message');
+    if (msgEl) msgEl.textContent = message;
+    if (overlay) overlay.classList.add('active');
+  }
+
+  hideSpinner() {
+    const overlay = document.getElementById('spinner-overlay');
+    if (overlay) overlay.classList.remove('active');
   }
 
   init() {
     this.setupEventListeners();
-    this.syncWithSupabase().then(() => {
+    this.handleHashChange();
+    this.showSpinner('Synchronizing with Supabase Cloud…');
+    this.syncWithSupabase().finally(() => {
+      this.hideSpinner();
       if (!this.currentUser) this.showLoginModal(false);
       else { this.renderRoleSwitcher(); this.renderSidebar(); this.renderCurrentView(); }
     });
+
+    // Hash-based routing listener
+    window.addEventListener('hashchange', () => this.handleHashChange());
 
     // Cross-tab and cross-window real-time data sync listener
     window.addEventListener('storage', (e) => {
@@ -57,13 +83,15 @@ class AppEngine {
         this.renderCurrentView();
       }
     });
+  }
 
-    // Background periodic cloud sync (every 30s)
-    setInterval(() => {
-      if (supabaseClient) {
-        this.syncWithSupabase();
-      }
-    }, 30000);
+  handleHashChange() {
+    const nav = this.getNavFromHash();
+    if (nav && nav !== this.activeNav) {
+      this.activeNav = nav;
+      this.renderSidebar();
+      this.renderCurrentView();
+    }
   }
 
   async syncWithSupabase() {
@@ -72,22 +100,37 @@ class AppEngine {
       return;
     }
     try {
-      // Fetch students from Supabase
-      const { data: stData, error: stErr } = await supabaseClient.from('students').select('*');
-      if (!stErr && stData && Array.isArray(stData) && stData.length > 0) {
-        stData.forEach(st => {
+      // Parallel Promise.all fetching pattern across all 10 core tables + audit_log
+      const [
+        { data: stData, error: stErr },
+        { data: fcData, error: fcErr },
+        { data: subData, error: subErr },
+        { data: asgData, error: asgErr },
+        { data: submData, error: submErr },
+        { data: svarData, error: svarErr },
+        { data: ansData, error: ansErr },
+        { data: poData, error: poErr },
+        { data: tmplData, error: tmplErr },
+        { data: auditData, error: auditErr }
+      ] = await Promise.all([
+        supabaseClient.from('students').select('*'),
+        supabaseClient.from('faculty').select('*'),
+        supabaseClient.from('subjects').select('*'),
+        supabaseClient.from('assignments').select('*'),
+        supabaseClient.from('submissions').select('*'),
+        supabaseClient.from('student_variables').select('*'),
+        supabaseClient.from('student_answers').select('*'),
+        supabaseClient.from('program_outcomes').select('*'),
+        supabaseClient.from('assignment_templates').select('*'),
+        supabaseClient.from('audit_log').select('*').order('changed_at', { ascending: false }).limit(500)
+      ]);
+
+      // Process Students
+      if (!stErr && stData && Array.isArray(stData)) {
+        this.data.students = stData.map(st => {
           const stUin = (st.uin || (st.email ? st.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-          const stEmail = (st.email || '').trim().toLowerCase();
-          const cleanId = 'st-' + stUin;
-
-          const existingIdx = this.data.students.findIndex(x =>
-            x.id === cleanId ||
-            (x.uin && x.uin.trim().toLowerCase() === stUin) ||
-            (stEmail && x.email && x.email.trim().toLowerCase() === stEmail)
-          );
-
-          const formatted = {
-            id: cleanId,
+          return {
+            id: 'st-' + stUin,
             uin: st.uin || stUin.toUpperCase(),
             name: st.name,
             email: st.email,
@@ -97,93 +140,49 @@ class AppEngine {
             division: st.division || 'A',
             batch: st.batch || 'A1'
           };
-          if (existingIdx >= 0) {
-            this.data.students[existingIdx] = formatted;
-          } else {
-            this.data.students.push(formatted);
-          }
         });
-
-        // Deduplicate local student roster by deterministic clean ID
-        const uniqueStudentsMap = new Map();
-        this.data.students.forEach(s => {
-          const uinKey = (s.uin || (s.email ? s.email.split('@')[0] : 'user')).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-          s.id = 'st-' + uinKey;
-          uniqueStudentsMap.set(uinKey, s);
-        });
-        this.data.students = Array.from(uniqueStudentsMap.values());
       }
 
-      // Fetch faculty from Supabase
-      const { data: fcData, error: fcErr } = await supabaseClient.from('faculty').select('*');
+      // Process Faculty
       if (!fcErr && fcData && Array.isArray(fcData) && fcData.length > 0) {
-        fcData.forEach(fc => {
-          const existingIdx = this.data.faculty.findIndex(x => x.id === fc.id);
-          const formatted = {
-            id: fc.id,
-            name: fc.name,
-            email: fc.email,
-            departmentId: fc.department_id,
-            role: fc.role,
-            assignedSubjects: fc.assigned_subjects || [],
-            isDualRole: fc.is_dual_role || false
-          };
-          if (existingIdx >= 0) {
-            this.data.faculty[existingIdx] = formatted;
-          } else {
-            this.data.faculty.push(formatted);
-          }
-        });
+        this.data.faculty = fcData.map(fc => ({
+          id: fc.id,
+          name: fc.name,
+          email: fc.email,
+          departmentId: fc.department_id,
+          role: fc.role,
+          assignedSubjects: fc.assigned_subjects || [],
+          isDualRole: fc.is_dual_role || false
+        }));
       }
 
-      // Fetch subjects from Supabase
-      const { data: subData, error: subErr } = await supabaseClient.from('subjects').select('*');
+      // Process Subjects
       if (!subErr && subData && Array.isArray(subData)) {
-        subData.forEach(sub => {
-          const existingIdx = this.data.subjects.findIndex(x => x.id === sub.id || x.code === sub.code);
-          const formatted = { id: sub.id, code: sub.code, shortName: sub.short_name, fullName: sub.full_name, departmentId: sub.department_id, className: sub.class_name, semester: sub.semester };
-          if (existingIdx >= 0) this.data.subjects[existingIdx] = formatted;
-          else this.data.subjects.push(formatted);
-        });
+        this.data.subjects = subData.map(sub => ({
+          id: sub.id, code: sub.code, shortName: sub.short_name, fullName: sub.full_name, departmentId: sub.department_id, className: sub.class_name, semester: sub.semester
+        }));
       }
 
-      // Fetch program outcomes from Supabase
-      const { data: poData, error: poErr } = await supabaseClient.from('program_outcomes').select('*');
+      // Process POs
       if (!poErr && poData && Array.isArray(poData) && poData.length > 0) {
-        poData.forEach(po => {
-          const existingIdx = this.data.programOutcomes.findIndex(x => x.id === po.id || x.code === po.code);
-          const formatted = {
-            id: po.id,
-            code: po.code,
-            description: po.description
-          };
-          if (existingIdx >= 0) {
-            this.data.programOutcomes[existingIdx] = formatted;
-          } else {
-            this.data.programOutcomes.push(formatted);
-          }
-        });
+        this.data.programOutcomes = poData.map(po => ({
+          id: po.id, code: po.code, description: po.description
+        }));
       }
 
-      // Fetch assignments from Supabase
-      const { data: asgData, error: asgErr } = await supabaseClient.from('assignments').select('*');
-      if (!asgErr && asgData && Array.isArray(asgData) && asgData.length > 0) {
-        asgData.forEach(asg => {
-          if (asg.code === 'VMD-EXP-01' || asg.code === 'EM-EXP-01' || asg.id === 'asg-vmd-001' || asg.id === 'asg-em-001' || asg.id === 'asg-vmd-custom-001' || asg.id === 'asg-seed-placeholder-vmd') return;
+      // Process Assignments
+      if (!asgErr && asgData && Array.isArray(asgData)) {
+        this.data.assignments = asgData.filter(asg =>
+          asg.code !== 'VMD-EXP-01' && asg.code !== 'EM-EXP-01' && asg.id !== 'asg-vmd-001' && asg.id !== 'asg-em-001'
+        ).map(asg => {
           const codeKey = (asg.code || 'asg').toLowerCase().replace(/[^a-z0-9_-]/g, '');
           const cleanId = 'asg-' + codeKey;
-
-          const existingIdx = this.data.assignments.findIndex(x => x.id === cleanId || (x.code && x.code.toLowerCase() === (asg.code || '').toLowerCase()));
           let parsedSchedules = asg.schedules;
-          if (typeof parsedSchedules === 'string') {
-            try { parsedSchedules = JSON.parse(parsedSchedules); } catch(e) { parsedSchedules = []; }
-          }
+          if (typeof parsedSchedules === 'string') { try { parsedSchedules = JSON.parse(parsedSchedules); } catch(e) { parsedSchedules = []; } }
           let parsedQuestions = asg.questions;
-          if (typeof parsedQuestions === 'string') {
-            try { parsedQuestions = JSON.parse(parsedQuestions); } catch(e) { parsedQuestions = []; }
-          }
+          if (typeof parsedQuestions === 'string') { try { parsedQuestions = JSON.parse(parsedQuestions); } catch(e) { parsedQuestions = []; } }
 
-          const formatted = {
+          return {
             id: cleanId,
             originalId: asg.id,
             code: asg.code,
@@ -200,29 +199,16 @@ class AppEngine {
             deadline: asg.deadline,
             rubricPresetId: asg.rubric_preset_id,
             createdAt: asg.created_at,
+            state: asg.state || (Array.isArray(parsedSchedules) && parsedSchedules.some(s => s.submissionsOpen) ? 'Published' : 'Draft'),
             schedules: Array.isArray(parsedSchedules) ? parsedSchedules : [],
             questions: Array.isArray(parsedQuestions) ? parsedQuestions : []
           };
-          if (existingIdx >= 0) {
-            const existingQuestions = this.data.assignments[existingIdx].questions || [];
-            if (formatted.questions.length === 0 && existingQuestions.length > 0) {
-              formatted.questions = existingQuestions;
-            }
-            this.data.assignments[existingIdx] = formatted;
-          } else {
-            this.data.assignments.push(formatted);
-          }
         });
       }
 
-      // Purge ghost dummy assignments from local array
-      this.data.assignments = (this.data.assignments || []).filter(a => a.id !== 'asg-vmd-001' && a.code !== 'VMD-EXP-01' && a.id !== 'asg-em-001' && a.code !== 'EM-EXP-01');
-
-      // Fetch submissions from Supabase
-      const { data: submData, error: submErr } = await supabaseClient.from('submissions').select('*');
-      if (!submErr && submData && Array.isArray(submData) && submData.length > 0) {
-        submData.forEach(s => {
-          const existingIdx = this.data.submissions.findIndex(x => x.id === s.id);
+      // Process Submissions
+      if (!submErr && submData && Array.isArray(submData)) {
+        this.data.submissions = submData.map(s => {
           const formatted = {
             id: s.id,
             assignmentId: s.assignment_id,
@@ -238,81 +224,50 @@ class AppEngine {
             latePenaltyPct: s.late_penalty_pct || 0,
             deductionPct: s.deduction_pct || 0,
             isLate: s.is_late || false,
-            submittedAt: s.submitted_at
+            submittedAt: s.submitted_at,
+            verificationStatus: s.verification_status || 'Pending',
+            verifiedBy: s.verified_by || null,
+            verifiedAt: s.verified_at || null
           };
-
-          this.normalizeSubmissionIds(formatted);
-
-          if (existingIdx >= 0) {
-            this.data.submissions[existingIdx] = formatted;
-          } else {
-            this.data.submissions.push(formatted);
-          }
+          return this.normalizeSubmissionIds(formatted);
         });
       }
 
-      // Fetch student_variables from Supabase
-      const { data: svarData, error: svarErr } = await supabaseClient.from('student_variables').select('*');
-      if (!svarErr && svarData && Array.isArray(svarData) && svarData.length > 0) {
-        svarData.forEach(v => {
-          const existingIdx = this.data.studentVariables.findIndex(x => x.id === v.id);
-          const formatted = {
-            id: v.id,
-            studentId: v.student_id,
-            assignmentId: v.assignment_id,
-            key: v.key,
-            value: v.value
-          };
-
-          this.normalizeSubmissionIds(formatted);
-
-          if (existingIdx >= 0) {
-            this.data.studentVariables[existingIdx] = formatted;
-          } else {
-            this.data.studentVariables.push(formatted);
-          }
+      // Process Student Variables
+      if (!svarErr && svarData && Array.isArray(svarData)) {
+        this.data.studentVariables = svarData.map(v => {
+          const formatted = { id: v.id, studentId: v.student_id, assignmentId: v.assignment_id, key: v.key, value: v.value };
+          return this.normalizeSubmissionIds(formatted);
         });
       }
 
-      // Fetch student_answers from Supabase
-      const { data: ansData, error: ansErr } = await supabaseClient.from('student_answers').select('*');
-      if (!ansErr && ansData && Array.isArray(ansData) && ansData.length > 0) {
-        ansData.forEach(a => {
-          const idKey = a.id || `ans-${a.student_id}-${a.parameter_id}`;
-          const existingIdx = this.data.studentAnswers.findIndex(x => x.id === idKey || (x.studentId === a.student_id && x.parameterId === a.parameter_id));
-          const formatted = {
-            id: idKey,
-            assignmentId: a.assignment_id,
-            studentId: a.student_id,
-            parameterId: a.parameter_id,
-            correctValue: a.correct_value,
-            correctUnit: a.correct_unit
-          };
-
-          this.normalizeSubmissionIds(formatted);
-
-          if (existingIdx >= 0) {
-            this.data.studentAnswers[existingIdx] = formatted;
-          } else {
-            this.data.studentAnswers.push(formatted);
-          }
+      // Process Student Answers
+      if (!ansErr && ansData && Array.isArray(ansData)) {
+        this.data.studentAnswers = ansData.map(a => {
+          const formatted = { id: a.id || `ans-${a.student_id}-${a.parameter_id}`, assignmentId: a.assignment_id, studentId: a.student_id, parameterId: a.parameter_id, correctValue: a.correct_value, correctUnit: a.correct_unit };
+          return this.normalizeSubmissionIds(formatted);
         });
       }
 
-      // Only push local assignments & students to Supabase Cloud if current user is faculty or admin
-      if (this.currentUser && (this.currentRole === 'faculty' || this.currentRole === 'admin')) {
-        this.purgeGhostAssignmentsFromSupabase();
-        await this.syncAllAssignmentsToSupabase();
-        await this.syncStudentsToSupabase();
+      // Process Assignment Templates
+      if (!tmplErr && tmplData && Array.isArray(tmplData)) {
+        this.data.assignmentTemplates = tmplData.map(t => ({
+          id: t.id, code: t.code, title: t.title, subjectCode: t.subject_code, questions: t.questions, rubricPresetId: t.rubric_preset_id, createdBy: t.created_by, createdAt: t.created_at
+        }));
       }
 
+      // Process Audit Logs
+      if (!auditErr && auditData && Array.isArray(auditData)) {
+        this.data.auditLogs = auditData;
+      }
+
+      this.lastSyncedAt = new Date();
       this.saveState();
       this.reconcileUserSession();
       this.ensureActiveAssignment();
       this.renderCurrentView();
     } catch (e) {
       console.warn('Supabase cloud sync background notice:', e);
-      this.showToast('Cloud sync failed — working in offline mode. Changes saved locally.', 'warning');
     }
   }
 
@@ -1022,9 +977,52 @@ class AppEngine {
     };
   }
 
+  async writeAudit(action, entityType, entityId, snapshot = {}) {
+    const entry = {
+      action: action,
+      entity_type: entityType,
+      entity_id: String(entityId || ''),
+      changed_by: this.currentUser ? this.currentUser.email : 'system',
+      changed_at: new Date().toISOString(),
+      snapshot: snapshot
+    };
+    if (!this.data.auditLogs) this.data.auditLogs = [];
+    this.data.auditLogs.unshift(entry);
+    if (this.data.auditLogs.length > 500) this.data.auditLogs.pop();
+
+    if (supabaseClient) {
+      try {
+        supabaseClient.from('audit_log').insert(entry).then(() => {}).catch(e => console.warn('Audit log write notice:', e));
+      } catch(e) {}
+    }
+  }
+
+  canFacultyEdit(asgId) {
+    if (!this.currentUser) return false;
+    if (this.currentRole === 'admin') return true;
+    if (this.currentRole !== 'faculty') return false;
+    const asg = (this.data.assignments || []).find(a => a.id === asgId || a.code === asgId);
+    if (!asg) return true;
+    return (asg.facultyId || '').trim().toLowerCase() === (this.currentUser.email || '').trim().toLowerCase();
+  }
+
+  sortTable(dataArray, key, dir = 'asc') {
+    if (!Array.isArray(dataArray)) return dataArray;
+    return [...dataArray].sort((a, b) => {
+      let valA = a[key] ?? '';
+      let valB = b[key] ?? '';
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+      if (valA < valB) return dir === 'asc' ? -1 : 1;
+      if (valA > valB) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
   switchRole(role) {
     this.currentRole = role;
     this.activeNav = 'dashboard';
+    window.location.hash = role === 'student' ? 'home' : 'dashboard';
     this.renderRoleSwitcher();
     this.renderSidebar();
     this.renderCurrentView();
@@ -1045,6 +1043,11 @@ class AppEngine {
     }
 
     this.activeNav = navId;
+    const hashTarget = (navId === 'dashboard' && this.currentRole === 'student') ? 'home' : navId;
+    if (window.location.hash.replace('#', '') !== hashTarget) {
+      window.location.hash = hashTarget;
+    }
+
     if (this.activeAssignmentId) {
       localStorage.setItem('rizvi_fe_active_asg_id', this.activeAssignmentId);
     }
@@ -1159,6 +1162,7 @@ class AppEngine {
       'assignments': 'file-text',
       'schedules': 'calendar',
       'csv-pipeline': 'zap',
+      'verify': 'check-circle-2',
       'reports': 'bar-chart-2',
       'solver': 'pencil',
       'grades': 'trophy',
@@ -1182,6 +1186,7 @@ class AppEngine {
         { id: 'assignments', label: 'Assignments' },
         { id: 'schedules', label: 'Schedule & Access' },
         { id: 'csv-pipeline', label: 'Grade & Evaluate' },
+        { id: 'verify', label: 'Verify Submissions' },
         { id: 'reports', label: 'Reports' }
       ];
     } else {
@@ -1192,7 +1197,7 @@ class AppEngine {
       ];
     }
 
-    sidebar.innerHTML = items.map(item => {
+    const itemsHtml = items.map(item => {
       const icon = iconMap[item.id] || 'circle';
       const isActive = this.activeNav === item.id;
       return `
@@ -1206,6 +1211,21 @@ class AppEngine {
         </div>
       `;
     }).join('');
+
+    const timeAgoStr = this.lastSyncedAt ? Math.max(0, Math.floor((new Date() - this.lastSyncedAt) / 60000)) + 'm ago' : 'Just now';
+    const footerHtml = `
+      <div style="margin-top:auto; padding:12px 8px; border-top:1px solid var(--sidebar-border); font-size:11px; color:var(--sidebar-text);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <span>Cloud Sync</span>
+          <span style="font-family:var(--font-mono);">${timeAgoStr}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="app.showSpinner('Refreshing data...'); app.syncWithSupabase().finally(() => app.hideSpinner())" style="width:100%; justify-content:center; font-size:11px; padding:4px;">
+          🔄 Refresh Data
+        </button>
+      </div>
+    `;
+
+    sidebar.innerHTML = itemsHtml + footerHtml;
 
     if (window.lucide) lucide.createIcons();
   }

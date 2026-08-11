@@ -595,5 +595,292 @@ const analyticsView = {
     link.click();
     link.remove();
     app.showToast(`Exported Master Class Gradebook for ${app.data.students.length} students`, 'success');
+  },
+
+  /* ==========================================================================
+     DRILL-DOWN REPORTS TAB (REPORTS A THROUGH E)
+     ========================================================================== */
+  activeReportType: 'reportA',
+
+  renderReportsTab(container) {
+    if (!this.activeReportType) this.activeReportType = 'reportA';
+
+    container.innerHTML = `
+      <div class="page-header-container">
+        <div>
+          <h1 class="page-title">Institutional Drill-Down Reports</h1>
+          <p class="page-subtitle">Generate & Export Custom Academic Reports A through E for Audit & Accreditation</p>
+        </div>
+        <button class="btn btn-primary" onclick="analyticsView.exportCurrentReportCSV()">
+          📥 Export Active Report CSV
+        </button>
+      </div>
+
+      <!-- Report Type & Filter Strip -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:16px; align-items:flex-end;">
+          <div class="filter-group">
+            <label>Select Report Type</label>
+            <select id="report-type-select" class="form-select" onchange="analyticsView.activeReportType = this.value; analyticsView.renderReportsTab(document.getElementById('main-content'));">
+              <option value="reportA" ${this.activeReportType === 'reportA' ? 'selected' : ''}>Report A: Subject Completion Matrix</option>
+              <option value="reportB" ${this.activeReportType === 'reportB' ? 'selected' : ''}>Report B: Parameter Accuracy Leaderboard</option>
+              <option value="reportC" ${this.activeReportType === 'reportC' ? 'selected' : ''}>Report C: Student Verification Roster</option>
+              <option value="reportD" ${this.activeReportType === 'reportD' ? 'selected' : ''}>Report D: CO/PO Attainment Summary</option>
+              <option value="reportE" ${this.activeReportType === 'reportE' ? 'selected' : ''}>Report E: System Audit Log Export</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label>Branch Filter</label>
+            <select id="report-branch-filter" class="form-select" onchange="analyticsView.renderReportTable()">
+              <option value="">All Branches</option>
+              ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label>Academic Year</label>
+            <select id="report-ay-filter" class="form-select" onchange="analyticsView.renderReportTable()">
+              <option value="2026-27">AY 2026-27</option>
+            </select>
+          </div>
+
+          <button class="btn btn-secondary" onclick="analyticsView.renderReportTable()">
+            ⚡ Run Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Report Output Container -->
+      <div class="card" id="report-output-card">
+        ${this.buildReportTableHTML()}
+      </div>
+    `;
+  },
+
+  renderReportTable() {
+    const card = document.getElementById('report-output-card');
+    if (card) card.innerHTML = this.buildReportTableHTML();
+  },
+
+  buildReportTableHTML() {
+    const branchFilter = document.getElementById('report-branch-filter')?.value || '';
+
+    switch(this.activeReportType) {
+      case 'reportA': {
+        // Report A: Subject Completion Matrix
+        const subjects = app.data.subjects || [];
+        return `
+          <h3 class="card-title" style="margin-bottom:12px;">Report A: Subject Completion Matrix</h3>
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Subject Code</th>
+                  <th>Subject Name</th>
+                  <th>Department</th>
+                  <th>Assignments Published</th>
+                  <th>Total Enrolled Students</th>
+                  <th>Total Submissions Logged</th>
+                  <th>Completion Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${subjects.map(s => {
+                  const dept = (app.data.departments || []).find(d => d.id === s.departmentId);
+                  const asgs = (app.data.assignments || []).filter(a => a.subjectId === s.id);
+                  const enrolled = branchFilter ? app.data.students.filter(st => st.branch === branchFilter) : app.data.students;
+                  const subs = app.data.submissions.filter(sub => asgs.some(a => a.id === sub.assignmentId) && (!branchFilter || enrolled.some(st => st.id === sub.studentId)));
+                  const rate = enrolled.length > 0 ? Math.round((new Set(subs.map(sb => sb.studentId)).size / enrolled.length) * 100) : 0;
+                  return `
+                    <tr>
+                      <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${s.code}</td>
+                      <td style="font-weight:600;">${s.fullName || s.name}</td>
+                      <td><span class="tag tag-co">${dept ? dept.shortName : 'FE'}</span></td>
+                      <td class="mono-val">${asgs.length}</td>
+                      <td class="mono-val">${enrolled.length}</td>
+                      <td class="mono-val">${subs.length}</td>
+                      <td><span class="tag ${rate >= 70 ? 'tag-success' : rate > 0 ? 'tag-warning' : 'tag-bt'}">${rate}%</span></td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      case 'reportB': {
+        // Report B: Parameter Accuracy Leaderboard
+        const allParams = (app.data.assignments || []).flatMap(a => (a.questions || []).flatMap(q => q.parameters || []));
+        return `
+          <h3 class="card-title" style="margin-bottom:12px;">Report B: Parameter Accuracy Leaderboard</h3>
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Parameter ID</th>
+                  <th>Parameter Label</th>
+                  <th>Value Marks</th>
+                  <th>Attempts Logged</th>
+                  <th>Average Score</th>
+                  <th>Accuracy Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allParams.map(p => {
+                  const subs = app.data.submissions.filter(s => s.parameterId === p.id);
+                  const totalEarned = subs.reduce((sum, s) => sum + (s.marksAwarded || 0), 0);
+                  const avgScore = subs.length > 0 ? (totalEarned / subs.length).toFixed(2) : 0;
+                  const correctCount = subs.filter(s => s.isCorrectValue).length;
+                  const accuracyRate = subs.length > 0 ? Math.round((correctCount / subs.length) * 100) : 0;
+                  return `
+                    <tr>
+                      <td class="mono-val" style="font-size:12px;">${p.id}</td>
+                      <td style="font-weight:600;">${p.label}</td>
+                      <td class="mono-val">${p.valueMarks || 4}</td>
+                      <td class="mono-val">${subs.length}</td>
+                      <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${avgScore}</td>
+                      <td><span class="tag ${accuracyRate >= 70 ? 'tag-success' : accuracyRate >= 40 ? 'tag-warning' : 'tag-danger'}">${accuracyRate}%</span></td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      case 'reportC': {
+        // Report C: Student Verification Roster
+        const enrolled = branchFilter ? app.data.students.filter(st => st.branch === branchFilter) : app.data.students;
+        return `
+          <h3 class="card-title" style="margin-bottom:12px;">Report C: Student Verification Roster</h3>
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>UIN</th>
+                  <th>Student Name</th>
+                  <th>Branch</th>
+                  <th>Batch</th>
+                  <th>Submissions Logged</th>
+                  <th>Verified Count</th>
+                  <th>Flagged Count</th>
+                  <th>Verification Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${enrolled.map(st => {
+                  const subs = app.data.submissions.filter(s => s.studentId === st.id);
+                  const verified = subs.filter(s => s.verificationStatus === 'Verified').length;
+                  const flagged = subs.filter(s => s.verificationStatus === 'Flagged').length;
+                  const status = subs.length === 0 ? 'No Attempts' : verified === subs.length ? 'Fully Verified' : flagged > 0 ? 'Flagged' : 'Pending Verification';
+                  return `
+                    <tr>
+                      <td class="mono-val">${st.uin}</td>
+                      <td style="font-weight:600;">${st.name}</td>
+                      <td><span class="tag tag-co">${st.branch}</span></td>
+                      <td><span class="tag tag-bt">Batch ${st.batch}</span></td>
+                      <td class="mono-val">${subs.length}</td>
+                      <td class="mono-val" style="color:var(--success); font-weight:700;">${verified}</td>
+                      <td class="mono-val" style="color:var(--danger); font-weight:700;">${flagged}</td>
+                      <td><span class="tag ${verified === subs.length && subs.length > 0 ? 'tag-success' : flagged > 0 ? 'tag-danger' : 'tag-warning'}">${status}</span></td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      case 'reportD': {
+        // Report D: CO/PO Attainment Summary
+        const cos = app.data.courseOutcomes || [];
+        return `
+          <h3 class="card-title" style="margin-bottom:12px;">Report D: CO/PO Attainment Summary</h3>
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Outcome Code</th>
+                  <th>Type</th>
+                  <th>Outcome Description</th>
+                  <th>Target Class Attainment %</th>
+                  <th>NBA Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${cos.map(co => `
+                  <tr>
+                    <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${co.code}</td>
+                    <td><span class="tag ${co.type === 'LO' ? 'tag-lo' : 'tag-co'}">${co.type || 'CO'}</span></td>
+                    <td style="font-size:13px;">${co.description}</td>
+                    <td class="mono-val" style="font-weight:700;">${app.data.attainmentSettings.classTargetPct}%</td>
+                    <td><span class="tag tag-success">✓ Active Outcome</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      case 'reportE':
+      default: {
+        // Report E: System Audit Log Export
+        const logs = app.data.auditLogs || [];
+        return `
+          <h3 class="card-title" style="margin-bottom:12px;">Report E: System Audit Log (${logs.length} entries)</h3>
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Entity Type</th>
+                  <th>Entity ID</th>
+                  <th>User Email</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${logs.map(l => `
+                  <tr>
+                    <td><span class="tag ${l.action === 'created' ? 'tag-success' : l.action === 'deleted' ? 'tag-danger' : 'tag-bt'}">${(l.action || 'updated').toUpperCase()}</span></td>
+                    <td style="font-weight:600;">${l.entity_type || '-'}</td>
+                    <td class="mono-val" style="font-size:12px;">${l.entity_id || '-'}</td>
+                    <td style="font-size:12px; color:var(--accent-blue);">${l.changed_by || 'system'}</td>
+                    <td class="mono-val" style="font-size:12px; color:var(--text-secondary);">${l.changed_at ? new Date(l.changed_at).toLocaleString() : '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+  },
+
+  exportCurrentReportCSV() {
+    const reportType = this.activeReportType || 'reportA';
+    app.showToast(`Exporting ${reportType.toUpperCase()} CSV...`, 'info');
+    if (reportType === 'reportE') {
+      const logs = app.data.auditLogs || [];
+      let csv = "Action,Entity Type,Entity ID,Changed By,Timestamp\n";
+      logs.forEach(l => {
+        csv += `"${l.action}","${l.entity_type}","${l.entity_id}","${l.changed_by}","${l.changed_at}"\n`;
+      });
+      const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Audit_Log_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } else {
+      this.exportCOAttainmentCSV();
+    }
   }
 };
+

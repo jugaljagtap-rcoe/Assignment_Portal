@@ -4,6 +4,11 @@
 
 const facultyView = {
   activeCSVAssignmentId: null,
+  activeVerifyAssignmentId: null,
+  gradingMode: 'bulk', // 'bulk' | 'queue' | 'roster'
+  queueStudentIndex: 0,
+  queueSelectedBatch: '',
+  asgTabMode: 'builder', // 'builder' | 'roster'
   tempModalParameters: [],
 
   render(container, activeNav) {
@@ -19,6 +24,9 @@ const facultyView = {
         break;
       case 'csv-pipeline':
         this.renderCSVPipeline(container);
+        break;
+      case 'verify':
+        this.renderVerificationLayer(container);
         break;
       case 'reports':
         analyticsView.render(container);
@@ -1955,9 +1963,18 @@ const facultyView = {
           <h1 class="page-title">Schedule & Access</h1>
           <p class="page-subtitle">Configure Publish Dates, Deadlines, Attempt Deductions, & Late Penalties</p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openAddScheduleModal('${asg.id}')">
-          + Add Batch Schedule
-        </button>
+        <div style="display:flex; gap:10px; align-items:center;">
+          ${asg.state === 'Locked' ? `
+            <span class="col-pill pill-locked" style="font-size:12px; padding:6px 14px;">🔒 Locked — Read Only</span>
+          ` : `
+            <button class="btn btn-secondary btn-sm" style="color:var(--purple); border-color:var(--purple);" onclick="facultyView.lockAssignment('${asg.id}')">
+              🔒 Lock & Finalize Assignment
+            </button>
+          `}
+          <button class="btn btn-primary btn-sm" onclick="facultyView.openAddScheduleModal('${asg.id}')">
+            + Add Batch Schedule
+          </button>
+        </div>
       </div>
 
       <div class="card" style="margin-bottom:24px; background:var(--warning-subtle); border-color:rgba(255,159,10,0.3);">
@@ -3042,5 +3059,304 @@ const facultyView = {
     app.closeModal();
     app.showToast(`Updated assignment details for ${asg.code}`, 'success');
     this.renderAssignmentBuilder(document.getElementById('main-content'));
+  },
+
+  /* ==========================================================================
+     VERIFICATION LAYER & THREE-MODE PIPELINE IMPLEMENTATIONS
+     ========================================================================== */
+
+  renderVerificationLayer(container) {
+    const assignments = (app.data.assignments || []).filter(a => {
+      if (app.currentRole === 'admin') return true;
+      return (a.facultyId || '').trim().toLowerCase() === (app.currentUser?.email || '').trim().toLowerCase();
+    });
+
+    if (assignments.length === 0) {
+      container.innerHTML = `
+        <div class="page-header-container">
+          <div>
+            <h1 class="page-title">Verify Submissions</h1>
+            <p class="page-subtitle">Second-person verification layer for student auto-graded submissions</p>
+          </div>
+        </div>
+        <div class="empty-state">
+          <div class="empty-state-emoji">🔍</div>
+          <div class="empty-state-title">No Assignments Found</div>
+          <div class="empty-state-subtitle">Build and publish lab assignments first to verify student submissions.</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (!this.activeVerifyAssignmentId) {
+      this.activeVerifyAssignmentId = assignments[0].id;
+    }
+
+    const asg = assignments.find(a => a.id === this.activeVerifyAssignmentId) || assignments[0];
+    const subs = app.data.submissions.filter(s => s.assignmentId === asg.id);
+
+    const totalSubs = subs.length;
+    const verifiedCount = subs.filter(s => s.verificationStatus === 'Verified').length;
+    const flaggedCount = subs.filter(s => s.verificationStatus === 'Flagged').length;
+    const pendingCount = subs.filter(s => (s.verificationStatus || 'Pending') === 'Pending').length;
+
+    container.innerHTML = `
+      <div class="page-header-container">
+        <div>
+          <h1 class="page-title">Verify Submissions</h1>
+          <p class="page-subtitle">Audit trail & manual verification for auto-graded student marks</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          ${app.currentRole === 'admin' ? `
+            <button class="btn btn-primary btn-sm" onclick="facultyView.verifyAllForAssignment('${asg.id}')">
+              ✅ Override & Verify All (${subs.length})
+            </button>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Assignment Selector & Stats Bar -->
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+          <div class="filter-group" style="min-width:280px;">
+            <label>Select Assignment to Verify</label>
+            <select class="form-select" onchange="facultyView.activeVerifyAssignmentId = this.value; facultyView.renderVerificationLayer(document.getElementById('main-content'));">
+              ${assignments.map(a => `<option value="${a.id}" ${a.id === asg.id ? 'selected' : ''}>${a.code}: ${a.title}</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="display:flex; gap:16px; align-items:center;">
+            <div class="roster-status-strip" style="margin-bottom:0;">
+              <span>🟢 Verified: <strong class="mono-val" style="color:var(--success);">${verifiedCount}</strong></span>
+              <span>🟡 Pending: <strong class="mono-val" style="color:var(--warning);">${pendingCount}</strong></span>
+              <span>🔴 Flagged: <strong class="mono-val" style="color:var(--danger);">${flaggedCount}</strong></span>
+              <span>Total: <strong class="mono-val">${totalSubs}</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submissions Verification Table -->
+      <div class="card">
+        ${subs.length === 0 ? `
+          <div class="empty-state">
+            <div class="empty-state-emoji">📥</div>
+            <div class="empty-state-title">No Submissions Found for ${asg.code}</div>
+            <div class="empty-state-subtitle">Once students submit or faculty uploads retroactive solution keys, submissions will appear here for verification.</div>
+          </div>
+        ` : `
+          <div class="table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th class="sortable">Student UIN</th>
+                  <th>Student Name</th>
+                  <th>Param ID</th>
+                  <th>Submitted Value</th>
+                  <th>Ground Truth</th>
+                  <th>Marks Awarded</th>
+                  <th>Status</th>
+                  <th>Verified By</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${subs.map(s => {
+                  const student = app.data.students.find(st => st.id === s.studentId);
+                  const ans = app.data.studentAnswers.find(a => a.studentId === s.studentId && a.parameterId === s.parameterId);
+                  const status = s.verificationStatus || 'Pending';
+                  
+                  return `
+                    <tr>
+                      <td class="mono-val">${student ? student.uin : s.studentId}</td>
+                      <td style="font-weight:500;">${student ? student.name : 'Student'}</td>
+                      <td class="mono-val" style="font-size:12px;">${s.parameterId}</td>
+                      <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${s.submittedValue} ${s.submittedUnit || ''}</td>
+                      <td class="mono-val" style="color:var(--text-secondary);">${ans ? ans.correctValue : '-'} ${ans ? (ans.correctUnit || '') : ''}</td>
+                      <td class="mono-val" style="font-weight:800; color:var(--success);">${s.marksAwarded}</td>
+                      <td>
+                        <span class="col-pill ${status === 'Verified' ? 'pill-verified' : status === 'Flagged' ? 'pill-flagged' : 'pill-pending'}">
+                          ${status}
+                        </span>
+                      </td>
+                      <td style="font-size:11px; color:var(--text-secondary);">${s.verifiedBy || '-'}</td>
+                      <td style="display:flex; gap:4px;">
+                        <button class="btn ${status === 'Verified' ? 'btn-secondary' : 'btn-primary'} btn-sm" style="padding:2px 8px; font-size:11px;" onclick="facultyView.toggleSubmissionVerification('${s.id}', 'Verified')">
+                          ${status === 'Verified' ? 'Unverify' : '✓ Verify'}
+                        </button>
+                        <button class="btn btn-destructive btn-sm" style="padding:2px 6px; font-size:11px;" onclick="facultyView.toggleSubmissionVerification('${s.id}', 'Flagged')">
+                          🚩 Flag
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+  },
+
+  async toggleSubmissionVerification(subId, newStatus) {
+    const sub = app.data.submissions.find(s => s.id === subId);
+    if (!sub) return;
+
+    if (sub.verificationStatus === newStatus && newStatus === 'Verified') {
+      sub.verificationStatus = 'Pending';
+      sub.verifiedBy = null;
+      sub.verifiedAt = null;
+    } else {
+      sub.verificationStatus = newStatus;
+      sub.verifiedBy = app.currentUser ? app.currentUser.email : 'faculty';
+      sub.verifiedAt = new Date().toISOString();
+    }
+
+    app.saveState();
+    await app.syncSubmissionToSupabase(sub);
+    app.writeAudit('verified', 'submission', sub.id, { status: sub.verificationStatus });
+
+    const asgSubs = app.data.submissions.filter(s => s.assignmentId === sub.assignmentId);
+    if (asgSubs.length > 0 && asgSubs.every(s => s.verificationStatus === 'Verified')) {
+      const asg = app.data.assignments.find(a => a.id === sub.assignmentId);
+      if (asg && asg.schedules) {
+        asg.schedules.forEach(sch => sch.gradesReleased = true);
+        await app.syncAssignmentToSupabase(asg);
+        app.showToast(`All submissions verified! Grades released to students for ${asg.code}.`, 'success');
+      }
+    }
+
+    this.renderVerificationLayer(document.getElementById('main-content'));
+  },
+
+  async verifyAllForAssignment(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    app.showSpinner('Verifying all submissions...');
+    const subs = app.data.submissions.filter(s => s.assignmentId === asg.id);
+    for (const sub of subs) {
+      sub.verificationStatus = 'Verified';
+      sub.verifiedBy = app.currentUser ? app.currentUser.email : 'admin';
+      sub.verifiedAt = new Date().toISOString();
+      await app.syncSubmissionToSupabase(sub);
+    }
+
+    if (asg.schedules) {
+      asg.schedules.forEach(sch => sch.gradesReleased = true);
+      await app.syncAssignmentToSupabase(asg);
+    }
+
+    app.saveState();
+    app.hideSpinner();
+    app.writeAudit('verify_all', 'assignment', asg.id, { totalVerified: subs.length });
+    app.showToast(`Successfully verified all ${subs.length} submissions and released grades!`, 'success');
+    this.renderVerificationLayer(document.getElementById('main-content'));
+  },
+
+  async lockAssignment(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    if (!asg.questions || asg.questions.length === 0) {
+      app.showToast('Cannot lock assignment: At least 1 question must be added', 'warning');
+      return;
+    }
+    if (!asg.schedules || asg.schedules.length === 0) {
+      app.showToast('Cannot lock assignment: Schedules must be configured', 'warning');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to Lock & Finalize ${asg.code}? Locked assignments are strictly Read-Only, close all student submissions, and auto-export the official Gazette Gradebook CSV.`)) return;
+
+    app.showSpinner('Locking assignment and exporting Gazette Gradebook...');
+
+    asg.state = 'Locked';
+    asg.schedules.forEach(s => {
+      s.submissionsOpen = false;
+      s.gradesReleased = true;
+    });
+
+    await app.syncAssignmentToSupabase(asg);
+    app.saveState();
+    app.writeAudit('locked', 'assignment', asg.id, { title: asg.title });
+
+    this.exportGazetteGradebookCSV(asg);
+
+    app.hideSpinner();
+    app.showToast(`Assignment ${asg.code} is now Locked & Finalized! Gazette CSV downloaded.`, 'success');
+    this.renderScheduleManager(document.getElementById('main-content'));
+  },
+
+  exportGazetteGradebookCSV(asg) {
+    const enrolledStudents = app.sortTable(app.data.students, 'uin', 'asc');
+    const allParams = (asg.questions || []).flatMap(q => q.parameters || []);
+
+    let csv = `Official Gazette Gradebook — ${asg.code}: ${asg.title}\n`;
+    csv += `UIN,Student Name,Branch,Division,Batch,${allParams.map(p => `"${p.label} (Max ${p.valueMarks})"`).join(',')},Total Marks,Verification Status\n`;
+
+    enrolledStudents.forEach(st => {
+      let total = 0;
+      const paramMarks = allParams.map(p => {
+        const sub = app.data.submissions.find(s => s.studentId === st.id && s.parameterId === p.id);
+        const m = sub ? sub.marksAwarded : 0;
+        total += m;
+        return m;
+      });
+
+      const stSubs = app.data.submissions.filter(s => s.studentId === st.id && s.assignmentId === asg.id);
+      const isVerified = stSubs.length > 0 && stSubs.every(s => s.verificationStatus === 'Verified');
+
+      csv += `"${st.uin}","${st.name}","${st.branch}","${st.division}","${st.batch}",${paramMarks.join(',')},${total.toFixed(2)},"${isVerified ? 'VERIFIED' : 'PENDING'}"\n`;
+    });
+
+    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csv);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Gazette_Gradebook_${asg.code}_Finalized.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+
+  async saveAssignmentAsTemplate(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const tmplId = `tmpl-${Date.now()}`;
+    const templateObj = {
+      id: tmplId,
+      code: asg.code,
+      title: asg.title,
+      subjectCode: asg.subjectId,
+      questions: asg.questions || [],
+      rubricPresetId: asg.rubricPresetId,
+      createdBy: app.currentUser ? app.currentUser.email : 'faculty',
+      createdAt: new Date().toISOString()
+    };
+
+    if (!app.data.assignmentTemplates) app.data.assignmentTemplates = [];
+    app.data.assignmentTemplates.push(templateObj);
+    app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('assignment_templates').upsert({
+          id: templateObj.id,
+          code: templateObj.code,
+          title: templateObj.title,
+          subject_code: templateObj.subjectCode,
+          questions: templateObj.questions,
+          rubric_preset_id: templateObj.rubricPresetId,
+          created_by: templateObj.createdBy,
+          created_at: templateObj.createdAt
+        });
+      } catch(e) { console.warn('Template save notice:', e); }
+    }
+
+    app.writeAudit('created_template', 'assignment_template', tmplId, { title: templateObj.title });
+    app.showToast(`Saved ${asg.code} as a reusable assignment template!`, 'success');
   }
 };
+

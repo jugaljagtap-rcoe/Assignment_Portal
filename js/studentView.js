@@ -353,6 +353,36 @@ const studentView = {
           <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
         </div>
 
+        <!-- Horizontal Scrollable Assignment Journey Timeline Pills -->
+        <div class="print-hide" style="margin-bottom:16px;">
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); display:block; margin-bottom:6px;">Assignment Journey Timeline</label>
+          <div class="timeline-pills-row">
+            ${studentAssignments.map(a => {
+              const isActive = asg && a.id === asg.id;
+              const aSubs = app.data.submissions.filter(s => s.studentId === student.id && s.assignmentId === a.id);
+              const aSch = app.getAssignmentSchedule(a.id, student.batch || 'A1');
+              
+              let label = 'Not Started';
+              let pillClass = '';
+              
+              if (aSubs.length > 0) {
+                const allVerified = aSubs.every(s => s.verificationStatus === 'Verified');
+                label = allVerified ? '✓ Graded' : 'Submitted';
+                pillClass = 'active';
+              } else if (aSch && !aSch.submissionsOpen) {
+                label = 'Closed';
+                pillClass = '';
+              }
+
+              return `
+                <div class="timeline-pill ${isActive ? 'active' : pillClass}" onclick="app.startAssignment('${a.id}');">
+                  ${a.code}: ${label}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
         <!-- Dynamic Batch Deadline & Policy Banner -->
         <div class="card print-hide" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -939,6 +969,9 @@ const studentView = {
         </div>
       </div>
 
+      <!-- Student Course Outcome (CO) Attainment Profile Cards -->
+      ${this.renderStudentCOAttainmentHTML(student, activeAsg)}
+
       <!-- Printable Footer Signature Block -->
       <div class="printable-footer" style="display:none; margin-top:40px; padding-top:20px; border-top:1px dashed #aaa; justify-content:space-between; font-size:12px;">
         <div style="text-align:center; width:200px;">
@@ -1023,5 +1056,70 @@ const studentView = {
       if (printableHeader) printableHeader.style.display = 'none';
       if (printableFooter) printableFooter.style.display = 'none';
     }, 1000);
+  },
+
+  renderStudentCOAttainmentHTML(student, activeAsg) {
+    const courseOutcomes = app.data.courseOutcomes || [];
+    if (courseOutcomes.length === 0 || !student) return '';
+
+    const paramMap = {};
+    (app.data.assignments || []).forEach(asg => {
+      (asg.questions || []).forEach(q => {
+        (q.parameters || []).forEach(p => {
+          paramMap[p.id] = { coId: q.coId || 'CO1', valueMarks: p.valueMarks || 4 };
+        });
+      });
+    });
+
+    const coAttainment = courseOutcomes.map(co => {
+      const relevantPids = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
+      let earned = 0;
+      let maxMarks = 0;
+
+      relevantPids.forEach(pid => {
+        maxMarks += (paramMap[pid].valueMarks || 4);
+        const sub = app.data.submissions.find(s => (s.studentId === student.id || s.studentId === student.uin) && s.parameterId === pid);
+        if (sub) earned += (sub.marksAwarded || 0);
+      });
+
+      const pct = maxMarks > 0 ? Math.round((earned / maxMarks) * 100) : 0;
+      const attained = pct >= (app.data.attainmentSettings?.studentThresholdPct || 60);
+
+      return { co, earned, maxMarks, pct, attained };
+    });
+
+    return `
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header" style="margin-bottom:16px;">
+          <div>
+            <h2 class="card-title">My Course Outcome (CO) Attainment Profile</h2>
+            <p class="card-subtitle">Personalized NBA Accreditation CO & LO Attainment Progress</p>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
+          ${coAttainment.map(ca => `
+            <div style="background:var(--bg-subtle); border:1px solid var(--border-default); border-radius:var(--radius-md); padding:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                <div>
+                  <span class="tag ${ca.co.type === 'LO' ? 'tag-lo' : 'tag-co'}" style="font-weight:700;">${ca.co.code}</span>
+                  <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-top:4px;">${ca.co.description}</div>
+                </div>
+                <span class="tag ${ca.attained ? 'tag-success' : 'tag-danger'}" style="font-size:11px;">
+                  ${ca.attained ? '✓ Attained' : '✕ Not Attained'}
+                </span>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-top:10px; margin-bottom:4px;">
+                <span>Score: <strong class="mono-val">${ca.earned.toFixed(1)} / ${ca.maxMarks}</strong></span>
+                <span class="mono-val" style="color:${ca.attained ? 'var(--success)' : 'var(--danger)'};">${ca.pct}%</span>
+              </div>
+              <div class="progress-bar-inline">
+                <div class="progress-bar-fill ${ca.attained ? 'success' : 'danger'}" style="width:${ca.pct}%;"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
 };

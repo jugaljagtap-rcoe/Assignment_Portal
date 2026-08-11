@@ -245,6 +245,10 @@ const INITIAL_DATA = {
 
   submissions: [],
 
+  auditLogs: [],
+
+  assignmentTemplates: [],
+
   attainmentSettings: {
     studentThresholdPct: 60,
     classTargetPct: 70

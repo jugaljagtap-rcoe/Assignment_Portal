@@ -37,66 +37,28 @@ const adminView = {
     const totalAssignments = app.data.assignments.length;
 
     const totalSubmissions = app.data.submissions.length;
-    const totalAssignmentsWithQuestions = app.data.assignments.filter(a => a.questions && a.questions.length > 0).length;
+    const pendingVerifications = app.data.submissions.filter(s => (s.verificationStatus || 'Pending') === 'Pending').length;
+    
+    // Assignment Lifecycle Breakdown
+    const draftCount = app.data.assignments.filter(a => a.state === 'Draft').length;
+    const publishedCount = app.data.assignments.filter(a => a.state === 'Published' || !a.state).length;
+    const lockedCount = app.data.assignments.filter(a => a.state === 'Locked').length;
+
     const studentsWithSubmissions = new Set(app.data.submissions.map(s => s.studentId)).size;
     const submissionRate = totalStudents > 0 ? Math.round((studentsWithSubmissions / totalStudents) * 100) : 0;
 
-    // Department-wise assignment count
-    const deptAssignmentCounts = app.data.departments.map(d => {
-      const deptSubjects = app.data.subjects.filter(s => s.departmentId === d.id);
-      const deptSubjectIds = deptSubjects.map(s => s.id);
-      const deptAssignments = app.data.assignments.filter(a => deptSubjectIds.includes(a.subjectId));
-      const deptSubmissions = app.data.submissions.filter(sub => 
-        deptAssignments.some(a => a.id === sub.assignmentId)
-      );
-      return {
-        dept: d,
-        assignmentCount: deptAssignments.length,
-        submissionCount: deptSubmissions.length
-      };
+    // Branch Progress Stats
+    const branchStats = HARDCODED_BRANCHES.map(bName => {
+      const branchStudents = app.data.students.filter(s => s.branch === bName);
+      const totalB = branchStudents.length;
+      const submittedB = new Set(
+        app.data.submissions.filter(sub => branchStudents.some(st => st.id === sub.studentId)).map(s => s.studentId)
+      ).size;
+      const rate = totalB > 0 ? Math.round((submittedB / totalB) * 100) : 0;
+      return { branch: bName, total: totalB, submitted: submittedB, rate: rate };
     });
 
-    // CO attainment summary across all defined outcomes
-    const paramMap = {};
-    app.data.assignments.forEach(asg => {
-      (asg.questions || []).forEach(q => {
-        (q.parameters || []).forEach(p => {
-          paramMap[p.id] = { coId: q.coId, valueMarks: p.valueMarks || 4 };
-        });
-      });
-    });
-
-    const courseOutcomes = app.data.courseOutcomes || [];
-    const classTarget = app.data.attainmentSettings.classTargetPct;
-
-    const coSummary = courseOutcomes.map(co => {
-      const relevantParamIds = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
-      const maxMarksForCO = relevantParamIds.reduce((sum, pid) => sum + (paramMap[pid].valueMarks || 4), 0);
-      let passingStudents = 0;
-
-      app.data.students.forEach(st => {
-        let earned = 0;
-        relevantParamIds.forEach(pid => {
-          const attempts = app.data.submissions.filter(s => s.studentId === st.id && s.parameterId === pid);
-          if (attempts.length === 0) return;
-          const best = attempts.reduce((b, s) => (s.marksAwarded || 0) > (b.marksAwarded || 0) ? s : b, attempts[0]);
-          earned += (best.marksAwarded || 0);
-        });
-        const pct = maxMarksForCO > 0 ? (earned / maxMarksForCO * 100) : 0;
-        if (pct >= app.data.attainmentSettings.studentThresholdPct) passingStudents++;
-      });
-
-      const attainmentPct = totalStudents > 0 ? Math.round((passingStudents / totalStudents) * 100) : 0;
-      return {
-        co: co,
-        attainmentPct: attainmentPct,
-        targetMet: attainmentPct >= classTarget,
-        passingStudents: passingStudents
-      };
-    });
-
-    const cosMeetingTarget = coSummary.filter(c => c.targetMet).length;
-    const cosTotal = coSummary.length;
+    const recentAudits = (app.data.auditLogs || []).slice(0, 5);
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -105,13 +67,13 @@ const adminView = {
           <p class="page-subtitle">Rizvi College of Engineering — Academic & Accreditation Overview</p>
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="btn btn-secondary btn-sm" onclick="app.switchNav('google-auth')">🔑 Google Auth Settings</button>
+          <button class="btn btn-secondary btn-sm" onclick="app.switchNav('google-auth')">🔑 Audit Logs & Access</button>
           <button class="btn btn-secondary btn-sm" onclick="adminView.openAttainmentModal()">⚙️ CO Thresholds</button>
           <button class="btn btn-secondary btn-sm" onclick="app.resetState()">🔄 Reset Database</button>
         </div>
       </div>
 
-      <!-- Row 1: Core Institutional KPIs -->
+      <!-- Row 1: Key Performance Indicators -->
       <div class="kpi-grid">
         <div class="kpi-card">
           <span class="kpi-label">Total FE Roster</span>
@@ -119,16 +81,16 @@ const adminView = {
           <span class="kpi-trend positive">Across ${HARDCODED_BRANCHES.length} Branches</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Active Lab Faculty</span>
-          <span class="kpi-value">${totalFaculty}</span>
-          <span class="kpi-trend neutral">Cross-Department</span>
+          <span class="kpi-label">Pending Verifications</span>
+          <span class="kpi-value" style="color:${pendingVerifications > 0 ? 'var(--warning)' : 'var(--success)'};">${pendingVerifications}</span>
+          <span class="kpi-trend ${pendingVerifications > 0 ? 'negative' : 'positive'}">
+            ${pendingVerifications > 0 ? 'Awaiting Faculty Sign-off' : 'All Verified'}
+          </span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Lab Assignments Published</span>
-          <span class="kpi-value">${totalAssignments}</span>
-          <span class="kpi-trend ${totalAssignmentsWithQuestions > 0 ? 'positive' : 'neutral'}">
-            ${totalAssignmentsWithQuestions} With Questions Built
-          </span>
+          <span class="kpi-label">Assignments Published</span>
+          <span class="kpi-value">${publishedCount}</span>
+          <span class="kpi-trend neutral">${draftCount} Drafts · ${lockedCount} Locked</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Student Submission Rate</span>
@@ -141,205 +103,161 @@ const adminView = {
         </div>
       </div>
 
-      <!-- Row 2: CO Attainment Summary -->
-      <div class="kpi-grid" style="margin-top:16px;">
-        <div class="kpi-card">
-          <span class="kpi-label">Total Outcomes Defined</span>
-          <span class="kpi-value">${cosTotal}</span>
-          <span class="kpi-trend neutral">CO + LO Combined</span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi-label">COs Meeting Target</span>
-          <span class="kpi-value" style="color:${cosTotal > 0 && cosMeetingTarget === cosTotal ? 'var(--success)' : cosMeetingTarget > 0 ? 'var(--warning)' : 'var(--danger)'};">
-            ${cosMeetingTarget} / ${cosTotal}
-          </span>
-          <span class="kpi-trend ${cosMeetingTarget === cosTotal && cosTotal > 0 ? 'positive' : 'neutral'}">
-            Target: ≥ ${classTarget}% Class Attainment
-          </span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Student CO Threshold</span>
-          <span class="kpi-value">${app.data.attainmentSettings.studentThresholdPct}%</span>
-          <span class="kpi-trend neutral">Min Score to Attain CO</span>
-        </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Total Submissions Logged</span>
-          <span class="kpi-value">${totalSubmissions}</span>
-          <span class="kpi-trend neutral">Parameter-Level Attempts</span>
-        </div>
-      </div>
-
-      <!-- CO Attainment Settings Card -->
-      <div class="card" style="margin-top:24px;">
+      <!-- Row 2: Assignment Lifecycle State breakdown -->
+      <div class="card" style="margin-top:20px;">
         <div class="card-header">
           <div>
-            <h2 class="card-title">College CO Attainment Thresholds</h2>
-            <p class="card-subtitle">Global NBA accreditation parameters — faculty can override per subject</p>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="adminView.openAttainmentModal()">Edit Thresholds</button>
-        </div>
-        <div style="display:flex; gap:40px; margin-top:12px;">
-          <div>
-            <span style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Student Score Target</span>
-            <div style="font-size:24px; font-weight:700; color:var(--accent-blue);">${app.data.attainmentSettings.studentThresholdPct}%</div>
-            <span style="font-size:12px; color:var(--text-secondary);">Minimum score for a student to attain a CO</span>
-          </div>
-          <div>
-            <span style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Class Attainment Target</span>
-            <div style="font-size:24px; font-weight:700; color:var(--success);">${app.data.attainmentSettings.classTargetPct}%</div>
-            <span style="font-size:12px; color:var(--text-secondary);">% of students required for class-level CO attainment</span>
+            <h2 class="card-title">Assignment Lifecycle Overview</h2>
+            <p class="card-subtitle">Draft → Published → Locked terminal state tracking</p>
           </div>
         </div>
-      </div>
-
-      <!-- Department-wise Breakdown -->
-      <div class="card" style="margin-top:24px;">
-        <div class="card-header" style="margin-bottom:16px;">
-          <div>
-            <h2 class="card-title">Department-wise Assignment & Submission Breakdown</h2>
-            <p class="card-subtitle">Activity summary per department for Academic Year 2026-27</p>
-          </div>
-        </div>
-        <div class="table-container">
-          <table class="custom-table">
-            <thead>
-              <tr>
-                <th>Department</th>
-                <th>Short Code</th>
-                <th>Subjects Defined</th>
-                <th>Assignments Published</th>
-                <th>Total Submissions</th>
-                <th>Activity Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${deptAssignmentCounts.map(d => `
-                <tr>
-                  <td style="font-weight:600;">${d.dept.name}</td>
-                  <td><span class="tag tag-co">${d.dept.shortName}</span></td>
-                  <td style="font-family:var(--font-mono); font-weight:700;">
-                    ${app.data.subjects.filter(s => s.departmentId === d.dept.id).length}
-                  </td>
-                  <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">
-                    ${d.assignmentCount}
-                  </td>
-                  <td style="font-family:var(--font-mono); font-weight:700;">
-                    ${d.submissionCount}
-                  </td>
-                  <td>
-                    <span class="tag ${d.assignmentCount > 0 && d.submissionCount > 0 ? 'tag-success' : d.assignmentCount > 0 ? 'tag-warning' : 'tag-bt'}">
-                      ${d.assignmentCount === 0 ? 'No Assignments' : d.submissionCount === 0 ? 'No Submissions Yet' : 'Active'}
-                    </span>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- CO Attainment Summary Table -->
-      ${cosTotal > 0 ? `
-        <div class="card" style="margin-top:24px;">
-          <div class="card-header" style="margin-bottom:16px;">
-            <div>
-              <h2 class="card-title">College-Wide CO Attainment Summary</h2>
-              <p class="card-subtitle">NBA accreditation attainment status across all defined outcomes</p>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px;">
+          <div style="padding:14px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="col-pill pill-draft">Draft</span>
+              <strong style="font-size:20px;">${draftCount}</strong>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="app.switchNav('reports')">
-              📊 Full Attainment Report
-            </button>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Faculty editing — hidden from students</div>
           </div>
+          <div style="padding:14px; background:var(--success-subtle); border-radius:var(--radius-md); border:1px solid var(--success);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="col-pill pill-published">Published</span>
+              <strong style="font-size:20px; color:var(--success);">${publishedCount}</strong>
+            </div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Active for student submissions</div>
+          </div>
+          <div style="padding:14px; background:var(--purple-subtle); border-radius:var(--radius-md); border:1px solid var(--purple);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="col-pill pill-locked">Locked</span>
+              <strong style="font-size:20px; color:var(--purple);">${lockedCount}</strong>
+            </div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Finalized & auto-exported to Gazette</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Branch Submission Rates with Animated Progress Bars -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Branch-wise Submission Progress</h2>
+            <p class="card-subtitle">Live participation rate across all 5 engineering departments</p>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          ${branchStats.map(bs => `
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-bottom:4px;">
+                <span>${bs.branch}</span>
+                <span class="mono-val">${bs.submitted} / ${bs.total} (${bs.rate}%)</span>
+              </div>
+              <div class="progress-bar-inline">
+                <div class="progress-bar-fill ${bs.rate >= 70 ? 'success' : bs.rate >= 40 ? 'warning' : 'danger'}" style="width:${bs.rate}%;"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Row 4: Recent Activity Audit Trail Strip -->
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Recent System Activity (Audit Trail)</h2>
+            <p class="card-subtitle">Last 5 administrative and faculty data mutations</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="app.switchNav('google-auth')">View Full Audit Log →</button>
+        </div>
+        ${recentAudits.length === 0 ? `
+          <div class="empty-state" style="padding:20px;">
+            <div class="empty-state-emoji">📜</div>
+            <div class="empty-state-title">No Audit Events Logged Yet</div>
+            <div class="empty-state-subtitle">Mutation logs will appear here automatically as changes occur.</div>
+          </div>
+        ` : `
           <div class="table-container">
             <table class="custom-table">
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th>Outcome Code</th>
-                  <th>Description</th>
-                  <th>Students Attaining</th>
-                  <th>Class Attainment %</th>
-                  <th>NBA Status</th>
+                  <th>Action</th>
+                  <th>Entity Type</th>
+                  <th>Entity ID</th>
+                  <th>User</th>
+                  <th>Timestamp</th>
                 </tr>
               </thead>
               <tbody>
-                ${coSummary.map(cs => `
+                ${recentAudits.map(a => `
                   <tr>
-                    <td>
-                      <span class="tag ${cs.co.type === 'LO' ? 'tag-lo' : 'tag-co'}">
-                        ${cs.co.type || 'CO'}
-                      </span>
-                    </td>
-                    <td style="font-weight:700; font-family:var(--font-mono); color:var(--accent-blue);">${cs.co.code}</td>
-                    <td style="font-size:13px;">${cs.co.description}</td>
-                    <td style="font-weight:700;">
-                      ${cs.passingStudents} / ${totalStudents}
-                    </td>
-                    <td style="font-weight:700; font-size:15px; color:${cs.targetMet ? 'var(--success)' : 'var(--danger)'};">
-                      ${cs.attainmentPct}%
-                    </td>
-                    <td>
-                      <span class="tag ${cs.targetMet ? 'tag-success' : 'tag-danger'}">
-                        ${cs.targetMet ? '✓ NBA Target Met' : '✕ Target Not Met'}
-                      </span>
-                    </td>
+                    <td><span class="tag ${a.action === 'created' ? 'tag-success' : a.action === 'deleted' ? 'tag-danger' : 'tag-bt'}">${(a.action || 'updated').toUpperCase()}</span></td>
+                    <td style="font-weight:600;">${a.entity_type || '-'}</td>
+                    <td class="mono-val" style="font-size:12px;">${a.entity_id || '-'}</td>
+                    <td style="font-size:12px; color:var(--accent-blue);">${a.changed_by || 'system'}</td>
+                    <td class="mono-val" style="font-size:12px; color:var(--text-secondary);">${a.changed_at ? new Date(a.changed_at).toLocaleString() : '-'}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           </div>
-        </div>
-      ` : `
-        <div class="card" style="margin-top:24px; text-align:center; padding:32px;">
-          <div style="font-size:40px; margin-bottom:12px;">🎯</div>
-          <h3 style="font-size:16px; font-weight:700; margin-bottom:8px;">No Course Outcomes Defined Yet</h3>
-          <p style="color:var(--text-secondary); font-size:13px; max-width:480px; margin:0 auto;">
-            Faculty must define Course Outcomes (COs) and Lab Outcomes (LOs) under the 
-            Faculty Portal → Course Outcomes & Modules section before CO attainment data 
-            can appear here.
-          </p>
-        </div>
-      `}
+        `}
+      </div>
     `;
   },
 
   renderGoogleAuthSettings(container) {
+    const logs = app.data.auditLogs || [];
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Strict Google Auth & Whitelist Enforcement</h1>
-          <p class="page-subtitle">Configure <code>@eng.rizvi.edu.in</code> Domain Authentication & Strict Pre-Enrolled Role Resolution</p>
+          <h1 class="page-title">Access Control & Audit Trail Log</h1>
+          <p class="page-subtitle">Configure <code>@eng.rizvi.edu.in</code> Domain Whitelist & Inspect System Audit Trail</p>
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
-        <h3 class="card-title" style="color:var(--accent-blue);">🔒 Whitelist Enforcement Policy (Strict Access Control)</h3>
-        <p style="font-size:13px; color:var(--text-primary); margin-top:4px;">
-          Even if an email address belongs to <code>@eng.rizvi.edu.in</code>, <strong>login is strictly denied</strong> if the email is not explicitly listed in the Admin Roster, Faculty Roster, or Student Master CSV Roster. No unlisted accounts can log in!
-        </p>
-      </div>
-
-      <!-- Hardcoded Admin Roster Table -->
+      <!-- Audit Log Viewer Table -->
       <div class="card" style="margin-bottom:24px;">
-        <h3 class="card-title" style="margin-bottom:12px;">Hardcoded Institutional Dual Admin & Faculty Account</h3>
-        <div class="table-container">
-          <table class="custom-table">
-            <thead>
-              <tr>
-                <th>Email Address</th>
-                <th>Institutional Designation</th>
-                <th>System Access Level</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">jugaljagtap@eng.rizvi.edu.in</td>
-                <td style="font-weight:600;">Prof. Jugal Jagtap (Dual Admin & Faculty)</td>
-                <td><span class="tag tag-danger">Dual Admin & Faculty (Profile Switcher Enabled)</span></td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">System Audit Log (${logs.length} entries)</h2>
+            <p class="card-subtitle">Full immutable activity record across all database mutations</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="adminView.renderGoogleAuthSettings(document.getElementById('main-content'))">🔄 Refresh Log</button>
         </div>
+
+        ${logs.length === 0 ? `
+          <div class="empty-state">
+            <div class="empty-state-emoji">📋</div>
+            <div class="empty-state-title">No Audit Logs Recorded Yet</div>
+            <div class="empty-state-subtitle">Every data creation, edit, or deletion operation will be recorded here automatically with user email and timestamp.</div>
+          </div>
+        ` : `
+          <div class="table-container" style="max-height:450px; overflow-y:auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Entity Type</th>
+                  <th>Entity ID</th>
+                  <th>User Email</th>
+                  <th>Timestamp</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${logs.map(l => `
+                  <tr>
+                    <td><span class="tag ${l.action === 'created' ? 'tag-success' : l.action === 'deleted' ? 'tag-danger' : 'tag-bt'}">${(l.action || 'updated').toUpperCase()}</span></td>
+                    <td style="font-weight:600;">${l.entity_type || '-'}</td>
+                    <td class="mono-val" style="font-size:12px;">${l.entity_id || '-'}</td>
+                    <td style="font-size:12px; color:var(--accent-blue);">${l.changed_by || 'system'}</td>
+                    <td class="mono-val" style="font-size:12px; color:var(--text-secondary);">${l.changed_at ? new Date(l.changed_at).toLocaleString() : '-'}</td>
+                    <td><span class="mono-val" style="font-size:11px; color:var(--text-tertiary);">${JSON.stringify(l.snapshot || {}).slice(0, 40)}...</span></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
       </div>
 
       <!-- Test Email Whitelist Simulator Sandbox -->
@@ -353,33 +271,6 @@ const adminView = {
         </div>
 
         <div id="google-sim-result" style="margin-top:14px;"></div>
-      </div>
-
-      <!-- Strategy Explanation Cards -->
-      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:20px;">
-        <div class="card">
-          <span class="tag tag-danger" style="margin-bottom:8px;">1. HARDCODED ADMIN & FACULTY</span>
-          <h4 style="font-size:15px; margin-bottom:6px;">Dual-Role Master Account</h4>
-          <p style="font-size:12px; color:var(--text-secondary);">
-            Hardcoded account <code>jugaljagtap@eng.rizvi.edu.in</code> gains immediate Dual Admin & Faculty access with profile toggle.
-          </p>
-        </div>
-
-        <div class="card">
-          <span class="tag tag-co" style="margin-bottom:8px;">2. FACULTY ROSTER</span>
-          <h4 style="font-size:15px; margin-bottom:6px;">Pre-Enrolled Faculty</h4>
-          <p style="font-size:12px; color:var(--text-secondary);">
-            Faculty members listed in the Faculty Roster get access to build assignments and manage lab schedules.
-          </p>
-        </div>
-
-        <div class="card">
-          <span class="tag tag-bt" style="margin-bottom:8px;">3. STUDENT MASTER</span>
-          <h4 style="font-size:15px; margin-bottom:6px;">Student Master CSV Roster</h4>
-          <p style="font-size:12px; color:var(--text-secondary);">
-            Students pre-imported via CSV (matching <code>uin@eng.rizvi.edu.in</code>) get access to their personalized Canvas Sheets.
-          </p>
-        </div>
       </div>
     `;
   },
@@ -529,12 +420,168 @@ const adminView = {
         <td><span class="tag tag-bt">Div ${s.division}</span></td>
         <td><span class="tag tag-bt">Batch ${s.batch}</span></td>
         <td style="display:flex; gap:6px;">
+          <button class="btn btn-primary btn-sm" onclick="adminView.openStudentProfileModal('${s.id}')">👤 Profile</button>
           <button class="btn btn-ghost btn-sm" onclick="adminView.openEditStudentModal('${s.id}')">✏️ Edit</button>
           <button class="btn btn-ghost btn-sm" onclick="app.setActiveStudent('${s.id}'); app.switchRole('student');">Preview Canvas</button>
           <button class="btn btn-secondary btn-sm" style="padding:4px 8px; font-size:11px; color:var(--danger);" onclick="adminView.deleteStudent('${s.id}')">🗑️ Delete</button>
         </td>
       </tr>
     `).join('');
+  },
+
+  openStudentProfileModal(studentId) {
+    const s = app.data.students.find(st => st.id === studentId);
+    if (!s) return;
+
+    const studentSubmissions = app.data.submissions.filter(sub => sub.studentId === s.id);
+    const studentAssignments = app.data.assignments;
+
+    const totalAssignments = studentAssignments.length;
+    const touchedAssignments = new Set(studentSubmissions.map(sub => sub.assignmentId)).size;
+    const submissionRate = totalAssignments > 0 ? Math.round((touchedAssignments / totalAssignments) * 100) : 0;
+
+    let totalEarned = 0;
+    let totalPossible = 0;
+    studentSubmissions.forEach(sub => {
+      totalEarned += (sub.marksAwarded || 0);
+    });
+
+    studentAssignments.forEach(asg => {
+      (asg.questions || []).forEach(q => {
+        (q.parameters || []).forEach(p => {
+          totalPossible += (p.valueMarks || 4);
+        });
+      });
+    });
+
+    const activeAsg = studentAssignments[0] || null;
+
+    app.showModal(`🎓 Academic Profile: ${s.name}`, `
+      <div style="display:flex; flex-direction:column; gap:16px; min-width:540px;">
+        <!-- Top Student Card -->
+        <div class="card" style="background:var(--bg-subtle); border-color:var(--border-strong); padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <h2 style="font-size:18px; font-weight:800; color:var(--text-primary); margin-bottom:2px;">${s.name}</h2>
+              <div style="font-size:12px; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; margin-top:4px;">
+                <span>UIN: <strong class="mono-val">${s.uin}</strong></span>
+                <span>Email: <strong style="color:var(--accent-blue);">${s.email || `${s.uin}@eng.rizvi.edu.in`}</strong></span>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <span class="tag tag-co">${s.yearOfStudy || 'FE'}</span>
+                <span class="tag tag-co">${s.branch}</span>
+                <span class="tag tag-bt">Div ${s.division}</span>
+                <span class="tag tag-bt">Batch ${s.batch}</span>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:24px; font-weight:800; color:var(--accent-blue);">${totalEarned.toFixed(1)} / ${totalPossible}</div>
+              <div style="font-size:11px; font-weight:700; color:var(--text-tertiary); text-transform:uppercase;">Total Marks Earned</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overall Performance Row -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+          <div class="stat-card-clean">
+            <span class="num">${submissionRate}%</span>
+            <span class="lbl">Submission Rate (${touchedAssignments}/${totalAssignments})</span>
+          </div>
+          <div class="stat-card-clean">
+            <span class="num">${studentSubmissions.length}</span>
+            <span class="lbl">Parameters Submitted</span>
+          </div>
+          <div class="stat-card-clean">
+            <span class="num" style="color:var(--success);">${studentSubmissions.filter(sub => sub.verificationStatus === 'Verified').length}</span>
+            <span class="lbl">Verified Submissions</span>
+          </div>
+        </div>
+
+        <!-- Assignment Journey Timeline -->
+        <div>
+          <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); display:block; margin-bottom:6px;">Assignment Journey Timeline</label>
+          <div class="timeline-pills-row">
+            ${studentAssignments.map(asg => {
+              const asgSubs = studentSubmissions.filter(sub => sub.assignmentId === asg.id);
+              let statusLabel = 'Not Started';
+              let pillClass = '';
+              if (asgSubs.length > 0) {
+                const allVerified = asgSubs.every(sub => sub.verificationStatus === 'Verified');
+                statusLabel = allVerified ? '✓ Graded' : 'Submitted';
+                pillClass = 'active';
+              }
+              return `
+                <div class="timeline-pill ${pillClass}" onclick="adminView.renderStudentAsgDetailModal('${s.id}', '${asg.id}')">
+                  ${asg.code}: ${statusLabel}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div id="student-modal-asg-detail">
+          ${activeAsg ? this.getStudentAsgDetailHtml(s, activeAsg) : '<div class="empty-state">No assignments available.</div>'}
+        </div>
+      </div>
+    `);
+  },
+
+  renderStudentAsgDetailModal(studentId, asgId) {
+    const s = app.data.students.find(st => st.id === studentId);
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    const container = document.getElementById('student-modal-asg-detail');
+    if (s && asg && container) {
+      container.innerHTML = this.getStudentAsgDetailHtml(s, asg);
+    }
+  },
+
+  getStudentAsgDetailHtml(student, assignment) {
+    const subs = app.data.submissions.filter(sub => sub.studentId === student.id && sub.assignmentId === assignment.id);
+    let totalMarks = 0;
+    subs.forEach(s => totalMarks += (s.marksAwarded || 0));
+
+    return `
+      <div class="card" style="padding:14px; background:var(--bg-surface);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div>
+            <strong style="font-size:14px;">${assignment.code}: ${assignment.title}</strong>
+            <div style="font-size:12px; color:var(--text-secondary);">${assignment.className || 'FE'} | ${subs.length} parameter responses</div>
+          </div>
+          <div style="font-size:16px; font-weight:800; color:var(--accent-blue);">${totalMarks.toFixed(1)} Marks</div>
+        </div>
+
+        ${subs.length === 0 ? `
+          <div class="empty-state" style="padding:20px;">
+            <div class="empty-state-emoji">⏳</div>
+            <div class="empty-state-title">No Submissions Logged</div>
+            <div class="empty-state-subtitle">Student has not attempted parameters for this assignment yet.</div>
+          </div>
+        ` : `
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Param ID</th>
+                <th>Submitted Value</th>
+                <th>Unit</th>
+                <th>Marks</th>
+                <th>Verification</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${subs.map(sub => `
+                <tr>
+                  <td class="mono-val">${sub.parameterId}</td>
+                  <td class="mono-val" style="font-weight:700;">${sub.submittedValue}</td>
+                  <td><span class="tag tag-co">${sub.submittedUnit || '-'}</span></td>
+                  <td style="font-weight:700; color:var(--success);">${sub.marksAwarded}</td>
+                  <td><span class="tag ${sub.verificationStatus === 'Verified' ? 'tag-success' : 'tag-warning'}">${sub.verificationStatus || 'Pending'}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `}
+      </div>
+    `;
   },
 
   deleteStudent(id) {
