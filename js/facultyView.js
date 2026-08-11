@@ -705,7 +705,7 @@ const facultyView = {
     );
 
     const strengthVal = val ? parseInt(val) : null;
-    const deterministicCoPoId = `copo-${coId}-${targetPoCode.toLowerCase()}`;
+    const deterministicCoPoId = `copo-${coId}-${targetPoCode}`.toLowerCase();
     const mapRecord = {
       id: existingIdx >= 0 ? app.data.coPOMapping[existingIdx].id : deterministicCoPoId,
       co_id: coId,

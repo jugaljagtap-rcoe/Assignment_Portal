@@ -216,8 +216,20 @@ class AppEngine {
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
       if (coPoRes && coPoRes.data) this.data.coPOMapping = coPoRes.data;
 
+      // Deduplicate before persisting — this also cleans Supabase of stale duplicates
+      await this.cleanDuplicateModules();
+      await this.cleanDuplicateCourseOutcomes();
+
+      // Only migrate from localStorage when Supabase tables are genuinely empty
       if (!localStorage.getItem('rizvi_supabase_migrated_v2')) {
-        await this.migrateLocalStorageToSupabase();
+        const hasSupabaseModules = (this.data.modules || []).length > 0;
+        const hasSupabaseCOs = (this.data.courseOutcomes || []).length > 0;
+        if (hasSupabaseModules || hasSupabaseCOs) {
+          // Supabase already has data — skip migration, just mark complete
+          localStorage.setItem('rizvi_supabase_migrated_v2', '1');
+        } else {
+          await this.migrateLocalStorageToSupabase();
+        }
       }
 
       this.lastSyncedAt = new Date();
@@ -228,27 +240,71 @@ class AppEngine {
     }
   }
 
-  cleanDuplicateModules() {
+  async cleanDuplicateModules() {
     const modules = this.data.modules || [];
     const grouped = {};
     modules.forEach(m => {
-      const code = (m.code || m.module_code || m.id || '').trim();
-      if (!grouped[code]) grouped[code] = [];
-      grouped[code].push(m);
+      // Normalize key: lowercase code + subject_id for deduplication
+      const code = (m.code || m.module_code || m.id || '').trim().toLowerCase();
+      const subId = (m.subject_id || m.subjectId || '').toLowerCase();
+      const key = `${code}__${subId}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(m);
     });
 
     const cleaned = [];
+    const toDelete = [];
     Object.values(grouped).forEach(group => {
       if (group.length === 1) {
         cleaned.push(group[0]);
       } else {
-        const preferred = group.find(m => (m.subjectId || m.subject_id) === 'sub-24051181') || group[0];
+        // Prefer the record whose ID is already lowercase (canonical form)
+        const preferred = group.find(m => m.id === (m.id || '').toLowerCase()) || group[0];
         cleaned.push(preferred);
+        group.forEach(m => { if (m !== preferred) toDelete.push(m.id); });
       }
     });
 
+    // Delete duplicate records from Supabase
+    for (const dupId of toDelete) {
+      await this.supabaseDelete('modules', dupId, `duplicate module ${dupId}`);
+    }
+
     this.data.modules = cleaned;
-    this.saveState();
+    return cleaned;
+  }
+
+  async cleanDuplicateCourseOutcomes() {
+    const cos = this.data.courseOutcomes || [];
+    const grouped = {};
+    cos.forEach(co => {
+      // Normalize key: lowercase code + subject_id for deduplication
+      const code = (co.code || co.id || '').trim().toLowerCase();
+      const subId = (co.subject_id || co.subjectId || '').toLowerCase();
+      const key = `${code}__${subId}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(co);
+    });
+
+    const cleaned = [];
+    const toDelete = [];
+    Object.values(grouped).forEach(group => {
+      if (group.length === 1) {
+        cleaned.push(group[0]);
+      } else {
+        // Prefer the record whose ID is already lowercase (canonical form)
+        const preferred = group.find(co => co.id === (co.id || '').toLowerCase()) || group[0];
+        cleaned.push(preferred);
+        group.forEach(co => { if (co !== preferred) toDelete.push(co.id); });
+      }
+    });
+
+    // Delete duplicate records from Supabase
+    for (const dupId of toDelete) {
+      await this.supabaseDelete('course_outcomes', dupId, `duplicate course outcome ${dupId}`);
+    }
+
+    this.data.courseOutcomes = cleaned;
     return cleaned;
   }
 
@@ -257,10 +313,7 @@ class AppEngine {
 
     this.showToast('Migrating local data to Supabase...', 'info');
 
-    // 1. Clean duplicate modules
-    this.cleanDuplicateModules();
-
-    // 2. Fix ESL101 LO subjectId mismatch
+    // 1. Fix ESL101 LO subjectId mismatch in local data before migration
     if (Array.isArray(this.data.courseOutcomes)) {
       const esl = (this.data.subjects || []).find(s => s.code === 'ESL101');
       this.data.courseOutcomes.forEach(co => {
@@ -271,14 +324,15 @@ class AppEngine {
           }
         }
       });
-      this.saveState();
     }
 
     try {
-      // Upsert course outcomes with deterministic IDs
+      // Upsert course outcomes with normalized lowercase deterministic IDs
       if (Array.isArray(this.data.courseOutcomes) && this.data.courseOutcomes.length > 0) {
         for (const co of this.data.courseOutcomes) {
-          const deterministicId = `co-${(co.code || co.id || '').replace(/\./g, '-')}`;
+          const deterministicId = `co-${(co.code || co.id || '').replace(/\./g, '-').toLowerCase()}`;
+          // Normalize local record ID to lowercase before upsert
+          co.id = deterministicId;
           await supabaseClient.from('course_outcomes').upsert({
             id: deterministicId,
             code: co.code,
@@ -292,10 +346,12 @@ class AppEngine {
         }
       }
 
-      // Upsert modules with deterministic IDs
+      // Upsert modules with normalized lowercase deterministic IDs
       if (Array.isArray(this.data.modules) && this.data.modules.length > 0) {
         for (const m of this.data.modules) {
-          const deterministicId = `mod-${(m.code || m.module_code || m.id || '').replace(/\./g, '-')}`;
+          const deterministicId = `mod-${(m.code || m.module_code || m.id || '').replace(/\./g, '-').toLowerCase()}`;
+          // Normalize local record ID to lowercase before upsert
+          m.id = deterministicId;
           await supabaseClient.from('modules').upsert({
             id: deterministicId,
             code: m.code || m.module_code || '',
@@ -306,18 +362,17 @@ class AppEngine {
         }
       }
 
-      // Update local IDs to match deterministic IDs
+      // Normalize all in-memory IDs to lowercase so saveState() writes consistent keys
       this.data.courseOutcomes = (this.data.courseOutcomes || []).map(co => ({
         ...co,
-        id: `co-${(co.code || co.id || '').replace(/\./g, '-')}`,
+        id: `co-${(co.code || co.id || '').replace(/\./g, '-').toLowerCase()}`,
         subject_id: co.subjectId || co.subject_id || ''
       }));
       this.data.modules = (this.data.modules || []).map(m => ({
         ...m,
-        id: `mod-${(m.code || m.module_code || m.id || '').replace(/\./g, '-')}`,
+        id: `mod-${(m.code || m.module_code || m.id || '').replace(/\./g, '-').toLowerCase()}`,
         subject_id: m.subjectId || m.subject_id || ''
       }));
-      this.saveState();
 
       localStorage.removeItem('rizvi_supabase_migrated');
       localStorage.setItem('rizvi_supabase_migrated_v2', '1');

@@ -831,7 +831,7 @@ const adminView = {
       const existingSf = existingSfIdx >= 0 ? app.data.subjectFaculty[existingSfIdx] : null;
 
       if (isChecked && !existingSf) {
-        const deterministicSfId = `sf-${sub.id}-${email.split('@')[0]}`;
+        const deterministicSfId = `sf-${sub.id}-${email.split('@')[0]}`.toLowerCase();
         const newSf = {
           id: deterministicSfId,
           subject_id: sub.id,
@@ -917,7 +917,7 @@ const adminView = {
   async saveSubjectFacultyAssignment(e, subjectId) {
     e.preventDefault();
     const facultyEmail = document.getElementById('assign-faculty-select').value;
-    const deterministicSfId = `sf-${subjectId}-${facultyEmail.split('@')[0]}`;
+    const deterministicSfId = `sf-${subjectId}-${facultyEmail.split('@')[0]}`.toLowerCase();
     const sfRecord = {
       id: deterministicSfId,
       subject_id: subjectId,
