@@ -233,53 +233,112 @@ const facultyView = {
     }
   },
 
+  coManagerSubTab: 'co_modules',
+
+  switchCOManagerSubTab(subTab, subjectId) {
+    this.coManagerSubTab = subTab;
+    const sub = (app.data.subjects || []).find(s => s.id === subjectId);
+    const container = document.getElementById('subject-workspace-tab-content');
+    if (container && sub) {
+      this.renderCOAndModulesManager(container, sub);
+    } else {
+      app.renderCurrentView();
+    }
+  },
+
   renderSubjectOverviewTab(sub) {
-    const subAsgs = (app.data.assignments || []).filter(a => a.subjectId === sub.id);
-    const pendingCount = app.data.submissions.filter(s => subAsgs.some(a => a.id === s.assignmentId) && (s.verificationStatus || 'pending').toLowerCase() === 'pending').length;
+    try {
+      const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
+      const subAsgIds = subAsgs.map(a => a.id);
+      const pendingCount = (app.data.submissions || []).filter(s => subAsgIds.includes(s.assignmentId) && (s.verificationStatus || 'pending').toLowerCase() === 'pending').length;
 
-    return `
-      <div class="kpi-grid" style="margin-bottom:20px;">
-        <div class="kpi-card">
-          <span class="kpi-label">Lab Assignments</span>
-          <span class="kpi-value">${subAsgs.length}</span>
-          <span class="kpi-trend positive">Course Experiments</span>
+      const subjectAuditLogs = (app.data.auditLogs || []).filter(log => {
+        if (!sub) return true;
+        if (log.entity_id === sub.id) return true;
+        if (subAsgIds.includes(log.entity_id)) return true;
+        if (log.snapshot && (log.snapshot.subjectId === sub.id || log.snapshot.subject_id === sub.id)) return true;
+        return false;
+      }).slice(0, 5);
+
+      return `
+        <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : ''}')">+ Create Assignment</button>
+          <button class="btn btn-secondary btn-sm" onclick="facultyView.openAddCOModal('${sub ? sub.code : 'VMD'}')">+ Add CO</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#faculty-subject-${sub ? sub.id : ''}-students'">👥 View Enrolled Students</button>
         </div>
-        <div class="kpi-card">
-          <span class="kpi-label">Pending Verifications</span>
-          <span class="kpi-value" style="color:${pendingCount > 0 ? 'var(--warning)' : 'var(--success)'};">${pendingCount}</span>
-          <span class="kpi-trend ${pendingCount > 0 ? 'negative' : 'positive'}">Awaiting Faculty Sign-off</span>
-        </div>
-      </div>
 
-      <div class="card">
-        <h3 class="card-title" style="margin-bottom:12px;">Experiments & Assignments Status</h3>
-        ${subAsgs.length === 0 ? `<div class="empty-state">No assignments published for this subject yet.</div>` : `
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            ${subAsgs.map(a => {
-              const status = a.lifecycle_status || a.state || 'draft';
-              const isLocked = status === 'locked';
-              const isPublished = status === 'published';
-
-              return `
-                <div class="session-strip" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--bg-surface);">
-                  <div>
-                    <span class="mono-val" style="font-weight:700; color:var(--accent-blue);">${a.code}</span>
-                    <strong style="margin-left:8px;">${a.title}</strong>
-                  </div>
-
-                  <div style="display:flex; gap:10px; align-items:center;">
-                    <span class="col-pill ${isLocked ? 'pill-locked' : isPublished ? 'pill-published' : 'pill-draft'}">
-                      ${status.toUpperCase()}
-                    </span>
-                    <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#faculty-subject-${sub.id}-grade'">Grade Mode →</button>
-                  </div>
-                </div>
-              `;
-            }).join('')}
+        <div class="kpi-grid" style="margin-bottom:20px;">
+          <div class="kpi-card">
+            <span class="kpi-label">Lab Assignments</span>
+            <span class="kpi-value">${subAsgs.length}</span>
+            <span class="kpi-trend positive">Course Experiments</span>
           </div>
-        `}
-      </div>
-    `;
+          <div class="kpi-card">
+            <span class="kpi-label">Pending Verifications</span>
+            <span class="kpi-value" style="color:${pendingCount > 0 ? 'var(--warning)' : 'var(--success)'};">${pendingCount}</span>
+            <span class="kpi-trend ${pendingCount > 0 ? 'negative' : 'positive'}">Awaiting Faculty Sign-off</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 class="card-title" style="margin-bottom:12px;">Experiments & Assignments Status</h3>
+          ${subAsgs.length === 0 ? `
+            <div class="empty-state" style="padding:24px; text-align:center;">
+              <p style="font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">No assignments created for this subject yet.</p>
+              <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Click below to create your first experiment assignment.</p>
+              <button class="btn btn-primary btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : ''}')">+ Create Assignment</button>
+            </div>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              ${subAsgs.map(a => {
+                const status = a.lifecycle_status || a.state || 'draft';
+                const isLocked = status === 'locked';
+                const isPublished = status === 'published';
+
+                return `
+                  <div class="session-strip" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--bg-surface);">
+                    <div>
+                      <span class="mono-val" style="font-weight:700; color:var(--accent-blue);">${a.code}</span>
+                      <strong style="margin-left:8px;">${a.title}</strong>
+                    </div>
+
+                    <div style="display:flex; gap:10px; align-items:center;">
+                      <span class="col-pill ${isLocked ? 'pill-locked' : isPublished ? 'pill-published' : 'pill-draft'}">
+                        ${status.toUpperCase()}
+                      </span>
+                      <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#faculty-subject-${sub ? sub.id : ''}-grade'">Grade Mode →</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+
+        <div class="card">
+          <h3 class="card-title" style="margin-bottom:12px;">Recent Audit Activity — ${sub ? sub.code : ''}</h3>
+          ${subjectAuditLogs.length === 0 ? `
+            <p style="font-size:12px; color:var(--text-secondary); margin:0;">No recent audit activity logged for this subject.</p>
+          ` : `
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              ${subjectAuditLogs.map(log => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--bg-subtle); border-radius:var(--radius-md); font-size:12px;">
+                  <div>
+                    <span class="tag tag-co" style="font-weight:700;">${log.action ? log.action.toUpperCase() : 'LOG'}</span>
+                    <span style="font-weight:600; color:var(--text-primary); margin-left:6px;">${log.entity_type || 'entity'}</span>
+                    <span style="color:var(--text-secondary);">by ${log.changed_by || 'system'}</span>
+                  </div>
+                  <span class="mono-val" style="color:var(--text-tertiary); font-size:11px;">${log.changed_at ? new Date(log.changed_at).toLocaleString() : ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    } catch(err) {
+      console.error('renderSubjectOverviewTab error:', err);
+      return `<div class="empty-state">Error loading overview for this subject.</div>`;
+    }
   },
 
   /* PART 9 FIX: Filter students by subject's branch/class */
@@ -339,59 +398,280 @@ const facultyView = {
      ========================================================================== */
 
   renderCOAndModulesManager(container, sub) {
+    const activeSubTab = this.coManagerSubTab || 'co_modules';
+
     const courseOutcomes = (app.data.courseOutcomes || []).filter(co =>
       !sub || co.subjectId === sub?.id || co.subject_id === sub?.id
     );
     const modules = (app.data.modules || []).filter(m =>
-      !sub || m.subjectId === sub.id || m.subject_id === sub.id
+      !sub || m.subjectId === sub?.id || m.subject_id === sub?.id
     );
+
+    const allTargets = [...PO_LIST.map(p => p.code), ...PSO_LIST.map(p => p.code)];
 
     container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Course Outcomes & Modules Manager</h1>
-          <p class="page-subtitle">Configure NBA CO/LO statements and Syllabus Modules for <strong>${sub ? sub.code : 'Subject'}</strong></p>
+          <p class="page-subtitle">Configure NBA CO/LO statements, Bloom's Taxonomy, Syllabus Modules, and CO-PO-PSO Attainment Matrix for <strong>${sub ? sub.code : 'Subject'}</strong></p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openAddCOModal('${sub ? sub.code : 'VMD'}')">+ Add Course Outcome</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="facultyView.openAddModuleModal('${sub ? sub.id : ''}')">+ Add Module</button>
+          <button class="btn btn-primary btn-sm" onclick="facultyView.openAddCOModal('${sub ? sub.code : 'VMD'}')">+ Add Course Outcome</button>
+        </div>
       </div>
 
-      <div style="display:grid; grid-template-columns: 2fr 1fr; gap:20px;">
-        <div class="card">
-          <h3 class="card-title" style="margin-bottom:12px;">Course Outcomes (COs / LOs)</h3>
-          <div class="table-container">
-            <table class="custom-table">
-              <thead>
-                <tr><th>Code</th><th>Type</th><th>Statement</th><th>Target Attainment</th></tr>
-              </thead>
-              <tbody>
-                ${courseOutcomes.map(co => `
-                  <tr>
-                    <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${co.code}</td>
-                    <td><span class="tag ${co.type === 'LO' ? 'tag-lo' : 'tag-co'}">${co.type || 'CO'}</span></td>
-                    <td style="font-size:13px;">${co.description}</td>
-                    <td class="mono-val">${app.data.attainmentSettings?.classTargetPct || 70}%</td>
-                  </tr>
+      <div class="segmented-control print-hide" style="margin-bottom:20px;">
+        <button class="segmented-btn ${activeSubTab === 'co_modules' ? 'active' : ''}" onclick="facultyView.switchCOManagerSubTab('co_modules', '${sub ? sub.id : ''}')">
+          🎯 Course Outcomes & Syllabus Modules
+        </button>
+        <button class="segmented-btn ${activeSubTab === 'co_po_matrix' ? 'active' : ''}" onclick="facultyView.switchCOManagerSubTab('co_po_matrix', '${sub ? sub.id : ''}')">
+          📊 CO–PO–PSO Mapping Matrix
+        </button>
+      </div>
+
+      ${activeSubTab === 'co_modules' ? `
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:20px;">
+          <div class="card">
+            <h3 class="card-title" style="margin-bottom:12px;">Course Outcomes (COs / LOs)</h3>
+            <div class="table-container">
+              <table class="custom-table">
+                <thead>
+                  <tr><th>Code</th><th>Type</th><th>Statement</th><th>Target Attainment</th><th>CO → BT Level</th></tr>
+                </thead>
+                <tbody>
+                  ${courseOutcomes.length === 0 ? `<tr><td colspan="5" style="text-align:center; padding:16px; color:var(--text-secondary);">No course outcomes created yet.</td></tr>` : courseOutcomes.map(co => `
+                    <tr>
+                      <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${co.code}</td>
+                      <td><span class="tag ${co.type === 'LO' ? 'tag-lo' : 'tag-co'}">${co.type || 'CO'}</span></td>
+                      <td style="font-size:13px;">${co.description}</td>
+                      <td class="mono-val">${app.data.attainmentSettings?.classTargetPct || 70}%</td>
+                      <td>
+                        <select class="form-select btn-sm" onchange="facultyView.saveCOBTLevel('${co.id}', this.value)" style="padding:2px 6px; font-size:12px; font-weight:700;">
+                          ${['BT1', 'BT2', 'BT3', 'BT4', 'BT5', 'BT6'].map(bt => `<option value="${bt}" ${(co.btLevel || co.bt_level || 'BT2') === bt ? 'selected' : ''}>${bt}</option>`).join('')}
+                        </select>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 class="card-title" style="margin:0;">Syllabus Modules</h3>
+              <button class="btn btn-ghost btn-sm" onclick="facultyView.openAddModuleModal('${sub ? sub.id : ''}')">+ Add</button>
+            </div>
+            ${modules.length === 0 ? `<div class="empty-state">No syllabus modules defined.</div>` : `
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                ${modules.map(m => `
+                  <div style="padding:10px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
+                    <strong style="font-size:13px; color:var(--text-primary);">${m.code || m.module_code || ''}: ${m.name || m.module_name || m.title || 'Unnamed Module'}</strong>
+                    <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${m.topics || ''}</div>
+                  </div>
                 `).join('')}
-              </tbody>
-            </table>
+              </div>
+            `}
           </div>
         </div>
-
+      ` : `
+        <!-- SUB-TAB B: CO-PO-PSO MAPPING MATRIX -->
         <div class="card">
-          <h3 class="card-title" style="margin-bottom:12px;">Syllabus Modules</h3>
-          ${modules.length === 0 ? `<div class="empty-state">No syllabus modules defined.</div>` : `
-            <div style="display:flex; flex-direction:column; gap:8px;">
-              ${modules.map(m => `
-                <div style="padding:10px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
-                  <strong style="font-size:13px; color:var(--text-primary);">${m.code || m.module_code || ''}: ${m.name || m.module_name || m.title || 'Unnamed Module'}</strong>
-                  <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">${m.topics || ''}</div>
-                </div>
-              `).join('')}
+          <div style="margin-bottom:14px;">
+            <h3 class="card-title">CO–PO–PSO Attainment Mapping Matrix (${sub ? sub.code : ''})</h3>
+            <p class="card-subtitle" style="font-size:12px; color:var(--text-secondary);">Set correlation strength: 1 = Low (Direct Mapping), 2 = Medium (Moderate Correlation), 3 = High (Strong Alignment)</p>
+          </div>
+
+          ${courseOutcomes.length === 0 ? `<div class="empty-state">Please create Course Outcomes (COs) for this subject first before configuring the PO/PSO matrix.</div>` : `
+            <div class="table-container" style="overflow-x:auto;">
+              <table class="custom-table" style="font-size:12px;">
+                <thead>
+                  <tr>
+                    <th style="min-width:70px;">CO Code</th>
+                    <th style="min-width:200px;">CO Statement</th>
+                    ${allTargets.map(t => `<th style="text-align:center; min-width:55px;">${t}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${courseOutcomes.map(co => `
+                    <tr>
+                      <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${co.code}</td>
+                      <td style="font-size:12px; max-width:240px; white-space:normal; line-height:1.3;">${co.description}</td>
+                      ${allTargets.map(targetCode => {
+                        const existingMap = (app.data.coPOMapping || []).find(m =>
+                          (m.co_id === co.id || m.coId === co.id) &&
+                          (m.po_id === targetCode || m.poId === targetCode)
+                        );
+                        const curStrength = existingMap ? (existingMap.strength || '') : '';
+                        return `
+                          <td style="padding:4px; text-align:center;">
+                            <select class="form-select btn-sm" style="padding:2px; font-size:11px; width:52px; text-align:center; font-weight:700;" onchange="facultyView.saveCOPOMapping('${co.id}', '${targetCode}', this.value, '${sub ? sub.id : ''}')">
+                              <option value="" ${curStrength === '' ? 'selected' : ''}>-</option>
+                              <option value="1" ${curStrength == 1 ? 'selected' : ''}>1</option>
+                              <option value="2" ${curStrength == 2 ? 'selected' : ''}>2</option>
+                              <option value="3" ${curStrength == 3 ? 'selected' : ''}>3</option>
+                            </select>
+                          </td>
+                        `;
+                      }).join('')}
+                    </tr>
+                  `).join('')}
+                </tbody>
+                <tfoot>
+                  <tr style="background:var(--bg-subtle); font-weight:800; border-top:2px solid var(--border-strong);">
+                    <td colspan="2" style="text-align:right; font-size:12px; color:var(--text-primary);">Column Mapping Averages:</td>
+                    ${allTargets.map(targetCode => {
+                      const colMappings = (app.data.coPOMapping || []).filter(m =>
+                        courseOutcomes.some(co => co.id === m.co_id || co.id === m.coId) &&
+                        (m.po_id === targetCode || m.poId === targetCode) &&
+                        m.strength
+                      );
+                      const sum = colMappings.reduce((s, m) => s + (parseInt(m.strength) || 0), 0);
+                      const avg = colMappings.length > 0 ? (sum / colMappings.length).toFixed(1) : '-';
+                      return `<td style="text-align:center; color:var(--accent-blue); font-size:11px; font-weight:800;">${avg}</td>`;
+                    }).join('')}
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           `}
         </div>
-      </div>
+      `}
     `;
+  },
+
+  openAddModuleModal(subjectId) {
+    const sub = (app.data.subjects || []).find(s => s.id === subjectId);
+    app.showModal(`+ Add Syllabus Module ${sub ? '— ' + sub.code : ''}`, `
+      <form onsubmit="facultyView.saveNewModule(event, '${subjectId}')">
+        <div class="form-group">
+          <label class="form-label">Module Code (e.g. Module 1, MOD-01)</label>
+          <input type="text" id="mod-code" class="form-input code-font" placeholder="Module 1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Module Title / Name</label>
+          <input type="text" id="mod-name" class="form-input" placeholder="e.g. Kinematics of Particles" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Topics / Syllabus Coverage Summary</label>
+          <textarea id="mod-topics" class="form-input" rows="4" placeholder="List key sub-topics covered in this module..." required></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Module</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveNewModule(e, subjectId) {
+    e.preventDefault();
+    const modRecord = {
+      id: 'mod-' + Date.now(),
+      code: document.getElementById('mod-code').value.trim(),
+      name: document.getElementById('mod-name').value.trim(),
+      module_code: document.getElementById('mod-code').value.trim(),
+      module_name: document.getElementById('mod-name').value.trim(),
+      title: document.getElementById('mod-name').value.trim(),
+      topics: document.getElementById('mod-topics').value.trim(),
+      subjectId: subjectId,
+      subject_id: subjectId
+    };
+
+    if (!app.data.modules) app.data.modules = [];
+    app.data.modules.push(modRecord);
+    app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('modules').upsert({
+          id: modRecord.id,
+          code: modRecord.code,
+          name: modRecord.name,
+          topics: modRecord.topics,
+          subject_id: subjectId
+        });
+      } catch(err) { console.warn('Module upsert notice:', err); }
+    }
+
+    writeAudit('created', 'module', modRecord.id, modRecord);
+    app.closeModal();
+    app.showToast(`Added module ${modRecord.code}`, 'success');
+    app.renderCurrentView();
+  },
+
+  async saveCOBTLevel(coId, newBtLevel) {
+    const co = (app.data.courseOutcomes || []).find(c => c.id === coId);
+    if (!co) return;
+
+    co.btLevel = newBtLevel;
+    co.bt_level = newBtLevel;
+    app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('course_outcomes').upsert({
+          id: coId,
+          bt_level: newBtLevel
+        });
+      } catch(err) { console.warn('CO BT level upsert notice:', err); }
+    }
+
+    writeAudit('updated', 'course_outcome', coId, { bt_level: newBtLevel });
+    app.showToast(`Updated Bloom's Taxonomy to ${newBtLevel}`, 'success');
+  },
+
+  async saveCOPOMapping(coId, targetPoCode, val, subjectId) {
+    if (!app.data.coPOMapping) app.data.coPOMapping = [];
+
+    const existingIdx = app.data.coPOMapping.findIndex(m =>
+      (m.co_id === coId || m.coId === coId) &&
+      (m.po_id === targetPoCode || m.poId === targetPoCode)
+    );
+
+    const strengthVal = val ? parseInt(val) : null;
+    const mapRecord = {
+      id: existingIdx >= 0 ? app.data.coPOMapping[existingIdx].id : 'copo-' + Date.now() + '-' + Math.floor(Math.random()*1000),
+      co_id: coId,
+      coId: coId,
+      po_id: targetPoCode,
+      poId: targetPoCode,
+      strength: strengthVal,
+      subject_id: subjectId,
+      subjectId: subjectId
+    };
+
+    if (strengthVal !== null) {
+      if (existingIdx >= 0) {
+        app.data.coPOMapping[existingIdx] = mapRecord;
+      } else {
+        app.data.coPOMapping.push(mapRecord);
+      }
+    } else if (existingIdx >= 0) {
+      app.data.coPOMapping.splice(existingIdx, 1);
+    }
+
+    app.saveState();
+
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        if (strengthVal !== null) {
+          await supabaseClient.from('co_po_mapping').upsert({
+            id: mapRecord.id,
+            co_id: coId,
+            po_id: targetPoCode,
+            strength: strengthVal,
+            subject_id: subjectId
+          });
+        } else {
+          await supabaseClient.from('co_po_mapping').delete().eq('id', mapRecord.id);
+        }
+      } catch(err) { console.warn('CO-PO mapping upsert notice:', err); }
+    }
+
+    writeAudit('updated', 'co_po_mapping', mapRecord.id, mapRecord);
+    app.showToast('Updated CO–PO mapping matrix', 'success');
   },
 
   /* 2. Assignment Builder */

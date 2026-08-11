@@ -247,6 +247,7 @@ const INITIAL_DATA = {
   subjectFaculty: [],
   subjects: [],
   courseOutcomes: [],
+  coPOMapping: [],
   assignments: [],
   assignmentSubmissions: [],
   studentVariables: [],

@@ -135,7 +135,7 @@ class AppEngine {
       const [
         studentsRes, facultyRes, subjectFacultyRes, subjectsRes, assignmentsRes,
         submissionsRes, assignmentSubmissionsRes, studentVarsRes, studentAnswersRes,
-        courseOutcomesRes, modulesRes, auditLogRes, templatesRes
+        courseOutcomesRes, modulesRes, auditLogRes, templatesRes, coPoRes
       ] = await Promise.all([
         supabaseClient.from('students').select('*'),
         supabaseClient.from('faculty').select('*'),
@@ -149,7 +149,8 @@ class AppEngine {
         supabaseClient.from('course_outcomes').select('*'),
         supabaseClient.from('modules').select('*'),
         supabaseClient.from('audit_log').select('*').order('changed_at', { ascending: false }).limit(500),
-        supabaseClient.from('assignment_templates').select('*')
+        supabaseClient.from('assignment_templates').select('*'),
+        supabaseClient.from('co_po_mapping').select('*')
       ]);
 
       if (studentsRes.data && studentsRes.data.length > 0)
@@ -186,6 +187,7 @@ class AppEngine {
       }
       if (auditLogRes.data) this.data.auditLogs = auditLogRes.data;
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
+      if (coPoRes && coPoRes.data) this.data.coPOMapping = coPoRes.data;
 
       this.lastSyncedAt = new Date();
       this.saveState();
