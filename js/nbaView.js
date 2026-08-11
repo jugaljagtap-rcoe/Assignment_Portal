@@ -175,6 +175,7 @@ const nbaView = {
             <tbody>
               ${HARDCODED_DEPARTMENTS.map(d => {
                 const deptStudents = app.data.students.filter(s => {
+                  if (d.id === 'dept-fe') return (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase() === 'FE';
                   const b = s.branch || '';
                   if (d.id === 'dept-aids') return b.includes('Artificial Intelligence');
                   if (d.id === 'dept-civil') return b.includes('Civil');
