@@ -670,54 +670,111 @@ const adminView = {
 
   openAddFacultyModal(deptId, existingEmail = null) {
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    const deptFaculty = (app.data.faculty || []).filter(f => f.departmentId === deptId);
     const targetFac = existingEmail ? app.data.faculty.find(f => f.email.toLowerCase() === existingEmail.toLowerCase()) : null;
 
-    app.showModal(`👨‍🏫 Add / Assign Faculty to ${dept.name}`, `
-      <form onsubmit="adminView.saveAddFaculty(event, '${deptId}')">
-        <div style="margin-bottom:14px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); font-size:12px; color:var(--text-secondary);">
-          Select an existing faculty member or add a new faculty record to assign to <strong>${dept.name}</strong>.
+    const deptSubjects = (app.data.subjects || []).filter(s => s.departmentId === deptId || s.department_id === deptId);
+    const assignedSfSubjectIds = targetFac ? (app.data.subjectFaculty || [])
+      .filter(sf => (sf.faculty_id === targetFac.email || sf.facultyId === targetFac.email))
+      .map(sf => sf.subject_id || sf.subjectId) : [];
+
+    app.showModal(`👨‍🏫 Faculty Identity & Subject Assignments — ${dept.shortName}`, `
+      <form onsubmit="adminView.saveAddFaculty(event, '${deptId}')" style="min-width:540px;">
+        <div style="margin-bottom:14px; background:var(--bg-subtle); padding:12px; border-radius:var(--radius-md); border-left:4px solid var(--accent-blue);">
+          <h4 style="font-size:12px; font-weight:800; text-transform:uppercase; color:var(--accent-blue); margin-bottom:4px;">Section 1: Faculty Identity</h4>
+          <p style="font-size:12px; color:var(--text-secondary); margin:0;">Select an existing faculty member or choose + Add New Faculty to create a new profile.</p>
         </div>
+
         <div class="form-group">
-          <label class="form-label">Existing Faculty Roster Select (Optional)</label>
-          <select id="existing-faculty-select" class="form-select" onchange="adminView.onExistingFacultySelect(this.value)">
-            <option value="">-- Choose Existing Faculty or Enter New Below --</option>
-            ${(app.data.faculty || []).map(f => `<option value="${f.email}" ${targetFac && targetFac.email === f.email ? 'selected' : ''}>${f.name} (${f.email}) — Dept: ${f.departmentId || 'Unassigned'}</option>`).join('')}
+          <label class="form-label" style="font-weight:700;">Select Faculty Member</label>
+          <select id="existing-faculty-select" class="form-select" onchange="adminView.onExistingFacultySelect(this.value, '${deptId}')">
+            <option value="new" ${!targetFac ? 'selected' : ''}>+ Add New Faculty</option>
+            ${deptFaculty.map(f => `<option value="${f.email}" ${targetFac && targetFac.email.toLowerCase() === f.email.toLowerCase() ? 'selected' : ''}>${f.name} (${f.email})</option>`).join('')}
           </select>
         </div>
 
-        <div style="border-top:1px solid var(--border-default); padding-top:12px; margin-top:12px;">
-          <div class="form-group"><label class="form-label">Faculty Full Name</label><input type="text" id="fac-name" class="form-input" value="${targetFac ? targetFac.name : ''}" placeholder="e.g. Prof. Jugal Jagtap" required></div>
-          <div class="form-group"><label class="form-label">Email Address (@eng.rizvi.edu.in)</label><input type="email" id="fac-email" class="form-input code-font" value="${targetFac ? targetFac.email : ''}" placeholder="jugaljagtap@eng.rizvi.edu.in" required></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div class="form-group">
-            <label class="form-label">System Role</label>
-            <select id="fac-role" class="form-select" required>
-              <option value="faculty" ${targetFac && targetFac.role === 'faculty' ? 'selected' : ''}>Faculty Member</option>
-              <option value="admin" ${targetFac && targetFac.role === 'admin' ? 'selected' : ''}>Admin / Dual Role</option>
-            </select>
+            <label class="form-label">Full Name</label>
+            <input type="text" id="fac-name" class="form-input" value="${targetFac ? targetFac.name : ''}" placeholder="e.g. Prof. Jugal Jagtap" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="fac-email" class="form-input code-font" value="${targetFac ? targetFac.email : ''}" placeholder="jugaljagtap@eng.rizvi.edu.in" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">System Role</label>
+          <select id="fac-role" class="form-select" required>
+            <option value="faculty" ${!targetFac || targetFac.role === 'faculty' ? 'selected' : ''}>faculty</option>
+            <option value="admin" ${targetFac && targetFac.role === 'admin' ? 'selected' : ''}>admin</option>
+          </select>
+        </div>
+
+        <div style="border-top:1px solid var(--border-default); padding-top:14px; margin-top:14px;">
+          <div style="margin-bottom:10px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); border-left:4px solid var(--success);">
+            <h4 style="font-size:12px; font-weight:800; text-transform:uppercase; color:var(--success); margin-bottom:2px;">Section 2: Subject Teaching Assignments</h4>
+            <p style="font-size:12px; color:var(--text-secondary); margin:0;">Check all subject courses assigned to this faculty member in ${dept.shortName}</p>
+          </div>
+
+          <div id="subject-checkboxes-container" style="display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; background:var(--bg-subtle); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
+            ${deptSubjects.length === 0 ? `<p style="font-size:12px; color:var(--text-secondary); margin:0;">No subjects found for ${dept.shortName}.</p>` : deptSubjects.map(sub => {
+              const isChecked = assignedSfSubjectIds.includes(sub.id);
+              return `
+                <label style="display:flex; align-items:center; gap:10px; font-size:13px; cursor:pointer; padding:4px 0;">
+                  <input type="checkbox" name="assigned_subjects" value="${sub.id}" ${isChecked ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--accent-blue);">
+                  <span style="font-weight:700; color:var(--accent-blue);">${sub.code}</span>
+                  <span>— ${sub.fullName || sub.name}</span>
+                </label>
+              `;
+            }).join('')}
           </div>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save & Assign Faculty</button>
+          <button type="submit" class="btn btn-primary">💾 Save Faculty & Assignments</button>
         </div>
       </form>
     `);
   },
 
-  onExistingFacultySelect(email) {
-    if (!email) return;
-    const f = app.data.faculty.find(fac => fac.email === email);
-    if (!f) return;
+  onExistingFacultySelect(email, deptId) {
     const nEl = document.getElementById('fac-name');
     const eEl = document.getElementById('fac-email');
     const rEl = document.getElementById('fac-role');
+    const container = document.getElementById('subject-checkboxes-container');
+
+    if (!email || email === 'new') {
+      if (nEl) nEl.value = '';
+      if (eEl) eEl.value = '';
+      if (rEl) rEl.value = 'faculty';
+      if (container) {
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      }
+      return;
+    }
+
+    const f = app.data.faculty.find(fac => fac.email.toLowerCase() === email.toLowerCase());
+    if (!f) return;
+
     if (nEl) nEl.value = f.name || '';
     if (eEl) eEl.value = f.email || '';
     if (rEl) rEl.value = f.role || 'faculty';
+
+    if (container) {
+      const assignedSfSubjectIds = (app.data.subjectFaculty || [])
+        .filter(sf => sf.faculty_id === f.email || sf.facultyId === f.email)
+        .map(sf => sf.subject_id || sf.subjectId);
+
+      container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = assignedSfSubjectIds.includes(cb.value);
+      });
+    }
   },
 
-  saveAddFaculty(e, deptId) {
+  async saveAddFaculty(e, deptId) {
     e.preventDefault();
     const name = document.getElementById('fac-name').value.trim();
     const email = document.getElementById('fac-email').value.trim().toLowerCase();
@@ -729,6 +786,7 @@ const adminView = {
       name,
       email,
       departmentId: deptId,
+      department_id: deptId,
       role
     };
 
@@ -738,10 +796,68 @@ const adminView = {
       app.data.faculty.push(facRecord);
     }
 
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try {
+        await supabaseClient.from('faculty').upsert({
+          id: facRecord.id,
+          name: facRecord.name,
+          email: facRecord.email,
+          department_id: deptId,
+          role: facRecord.role
+        });
+      } catch(err) { console.warn('Faculty upsert notice:', err); }
+    }
+
+    const checkedCheckboxes = Array.from(document.querySelectorAll('input[name="assigned_subjects"]:checked'));
+    const checkedSubjectIds = checkedCheckboxes.map(cb => cb.value);
+
+    const deptSubjects = (app.data.subjects || []).filter(s => s.departmentId === deptId || s.department_id === deptId);
+
+    for (let idx = 0; idx < deptSubjects.length; idx++) {
+      const sub = deptSubjects[idx];
+      const isChecked = checkedSubjectIds.includes(sub.id);
+      const existingSfIdx = (app.data.subjectFaculty || []).findIndex(sf =>
+        (sf.faculty_id === email || sf.facultyId === email) &&
+        (sf.subject_id === sub.id || sf.subjectId === sub.id)
+      );
+      const existingSf = existingSfIdx >= 0 ? app.data.subjectFaculty[existingSfIdx] : null;
+
+      if (isChecked && !existingSf) {
+        const newSf = {
+          id: 'sf-' + Date.now() + '-' + idx,
+          subject_id: sub.id,
+          subjectId: sub.id,
+          faculty_id: email,
+          facultyId: email,
+          academic_year: '2026-27'
+        };
+        app.data.subjectFaculty.push(newSf);
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          try {
+            await supabaseClient.from('subject_faculty').upsert({
+              id: newSf.id,
+              subject_id: sub.id,
+              faculty_id: email,
+              academic_year: newSf.academic_year
+            });
+          } catch(err) { console.warn('SubjectFaculty upsert notice:', err); }
+        }
+        writeAudit('created', 'subject_faculty', newSf.id, newSf);
+      } else if (!isChecked && existingSf) {
+        app.data.subjectFaculty.splice(existingSfIdx, 1);
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          try {
+            await supabaseClient.from('subject_faculty').delete().eq('id', existingSf.id);
+          } catch(err) { console.warn('SubjectFaculty delete notice:', err); }
+        }
+        writeAudit('deleted', 'subject_faculty', existingSf.id, existingSf);
+      }
+    }
+
     app.saveState();
     writeAudit('updated', 'faculty', facRecord.id, facRecord);
     app.closeModal();
-    app.showToast(`Assigned ${name} to ${deptId}`, 'success');
+    app.showToast(`Saved faculty ${name} & updated subject assignments`, 'success');
     app.renderCurrentView();
   },
 
