@@ -511,17 +511,13 @@ const adminView = {
     dept.mission = document.getElementById('dept-mission-input').value.split('\n').map(l => l.trim()).filter(Boolean);
 
     app.saveState();
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('departments').upsert({
-          id: dept.id,
-          name: dept.name,
-          short_name: dept.shortName,
-          vision: dept.vision,
-          mission: dept.mission
-        });
-      } catch(err) { console.warn('Dept V&M save notice:', err); }
-    }
+    await app.supabaseUpsert('departments', {
+      id: dept.id,
+      name: dept.name,
+      short_name: dept.shortName,
+      vision: dept.vision,
+      mission: dept.mission
+    }, `Department ${dept.shortName}`);
 
     writeAudit('updated', 'department', dept.id, { vision: dept.vision });
     app.closeModal();
@@ -601,9 +597,17 @@ const adminView = {
     s.yearOfStudy = document.getElementById('transfer-year').value;
 
     app.saveState();
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try { supabaseClient.from('students').upsert(s); } catch(err) { console.warn(err); }
-    }
+    app.supabaseUpsert('students', {
+      id: s.id,
+      uin: s.uin,
+      name: s.name,
+      email: s.email,
+      branch: s.branch,
+      division: s.division,
+      batch: s.batch,
+      year_of_study: s.yearOfStudy,
+      academic_year: '2026-27'
+    }, `Student ${s.name}`);
     writeAudit('updated', 'student', s.id, { transfer: true, branch: s.branch, division: s.division });
     app.closeModal();
     app.showToast(`Transferred ${s.name} (${s.uin}) to ${s.branch} (Div ${s.division})`, 'success');
@@ -651,7 +655,8 @@ const adminView = {
         const batch = parts[5] || 'A1';
 
         const existingIdx = app.data.students.findIndex(s => s.uin === uin);
-        const stObj = { id: existingIdx >= 0 ? app.data.students[existingIdx].id : 'st-' + Date.now() + '-' + idx, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
+        const deterministicId = `st-${uin.toLowerCase()}`;
+        const stObj = { id: existingIdx >= 0 ? app.data.students[existingIdx].id : deterministicId, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
         if (existingIdx >= 0) app.data.students[existingIdx] = stObj;
         else app.data.students.push(stObj);
         imported++;
@@ -777,8 +782,9 @@ const adminView = {
     const role = document.getElementById('fac-role').value;
 
     const existingIdx = app.data.faculty.findIndex(f => f.email.toLowerCase() === email);
+    const deterministicFacId = `fac-${email.split('@')[0].toLowerCase()}`;
     const facRecord = {
-      id: existingIdx >= 0 ? app.data.faculty[existingIdx].id : 'fac-' + Date.now(),
+      id: existingIdx >= 0 ? app.data.faculty[existingIdx].id : deterministicFacId,
       name,
       email,
       departmentId: deptId,
@@ -792,17 +798,13 @@ const adminView = {
       app.data.faculty.push(facRecord);
     }
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('faculty').upsert({
-          id: facRecord.id,
-          name: facRecord.name,
-          email: facRecord.email,
-          department_id: deptId,
-          role: facRecord.role
-        });
-      } catch(err) { console.warn('Faculty upsert notice:', err); }
-    }
+    await app.supabaseUpsert('faculty', {
+      id: facRecord.id,
+      name: facRecord.name,
+      email: facRecord.email,
+      role: facRecord.role,
+      department_id: deptId
+    }, `Faculty ${name}`);
 
     const checkedCheckboxes = Array.from(document.querySelectorAll('input[name="assigned_subjects"]:checked'));
     const checkedSubjectIds = checkedCheckboxes.map(cb => cb.value);
@@ -819,8 +821,9 @@ const adminView = {
       const existingSf = existingSfIdx >= 0 ? app.data.subjectFaculty[existingSfIdx] : null;
 
       if (isChecked && !existingSf) {
+        const deterministicSfId = `sf-${sub.id}-${email.split('@')[0]}`;
         const newSf = {
-          id: 'sf-' + Date.now() + '-' + idx,
+          id: deterministicSfId,
           subject_id: sub.id,
           subjectId: sub.id,
           faculty_id: email,
@@ -828,24 +831,18 @@ const adminView = {
           academic_year: '2026-27'
         };
         app.data.subjectFaculty.push(newSf);
-        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-          try {
-            await supabaseClient.from('subject_faculty').upsert({
-              id: newSf.id,
-              subject_id: sub.id,
-              faculty_id: email,
-              academic_year: newSf.academic_year
-            });
-          } catch(err) { console.warn('SubjectFaculty upsert notice:', err); }
-        }
+        await app.supabaseUpsert('subject_faculty', {
+          id: newSf.id,
+          subject_id: sub.id,
+          faculty_id: email,
+          academic_year: newSf.academic_year,
+          assigned_by: app.currentUser ? app.currentUser.email : 'system',
+          assigned_at: new Date().toISOString()
+        }, `Subject assignment ${sub.id} → ${email}`);
         writeAudit('created', 'subject_faculty', newSf.id, newSf);
       } else if (!isChecked && existingSf) {
         app.data.subjectFaculty.splice(existingSfIdx, 1);
-        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-          try {
-            await supabaseClient.from('subject_faculty').delete().eq('id', existingSf.id);
-          } catch(err) { console.warn('SubjectFaculty delete notice:', err); }
-        }
+        await app.supabaseDelete('subject_faculty', existingSf.id, `Subject assignment ${existingSf.id}`);
         writeAudit('deleted', 'subject_faculty', existingSf.id, existingSf);
       }
     }
@@ -910,8 +907,9 @@ const adminView = {
   async saveSubjectFacultyAssignment(e, subjectId) {
     e.preventDefault();
     const facultyEmail = document.getElementById('assign-faculty-select').value;
+    const deterministicSfId = `sf-${subjectId}-${facultyEmail.split('@')[0]}`;
     const sfRecord = {
-      id: `sf-${subjectId}-${Date.now()}`,
+      id: deterministicSfId,
       subject_id: subjectId,
       faculty_id: facultyEmail,
       academic_year: '2026-27',
@@ -923,11 +921,14 @@ const adminView = {
     app.data.subjectFaculty.push(sfRecord);
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('subject_faculty').upsert(sfRecord);
-      } catch(err) { console.warn('subject_faculty upsert notice:', err); }
-    }
+    await app.supabaseUpsert('subject_faculty', {
+      id: sfRecord.id,
+      subject_id: subjectId,
+      faculty_id: facultyEmail,
+      academic_year: sfRecord.academic_year,
+      assigned_by: sfRecord.assigned_by,
+      assigned_at: sfRecord.assigned_at
+    }, `Subject assignment ${subjectId} → ${facultyEmail}`);
 
     writeAudit('created', 'subject_faculty', sfRecord.id, { subjectId, facultyEmail });
     app.closeModal();
@@ -940,11 +941,7 @@ const adminView = {
     app.data.subjectFaculty = (app.data.subjectFaculty || []).filter(sf => sf.id !== sfId);
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('subject_faculty').delete().eq('id', sfId);
-      } catch(err) { console.warn('subject_faculty delete notice:', err); }
-    }
+    await app.supabaseDelete('subject_faculty', sfId, `Subject faculty assignment ${sfId}`);
 
     writeAudit('deleted', 'subject_faculty', sfId, {});
     app.showToast('Removed faculty assignment', 'info');
@@ -1044,11 +1041,7 @@ const adminView = {
     const idx = app.data.students.findIndex(st => st.id === id);
     if (idx >= 0) app.data.students.splice(idx, 1);
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('students').delete().eq('id', id);
-      } catch(err) { console.warn('Delete student notice:', err); }
-    }
+    await app.supabaseDelete('students', id, `Student ${s.name} (${s.uin})`);
 
     app.saveState();
     writeAudit('deleted', 'student', id, s);
@@ -1137,9 +1130,10 @@ const adminView = {
 
   async saveNewStudent(e) {
     e.preventDefault();
+    const uin = document.getElementById('st-uin').value.trim();
     const stRecord = {
-      id: 'st-' + Date.now(),
-      uin: document.getElementById('st-uin').value.trim(),
+      id: `st-${uin.toLowerCase()}`,
+      uin: uin,
       name: document.getElementById('st-name').value.trim(),
       email: document.getElementById('st-email').value.trim(),
       branch: document.getElementById('st-branch').value,
@@ -1150,9 +1144,17 @@ const adminView = {
 
     app.data.students.push(stRecord);
     app.saveState();
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try { await supabaseClient.from('students').upsert(stRecord); } catch(err) { console.warn('Student insert notice:', err); }
-    }
+    await app.supabaseUpsert('students', {
+      id: stRecord.id,
+      uin: stRecord.uin,
+      name: stRecord.name,
+      email: stRecord.email,
+      branch: stRecord.branch,
+      division: stRecord.division,
+      batch: stRecord.batch,
+      year_of_study: stRecord.yearOfStudy,
+      academic_year: '2026-27'
+    }, `Student ${stRecord.name}`);
     writeAudit('created', 'student', stRecord.id, stRecord);
     app.closeModal();
     app.showToast(`Added student ${stRecord.name}`, 'success');
@@ -1211,20 +1213,17 @@ const adminView = {
     s.batch = document.getElementById('st-edit-batch').value.trim();
 
     app.saveState();
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('students').upsert({
-          id: s.id,
-          name: s.name,
-          uin: s.uin,
-          email: s.email,
-          branch: s.branch,
-          division: s.division,
-          batch: s.batch,
-          year_of_study: s.yearOfStudy
-        });
-      } catch(err) { console.warn('Student upsert notice:', err); }
-    }
+    await app.supabaseUpsert('students', {
+      id: s.id,
+      uin: s.uin,
+      name: s.name,
+      email: s.email,
+      branch: s.branch,
+      division: s.division,
+      batch: s.batch,
+      year_of_study: s.yearOfStudy,
+      academic_year: '2026-27'
+    }, `Student ${s.name}`);
     writeAudit('updated', 'student', id, s);
     app.closeModal();
     app.showToast(`Updated student profile for ${s.name}`, 'success');
@@ -1258,27 +1257,27 @@ const adminView = {
 
   async saveNewSubject(e, deptId) {
     e.preventDefault();
+    const code = document.getElementById('sub-code').value.trim();
+    const fullName = document.getElementById('sub-fullname').value.trim();
+    const deterministicSubId = `sub-${code.toLowerCase()}`;
     const subRecord = {
-      id: 'sub-' + Date.now(),
-      code: document.getElementById('sub-code').value.trim(),
-      name: document.getElementById('sub-fullname').value.trim(),
-      fullName: document.getElementById('sub-fullname').value.trim(),
+      id: deterministicSubId,
+      code: code,
+      name: fullName,
+      fullName: fullName,
       departmentId: deptId,
       semester: document.getElementById('sub-sem').value
     };
     app.data.subjects.push(subRecord);
     app.saveState();
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('subjects').upsert({
-          id: subRecord.id,
-          code: subRecord.code,
-          full_name: subRecord.fullName,
-          department_id: subRecord.departmentId,
-          semester: subRecord.semester
-        });
-      } catch(err) { console.warn('Subject upsert notice:', err); }
-    }
+    await app.supabaseUpsert('subjects', {
+      id: subRecord.id,
+      code: subRecord.code,
+      full_name: subRecord.fullName,
+      department_id: subRecord.departmentId,
+      semester: subRecord.semester,
+      class_name: subRecord.className || ''
+    }, `Subject ${subRecord.code}`);
     writeAudit('created', 'subject', subRecord.id, subRecord);
     app.closeModal();
     app.showToast(`Created subject ${subRecord.code}`, 'success');

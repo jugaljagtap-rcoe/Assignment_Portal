@@ -95,7 +95,9 @@ class AppEngine {
     this.setupEventListeners();
     this.handleHashChange();
     this.showSpinner('Loading portal data…');
-    this.loadAllFromSupabase().finally(() => {
+    this.loadAllFromSupabase().then(() => {
+      return this.checkSupabaseTables();
+    }).finally(() => {
       this.hideSpinner();
       if (!this.currentUser) this.showLoginModal(false);
       else {
@@ -420,23 +422,35 @@ class AppEngine {
   }
 
   loadState() {
-    const saved = localStorage.getItem('rizvi_fe_portal_data');
+    // localStorage is authoritative for instant first render only.
+    // After DOMContentLoaded, loadAllFromSupabase() overwrites this with server data.
+    let saved = null;
+    try {
+      saved = localStorage.getItem('rizvi_fe_portal_data');
+    } catch (e) {
+      // Tracking prevention may block localStorage — fall back to sessionStorage
+      try { saved = sessionStorage.getItem('rizvi_fe_portal_data'); } catch (_) {}
+    }
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         return Object.assign({}, INITIAL_DATA, parsed);
       } catch (e) {
-        console.error('Failed to parse local storage, loading INITIAL_DATA:', e);
+        console.error('Failed to parse cached state, loading INITIAL_DATA:', e);
       }
     }
     return JSON.parse(JSON.stringify(INITIAL_DATA));
   }
 
   saveState() {
+    // localStorage is cache only — Supabase is the authoritative source of truth.
+    const serialised = JSON.stringify(this.data);
     try {
-      localStorage.setItem('rizvi_fe_portal_data', JSON.stringify(this.data));
+      localStorage.setItem('rizvi_fe_portal_data', serialised);
     } catch (e) {
-      console.warn('LocalStorage save error:', e);
+      // Tracking prevention fallback
+      try { sessionStorage.setItem('rizvi_fe_portal_data', serialised); } catch (_) {}
+      console.warn('localStorage blocked, saved to sessionStorage instead:', e);
     }
   }
 
@@ -778,6 +792,72 @@ class AppEngine {
     }
     const batchSch = asg.schedules.find(s => s.scopeValue === batchName);
     return batchSch || asg.schedules[0];
+  }
+  /* ==========================================================================
+     SUPABASE WRITE WRAPPERS — Always use these instead of direct .from().upsert()
+     They handle offline mode, show user-facing toasts, and log errors.
+     ========================================================================== */
+  async supabaseUpsert(table, record, friendlyName) {
+    if (!supabaseClient) {
+      this.showToast(`⚠️ Offline: ${friendlyName} saved locally only. Reconnect to sync.`, 'warning');
+      return false;
+    }
+    try {
+      const { error } = await supabaseClient.from(table).upsert(record);
+      if (error) throw error;
+      return true;
+    } catch(err) {
+      console.error(`Supabase write failed [${table}]:`, err);
+      this.showToast(`❌ Failed to save ${friendlyName} to server: ${err.message}. Please retry.`, 'danger');
+      return false;
+    }
+  }
+
+  async supabaseDelete(table, id, friendlyName) {
+    if (!supabaseClient) {
+      this.showToast(`⚠️ Offline: ${friendlyName} deleted locally only.`, 'warning');
+      return false;
+    }
+    try {
+      const { error } = await supabaseClient.from(table).delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch(err) {
+      console.error(`Supabase delete failed [${table}]:`, err);
+      this.showToast(`❌ Failed to delete ${friendlyName} from server: ${err.message}`, 'danger');
+      return false;
+    }
+  }
+
+  /* ==========================================================================
+     STARTUP HEALTH CHECK — Verify critical Supabase tables exist.
+     Shows a persistent admin-only banner for any missing table.
+     ========================================================================== */
+  async checkSupabaseTables() {
+    if (!supabaseClient) return;
+    const criticalTables = [
+      'subjects', 'students', 'faculty', 'subject_faculty',
+      'course_outcomes', 'modules', 'co_po_mapping',
+      'assignments', 'submissions', 'assignment_submissions'
+    ];
+    const missingTables = [];
+    for (const table of criticalTables) {
+      try {
+        const { error } = await supabaseClient.from(table).select('id').limit(1);
+        if (error && (error.code === '42P01' || error.message?.includes('does not exist') || error.status === 404)) {
+          missingTables.push(table);
+        }
+      } catch (e) {
+        missingTables.push(table);
+      }
+    }
+    if (missingTables.length > 0 && this.currentUser && (this.currentUser.role === 'admin' || this.currentUser.isDualRole)) {
+      const banner = document.createElement('div');
+      banner.id = 'db-health-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;padding:10px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:12px;';
+      banner.innerHTML = `⚠️ Missing DB tables: <strong>${missingTables.join(', ')}</strong>. Contact system administrator. <button onclick="document.getElementById('db-health-banner').remove()" style="margin-left:auto;background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;padding:4px 10px;border-radius:4px;">Dismiss</button>`;
+      document.body.prepend(banner);
+    }
   }
 }
 

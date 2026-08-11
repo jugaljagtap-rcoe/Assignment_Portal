@@ -628,13 +628,16 @@ const facultyView = {
 
   async saveNewModule(e, subjectId) {
     e.preventDefault();
+    const code = document.getElementById('mod-code').value.trim();
+    const modName = document.getElementById('mod-name').value.trim();
+    const deterministicModId = `mod-${code.replace(/\./g, '-').toLowerCase()}`;
     const modRecord = {
-      id: 'mod-' + Date.now(),
-      code: document.getElementById('mod-code').value.trim(),
-      name: document.getElementById('mod-name').value.trim(),
-      module_code: document.getElementById('mod-code').value.trim(),
-      module_name: document.getElementById('mod-name').value.trim(),
-      title: document.getElementById('mod-name').value.trim(),
+      id: deterministicModId,
+      code: code,
+      name: modName,
+      module_code: code,
+      module_name: modName,
+      title: modName,
       topics: document.getElementById('mod-topics').value.trim(),
       subjectId: subjectId,
       subject_id: subjectId
@@ -644,17 +647,13 @@ const facultyView = {
     app.data.modules.push(modRecord);
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('modules').upsert({
-          id: modRecord.id,
-          code: modRecord.code,
-          name: modRecord.name,
-          topics: modRecord.topics,
-          subject_id: subjectId
-        });
-      } catch(err) { console.warn('Module upsert notice:', err); }
-    }
+    await app.supabaseUpsert('modules', {
+      id: modRecord.id,
+      code: modRecord.code,
+      module_name: modRecord.name,
+      topics: modRecord.topics,
+      subject_id: subjectId
+    }, `Module ${modRecord.code}`);
 
     writeAudit('created', 'module', modRecord.id, modRecord);
     app.closeModal();
@@ -679,20 +678,15 @@ const facultyView = {
 
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('course_outcomes').upsert({
-          id: co.id,
-          code: co.code,
-          description: co.description,
-          type: co.type || 'CO',
-          subject_id: co.subjectId || co.subject_id,
-          bt_level: co.btLevel || co.bt_level || 'BT2',
-          module_id: co.moduleId || co.module_id || null,
-          assignment_id: co.assignmentId || co.assignment_id || null
-        });
-      } catch(err) { console.warn('CO detail mapping upsert notice:', err); }
-    }
+    await app.supabaseUpsert('course_outcomes', {
+      id: co.id,
+      code: co.code,
+      description: co.description,
+      type: co.type || 'CO',
+      subject_id: co.subjectId || co.subject_id || '',
+      bt_level: co.btLevel || co.bt_level || 'BT2',
+      module_id: co.moduleId || co.module_id || null
+    }, `Course outcome ${co.code}`);
 
     writeAudit('updated', 'course_outcome', coId, { [fieldKey]: val });
     app.showToast(`Updated CO mapping detail`, 'success');
@@ -711,8 +705,9 @@ const facultyView = {
     );
 
     const strengthVal = val ? parseInt(val) : null;
+    const deterministicCoPoId = `copo-${coId}-${targetPoCode.toLowerCase()}`;
     const mapRecord = {
-      id: existingIdx >= 0 ? app.data.coPOMapping[existingIdx].id : 'copo-' + Date.now() + '-' + Math.floor(Math.random()*1000),
+      id: existingIdx >= 0 ? app.data.coPOMapping[existingIdx].id : deterministicCoPoId,
       co_id: coId,
       coId: coId,
       po_id: targetPoCode,
@@ -734,20 +729,16 @@ const facultyView = {
 
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        if (strengthVal !== null) {
-          await supabaseClient.from('co_po_mapping').upsert({
-            id: mapRecord.id,
-            co_id: coId,
-            po_id: targetPoCode,
-            strength: strengthVal,
-            subject_id: subjectId
-          });
-        } else {
-          await supabaseClient.from('co_po_mapping').delete().eq('id', mapRecord.id);
-        }
-      } catch(err) { console.warn('CO-PO mapping upsert notice:', err); }
+    if (strengthVal !== null) {
+      await app.supabaseUpsert('co_po_mapping', {
+        id: mapRecord.id,
+        co_id: coId,
+        po_id: targetPoCode,
+        strength: strengthVal,
+        subject_id: subjectId
+      }, `CO-PO mapping ${coId} → ${targetPoCode}`);
+    } else {
+      await app.supabaseDelete('co_po_mapping', mapRecord.id, `CO-PO mapping ${coId} → ${targetPoCode}`);
     }
 
     writeAudit('updated', 'co_po_mapping', mapRecord.id, mapRecord);
@@ -917,9 +908,16 @@ const facultyView = {
     s.verifiedBy = app.currentUser ? app.currentUser.email : 'prof@eng.rizvi.edu.in';
     s.verifiedAt = new Date().toISOString();
     app.saveState();
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try { await supabaseClient.from('submissions').upsert(s); } catch(e) { console.warn('verify notice:', e); }
-    }
+    await app.supabaseUpsert('submissions', {
+      id: s.id,
+      student_id: s.student_id || s.studentId || '',
+      assignment_id: s.assignment_id || s.assignmentId || '',
+      submitted_value: s.submittedValue || s.submitted_value || null,
+      submitted_unit: s.submittedUnit || s.submitted_unit || null,
+      verification_status: s.verificationStatus,
+      verified_by: s.verifiedBy,
+      verified_at: s.verifiedAt
+    }, `Submission ${subId}`);
     writeAudit('updated', 'submission', subId, { status: 'verified' });
     app.showToast('Submission verified successfully!', 'success');
     app.renderCurrentView();
@@ -973,9 +971,14 @@ const facultyView = {
     app.data.assignmentTemplates.push(tRecord);
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try { await supabaseClient.from('assignment_templates').upsert(tRecord); } catch(e) { console.warn('template notice:', e); }
-    }
+    await app.supabaseUpsert('assignment_templates', {
+      id: tRecord.id,
+      title: tRecord.title,
+      subject_code: tRecord.subject_code,
+      questions: tRecord.questions,
+      created_by: tRecord.created_by,
+      created_at: tRecord.created_at
+    }, `Template ${tRecord.title}`);
 
     writeAudit('created', 'template', tRecord.id, { title: tRecord.title });
     app.showToast(`Saved ${asg.code} as reusable assignment template!`, 'success');
@@ -997,9 +1000,11 @@ const facultyView = {
   async saveNewCO(e, subCode) {
     e.preventDefault();
     const sub = (app.data.subjects || []).find(s => s.code === subCode || s.id === subCode);
+    const coCode = document.getElementById('co-code').value.trim();
+    const deterministicCoId = `co-${coCode.replace(/\./g, '-').toLowerCase()}`;
     const coRecord = {
-      id: 'co-' + Date.now(),
-      code: document.getElementById('co-code').value.trim(),
+      id: deterministicCoId,
+      code: coCode,
       description: document.getElementById('co-desc').value.trim(),
       type: 'CO',
       subjectId: sub?.id || '',
@@ -1009,17 +1014,15 @@ const facultyView = {
     app.data.courseOutcomes.push(coRecord);
     app.saveState();
 
-    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try {
-        await supabaseClient.from('course_outcomes').upsert({
-          id: coRecord.id,
-          code: coRecord.code,
-          description: coRecord.description,
-          type: coRecord.type,
-          subject_id: coRecord.subject_id
-        });
-      } catch(err) { console.warn('CO upsert notice:', err); }
-    }
+    await app.supabaseUpsert('course_outcomes', {
+      id: coRecord.id,
+      code: coRecord.code,
+      description: coRecord.description,
+      type: coRecord.type,
+      subject_id: coRecord.subject_id,
+      bt_level: '',
+      module_id: null
+    }, `Course outcome ${coRecord.code}`);
 
     writeAudit('created', 'co', coRecord.id, coRecord);
     app.closeModal();
@@ -1042,9 +1045,13 @@ const facultyView = {
 
   saveNewAssignment(e, subId) {
     e.preventDefault();
+    const asgCode = document.getElementById('asg-code').value.trim();
+    const sub = subId ? (app.data.subjects || []).find(s => s.id === subId) : app.data.subjects[0];
+    const subCode = sub ? (sub.code || 'sub') : 'sub';
+    const deterministicAsgId = `asg-${subCode.toLowerCase()}-${asgCode.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
     const asgRecord = {
-      id: 'asg-' + Date.now(),
-      code: document.getElementById('asg-code').value.trim(),
+      id: deterministicAsgId,
+      code: asgCode,
       title: document.getElementById('asg-title').value.trim(),
       subjectId: subId || (app.data.subjects[0] ? app.data.subjects[0].id : 'sub-vmd'),
       lifecycle_status: 'draft',
