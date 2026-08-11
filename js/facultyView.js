@@ -81,7 +81,7 @@ const facultyView = {
           <h1 class="page-title">Faculty Workspace</h1>
           <p class="page-subtitle">Welcome back, Prof. ${app.currentUser ? app.currentUser.name : 'Faculty'} · Academic Year 2026-27</p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal()">+ Create New Assignment</button>
+        <!-- Assignment creation is done inside a subject workspace only -->
       </div>
 
       ${pendingSubmissions.length > 0 ? `
@@ -747,39 +747,120 @@ const facultyView = {
 
   /* 2. Assignment Builder */
   renderAssignmentBuilder(container, sub) {
-    const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id);
+    const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
 
     container.innerHTML = `
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Assignment Question Builder</h1>
-          <p class="page-subtitle">Design questions, formula parameters, ground truths, and templates for <strong>${sub ? sub.code : 'Subject'}</strong></p>
+          <p class="page-subtitle">Design questions, formula parameters, ground truths, and templates for <strong>${sub ? sub.code : 'all subjects'}</strong></p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : ''}')">+ Create New Assignment</button>
+        ${sub ? `<button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal('${sub.id}')">+ Create New Assignment</button>` : ''}
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:16px;">
-        ${subAsgs.map(a => `
-          <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-              <div>
-                <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.code}</span>
-                <strong style="font-size:15px; margin-left:8px;">${a.title}</strong>
-              </div>
-              <div style="display:flex; gap:8px;">
-                <button class="btn btn-secondary btn-sm" onclick="facultyView.saveAsTemplate('${a.id}')">💾 Save as Template</button>
-                <span class="col-pill ${a.lifecycle_status === 'locked' ? 'pill-locked' : a.lifecycle_status === 'published' ? 'pill-published' : 'pill-draft'}">
-                  ${(a.lifecycle_status || 'draft').toUpperCase()}
-                </span>
-              </div>
-            </div>
-
-            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
-              Questions Defined: <strong>${(a.questions || []).length}</strong> | Total Parameters: <strong>${(a.questions || []).flatMap(q => q.parameters || []).length}</strong>
-            </div>
+      ${subAsgs.length === 0 ? `
+        <div class="card" style="padding:40px; text-align:center;">
+          <div class="empty-state">
+            <div class="empty-state-emoji">📋</div>
+            <h3 class="empty-state-title">No Assignments Yet</h3>
+            <p class="empty-state-subtitle">Create your first assignment to start building questions and parameters.</p>
+            ${sub ? `<button class="btn btn-primary" style="margin-top:12px;" onclick="facultyView.openCreateAssignmentModal('${sub.id}')">+ Create Assignment</button>` : ''}
           </div>
-        `).join('')}
-      </div>
+        </div>
+      ` : `
+        <div style="display:flex; flex-direction:column; gap:20px;">
+          ${subAsgs.map(a => {
+            const questions = Array.isArray(a.questions) ? a.questions :
+              (typeof a.questions === 'string' ? (()=>{ try{return JSON.parse(a.questions);}catch(_){return [];} })() : []);
+            const totalParams = questions.flatMap(q => q.parameters || []).length;
+            const isLocked = (a.lifecycle_status || a.state) === 'locked';
+
+            return `
+              <div class="card">
+                <!-- Assignment Header -->
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+                  <div>
+                    <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.code}</span>
+                    <strong style="font-size:15px; margin-left:8px;">${a.title}</strong>
+                    ${a.btLevel ? `<span class="tag tag-bt" style="margin-left:8px;">${a.btLevel}</span>` : ''}
+                  </div>
+                  <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+                    <button class="btn btn-secondary btn-sm" onclick="facultyView.saveAsTemplate('${a.id}')">💾 Template</button>
+                    ${!isLocked ? `<button class="btn btn-ghost btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : a.subjectId || ''}')" title="Create another assignment">+</button>` : ''}
+                    <span class="col-pill ${isLocked ? 'pill-locked' : (a.lifecycle_status === 'published' ? 'pill-published' : 'pill-draft')}">
+                      ${(a.lifecycle_status || 'draft').toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; display:flex; gap:16px;">
+                  <span>Questions: <strong>${questions.length}</strong></span>
+                  <span>Parameters: <strong>${totalParams}</strong></span>
+                </div>
+
+                <!-- Questions Tree -->
+                ${questions.length === 0 ? `
+                  <div style="text-align:center; padding:16px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px dashed var(--border-default); color:var(--text-secondary); font-size:13px;">
+                    No questions yet. Click <strong>+ Add Question</strong> to begin.
+                  </div>
+                ` : `
+                  <div style="display:flex; flex-direction:column; gap:12px;">
+                    ${questions.map((q, qi) => {
+                      const qParams = Array.isArray(q.parameters) ? q.parameters : [];
+                      return `
+                        <div style="background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default); overflow:hidden;">
+                          <!-- Question Row -->
+                          <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:12px 14px; border-bottom:1px solid var(--border-default);">
+                            <div style="flex:1; min-width:0;">
+                              <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Q${qi + 1}${q.section ? ' · ' + q.section : ''}</span>
+                              ${q.btLevel ? `<span class="tag tag-bt" style="margin-left:6px; font-size:10px;">${q.btLevel}</span>` : ''}
+                              <p style="font-size:13px; color:var(--text-primary); margin:4px 0 0; line-height:1.5; word-break:break-word;">${q.text}</p>
+                            </div>
+                            ${!isLocked ? `
+                              <button class="btn btn-ghost btn-sm" style="flex-shrink:0; margin-left:10px;"
+                                onclick="facultyView.openAddParameterModal('${a.id}', '${q.id}')">
+                                + Add Parameter
+                              </button>
+                            ` : ''}
+                          </div>
+
+                          <!-- Parameters -->
+                          ${qParams.length === 0 ? `
+                            <div style="padding:8px 14px; font-size:12px; color:var(--text-tertiary);">No parameters defined yet.</div>
+                          ` : `
+                            <div style="padding:8px 14px;">
+                              <div style="display:flex; flex-direction:column; gap:4px;">
+                                ${qParams.map((p, pi) => `
+                                  <div style="display:flex; align-items:center; gap:10px; font-size:12px; padding:6px 10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+                                    <span style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono); min-width:20px;">P${pi+1}</span>
+                                    <span style="flex:1; font-weight:600; color:var(--text-primary);">${p.label}</span>
+                                    ${p.unitHint ? `<span class="tag tag-co" style="font-size:10px;">${p.unitHint}</span>` : ''}
+                                    <span style="color:var(--text-secondary);">Marks: <strong>${p.valueMarks}</strong></span>
+                                    ${p.correctValue ? `<span style="color:var(--success); font-family:var(--font-mono); font-weight:700;">✓ ${p.correctValue}</span>` : `<span style="color:var(--text-tertiary);">No ground truth</span>`}
+                                  </div>
+                                `).join('')}
+                              </div>
+                            </div>
+                          `}
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `}
+
+                <!-- Add Question Button -->
+                ${!isLocked ? `
+                  <div style="margin-top:14px; display:flex; justify-content:flex-start;">
+                    <button class="btn btn-secondary btn-sm" onclick="facultyView.openAddQuestionModal('${a.id}')">
+                      ➕ Add Question
+                    </button>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `}
     `;
   },
 
@@ -1031,13 +1112,65 @@ const facultyView = {
   },
 
   openCreateAssignmentModal(subId) {
-    app.showModal('Create New Lab Assignment', `
-      <form onsubmit="facultyView.saveNewAssignment(event, '${subId || ''}')">
-        <div class="form-group"><label class="form-label">Assignment Code (e.g. ASG-VMD-01)</label><input type="text" id="asg-code" class="form-input code-font" required></div>
-        <div class="form-group"><label class="form-label">Assignment Title</label><input type="text" id="asg-title" class="form-input" required></div>
+    const sub = (app.data.subjects || []).find(s => s.id === subId);
+    if (!sub) {
+      app.showToast('Please open a subject workspace first before creating an assignment.', 'warning');
+      return;
+    }
+    const subCOs = (app.data.courseOutcomes || []).filter(co => co.subjectId === subId || co.subject_id === subId);
+    const suggestedCode = `ASG-${(sub.code || 'SUB').toUpperCase()}-${String(((app.data.assignments || []).filter(a => a.subjectId === subId || a.subject_id === subId).length) + 1).padStart(2, '0')}`;
+
+    app.showModal(`📋 Create New Lab Assignment — ${sub.code}`, `
+      <form onsubmit="facultyView.saveNewAssignment(event, '${subId}')" style="min-width:480px;">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; background:var(--bg-subtle); padding:12px; border-radius:var(--radius-md); border-left:4px solid var(--accent-blue);">
+          <div>
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin-bottom:2px;">Subject</div>
+            <div style="font-size:13px; font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${sub.code}</div>
+            <div style="font-size:12px; color:var(--text-secondary);">${sub.fullName || sub.name}</div>
+          </div>
+          <div>
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin-bottom:2px;">Semester</div>
+            <div style="font-size:13px; font-weight:700; color:var(--text-primary);">${sub.semester || 'Semester I'}</div>
+            <div style="font-size:12px; color:var(--text-secondary);">Academic Year 2026-27</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Assignment Code</label>
+            <input type="text" id="asg-code" class="form-input code-font" value="${suggestedCode}" placeholder="ASG-VMD-01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Primary BT Level</label>
+            <select id="asg-bt-level" class="form-select" required>
+              ${['BT1 — Remember', 'BT2 — Understand', 'BT3 — Apply', 'BT4 — Analyze', 'BT5 — Evaluate', 'BT6 — Create'].map((lbl, i) => `<option value="BT${i+1}" ${i===2 ? 'selected' : ''}>${lbl}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Assignment Title</label>
+          <input type="text" id="asg-title" class="form-input" placeholder="e.g. Experiment 1: Concurrent Force System" required>
+        </div>
+
+        ${subCOs.length > 0 ? `
+        <div class="form-group">
+          <label class="form-label">Map to Course Outcomes (select all that apply)</label>
+          <div style="display:flex; flex-direction:column; gap:6px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); border:1px solid var(--border-default); max-height:160px; overflow-y:auto;">
+            ${subCOs.map(co => `
+              <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer;">
+                <input type="checkbox" name="asg-cos" value="${co.id}" style="margin-top:2px; accent-color:var(--accent-blue);">
+                <span><strong style="color:var(--accent-blue);">${co.code}</strong> — ${co.description}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        ` : `<div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; padding:8px; background:var(--bg-subtle); border-radius:var(--radius-md);">ℹ️ No Course Outcomes defined yet for ${sub.code}. You can add COs from the <strong>My Course</strong> tab and link them later.</div>`}
+
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create Assignment</button>
+          <button type="submit" class="btn btn-primary">📋 Create Assignment</button>
         </div>
       </form>
     `);
@@ -1049,6 +1182,11 @@ const facultyView = {
     const sub = subId ? (app.data.subjects || []).find(s => s.id === subId) : app.data.subjects[0];
     const subCode = sub ? (sub.code || 'sub') : 'sub';
     const deterministicAsgId = `asg-${subCode.toLowerCase()}-${asgCode.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+    // Collect selected CO IDs
+    const selectedCOIds = Array.from(document.querySelectorAll('input[name="asg-cos"]:checked')).map(cb => cb.value);
+    const btLevel = document.getElementById('asg-bt-level')?.value || 'BT3';
+
     const asgRecord = {
       id: deterministicAsgId,
       code: asgCode,
@@ -1056,6 +1194,8 @@ const facultyView = {
       subjectId: subId || (app.data.subjects[0] ? app.data.subjects[0].id : 'sub-vmd'),
       lifecycle_status: 'draft',
       state: 'Draft',
+      btLevel: btLevel,
+      coIds: selectedCOIds,
       questions: [],
       schedules: []
     };
@@ -1067,12 +1207,164 @@ const facultyView = {
       title: asgRecord.title,
       subject_id: asgRecord.subjectId,
       lifecycle_status: 'draft',
-      questions: [],
-      schedules: []
+      questions: JSON.stringify([]),
+      schedules: JSON.stringify([])
     }, `Assignment ${asgRecord.code}`);
     writeAudit('created', 'assignment', asgRecord.id, asgRecord);
     app.closeModal();
-    app.showToast(`Created assignment ${asgRecord.code}`, 'success');
+    app.showToast(`✅ Created assignment ${asgRecord.code}`, 'success');
+    window.location.hash = `#faculty-subject-${subId}-assignments`;
+  },
+
+  /* ==========================================================================
+     ASSIGNMENT BUILDER — Question & Parameter Modals
+     ========================================================================== */
+  openAddQuestionModal(asgId) {
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+    const subCOs = (app.data.courseOutcomes || []).filter(co =>
+      co.subjectId === asg.subjectId || co.subject_id === asg.subjectId ||
+      co.subject_id === asg.subject_id
+    );
+
+    app.showModal(`➕ Add Question — ${asg.code}`, `
+      <form onsubmit="facultyView.saveNewQuestion(event, '${asgId}')" style="min-width:480px;">
+        <div class="form-group">
+          <label class="form-label">Question Text</label>
+          <textarea id="q-text" class="form-input" rows="4"
+            placeholder="e.g. Find the resultant of two concurrent forces {{F1}} N and {{F2}} N at angle {{theta}}°."
+            required></textarea>
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">Use {{variable}} placeholders for student-specific values.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Section Label <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="q-section" class="form-input" placeholder="e.g. Section A — Numerical">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">CO Mapping</label>
+            <select id="q-co" class="form-select">
+              <option value="">— None —</option>
+              ${subCOs.map(co => `<option value="${co.id}">${co.code} — ${co.description.substring(0,40)}…</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">BT Level</label>
+            <select id="q-bt" class="form-select">
+              ${['BT1 — Remember','BT2 — Understand','BT3 — Apply','BT4 — Analyze','BT5 — Evaluate','BT6 — Create'].map((l,i)=>`<option value="BT${i+1}" ${i===2?'selected':''}>BT${i+1} — ${l.split('—')[1].trim()}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Question</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveNewQuestion(e, asgId) {
+    e.preventDefault();
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+    if (!Array.isArray(asg.questions)) asg.questions = [];
+
+    const qId = `q-${asgId}-${Date.now()}`;
+    const qRecord = {
+      id: qId,
+      text: document.getElementById('q-text').value.trim(),
+      section: document.getElementById('q-section').value.trim(),
+      coId: document.getElementById('q-co').value,
+      btLevel: document.getElementById('q-bt').value,
+      parameters: []
+    };
+    asg.questions.push(qRecord);
+    app.saveState();
+
+    await app.supabaseUpsert('assignments', {
+      id: asg.id,
+      code: asg.code,
+      title: asg.title,
+      subject_id: asg.subjectId || asg.subject_id,
+      lifecycle_status: asg.lifecycle_status || 'draft',
+      questions: JSON.stringify(asg.questions),
+      schedules: JSON.stringify(asg.schedules || [])
+    }, `Assignment ${asg.code} (questions)`);
+
+    writeAudit('created', 'question', qId, qRecord);
+    app.closeModal();
+    app.showToast(`Added question to ${asg.code}`, 'success');
+    app.renderCurrentView();
+  },
+
+  openAddParameterModal(asgId, questionId) {
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+
+    app.showModal(`⚙️ Add Parameter — ${asg.code}`, `
+      <form onsubmit="facultyView.saveNewParameter(event, '${asgId}', '${questionId}')" style="min-width:440px;">
+        <div class="form-group">
+          <label class="form-label">Parameter Label / Symbol</label>
+          <input type="text" id="param-label" class="form-input code-font" placeholder="e.g. Resultant Force R" required>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Unit Hint</label>
+            <input type="text" id="param-unit" class="form-input code-font" placeholder="e.g. N, m/s², kN·m">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Value Marks</label>
+            <input type="number" id="param-marks" class="form-input" min="0" step="0.5" value="2" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correct Value (Ground Truth)</label>
+          <input type="text" id="param-correct" class="form-input code-font"
+            placeholder="e.g. 141.42 or leave blank for formula-derived">
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">This is the expected answer against which student submissions are auto-checked.</div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Parameter</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveNewParameter(e, asgId, questionId) {
+    e.preventDefault();
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+    const q = (asg.questions || []).find(q => q.id === questionId);
+    if (!q) return;
+    if (!Array.isArray(q.parameters)) q.parameters = [];
+
+    const paramId = `param-${questionId}-${Date.now()}`;
+    const correctValue = document.getElementById('param-correct').value.trim();
+    const paramRecord = {
+      id: paramId,
+      label: document.getElementById('param-label').value.trim(),
+      unitHint: document.getElementById('param-unit').value.trim(),
+      valueMarks: parseFloat(document.getElementById('param-marks').value) || 2,
+      correctValue: correctValue
+    };
+    q.parameters.push(paramRecord);
+    app.saveState();
+
+    // Upsert the full assignment (JSONB questions column)
+    await app.supabaseUpsert('assignments', {
+      id: asg.id,
+      code: asg.code,
+      title: asg.title,
+      subject_id: asg.subjectId || asg.subject_id,
+      lifecycle_status: asg.lifecycle_status || 'draft',
+      questions: JSON.stringify(asg.questions),
+      schedules: JSON.stringify(asg.schedules || [])
+    }, `Assignment ${asg.code} (parameters)`);
+
+    writeAudit('created', 'parameter', paramId, paramRecord);
+    app.closeModal();
+    app.showToast(`Added parameter "${paramRecord.label}" to question`, 'success');
     app.renderCurrentView();
   }
 };
