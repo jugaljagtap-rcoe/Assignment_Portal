@@ -152,7 +152,11 @@ class AppEngine {
         supabaseClient.from('assignment_templates').select('*')
       ]);
 
-      if (studentsRes.data && studentsRes.data.length > 0) this.data.students = studentsRes.data;
+      if (studentsRes.data && studentsRes.data.length > 0)
+        this.data.students = studentsRes.data.map(s => ({
+          ...s,
+          yearOfStudy: s.year_of_study || s.yearOfStudy || 'FE'
+        }));
       if (facultyRes.data && facultyRes.data.length > 0) this.data.faculty = facultyRes.data;
       if (subjectFacultyRes.data) this.data.subjectFaculty = subjectFacultyRes.data;
       if (subjectsRes.data && subjectsRes.data.length > 0) this.data.subjects = subjectsRes.data;

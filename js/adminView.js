@@ -360,7 +360,7 @@ const adminView = {
 
   renderDeptStudentsTab(dept) {
     const deptStudents = app.data.students.filter(s => {
-      if (dept.id === 'dept-fe') return (s.yearOfStudy || 'FE').toUpperCase() === 'FE';
+      if (dept.id === 'dept-fe') return (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase() === 'FE';
       const b = s.branch || '';
       if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
       if (dept.id === 'dept-civil') return b.includes('Civil');
@@ -976,6 +976,15 @@ const adminView = {
         <div class="form-group"><label class="form-label">UIN (Unique Identification Number)</label><input type="text" id="st-uin" class="form-input code-font" required></div>
         <div class="form-group"><label class="form-label">Email Address</label><input type="email" id="st-email" class="form-input code-font" required></div>
         <div class="form-group">
+          <label class="form-label">Year of Study</label>
+          <select id="st-year" class="form-select" required>
+            <option value="FE">FE</option>
+            <option value="SE">SE</option>
+            <option value="TE">TE</option>
+            <option value="BE">BE</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Branch</label>
           <select id="st-branch" class="form-select" required>
             ${HARDCODED_BRANCHES.map(b => `<option value="${b}" ${b === preselectedBranch ? 'selected' : ''}>${b}</option>`).join('')}
@@ -1003,7 +1012,7 @@ const adminView = {
       branch: document.getElementById('st-branch').value,
       division: document.getElementById('st-div').value,
       batch: document.getElementById('st-batch').value,
-      yearOfStudy: 'FE'
+      yearOfStudy: document.getElementById('st-year').value
     };
 
     app.data.students.push(stRecord);
