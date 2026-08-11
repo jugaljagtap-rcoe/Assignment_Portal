@@ -3,15 +3,24 @@
    ========================================================================== */
 
 const adminView = {
-  activeDeptTab: 'overview', // 'overview' | 'classes' | 'subjects' | 'students' | 'faculty' | 'vm'
+  activeDeptTab: 'overview',
 
   render(container, activeNav) {
     const hash = window.location.hash || '#admin-home';
 
     if (hash.startsWith('#admin-dept-')) {
-      const parts = hash.replace('#admin-dept-', '').split('-');
-      const deptId = 'dept-' + parts[0];
-      const tab = parts[1] || 'overview';
+      const raw = hash.replace('#admin-dept-', '');
+      const validTabs = ['overview', 'classes', 'subjects', 'students', 'faculty', 'vm'];
+      let tab = 'overview';
+      let deptId = raw;
+
+      for (const t of validTabs) {
+        if (raw.endsWith('-' + t)) {
+          tab = t;
+          deptId = raw.substring(0, raw.length - (t.length + 1));
+          break;
+        }
+      }
       this.renderDepartmentWorkspace(container, deptId, tab);
     } else {
       switch(activeNav) {
@@ -82,12 +91,9 @@ const adminView = {
           });
 
           const deptAsgs = (app.data.assignments || []).filter(a => deptSubjects.some(s => s.id === a.subjectId));
-          
-          // Compute completion rate from assignmentSubmissions (student counts)
           const deptAsgSubs = (app.data.assignmentSubmissions || []).filter(as => deptAsgs.some(a => a.id === as.assignmentId));
           const completedStudents = new Set(deptAsgSubs.filter(as => as.status === 'submitted' || as.status === 'late').map(as => as.studentId)).size;
           const rate = deptStudents.length > 0 ? Math.round((completedStudents / deptStudents.length) * 100) : 0;
-
           const hasPendingVerifications = app.data.submissions.some(s => deptAsgs.some(a => a.id === s.assignmentId) && (s.verificationStatus || 'pending').toLowerCase() === 'pending');
 
           return `
@@ -238,7 +244,6 @@ const adminView = {
         </div>
       </div>
 
-      <!-- Recent Audit Log Strip -->
       <div class="card">
         <h3 class="card-title" style="margin-bottom:12px;">Recent Audit Activity for ${dept.shortName}</h3>
         ${recentAudits.length === 0 ? `<div class="empty-state">No audit logs recorded for this department yet.</div>` : `
@@ -353,8 +358,40 @@ const adminView = {
     `;
   },
 
+  /* PART 8 FIX: renderDeptStudentsTab returns HTML string filtered by dept branch */
   renderDeptStudentsTab(dept) {
-    return this.renderStudentsMaster(document.getElementById('admin-dept-tab-content'));
+    const deptStudents = app.data.students.filter(s => {
+      const b = s.branch || '';
+      if (dept.id === 'dept-aids') return b.includes('Artificial Intelligence');
+      if (dept.id === 'dept-civil') return b.includes('Civil');
+      if (dept.id === 'dept-comp') return b.includes('Computer Engineering');
+      if (dept.id === 'dept-ecs') return b.includes('Electronics');
+      if (dept.id === 'dept-mech') return b.includes('Mechanical');
+      return true;
+    });
+
+    return `
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom:12px;">Enrolled Student Roster — ${dept.name} (${deptStudents.length} Students)</h3>
+        <div class="table-container" style="max-height:500px; overflow-y:auto;">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>UIN</th>
+                <th>Student Name</th>
+                <th>Email</th>
+                <th>Branch</th>
+                <th>Division / Batch</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${this.buildStudentRows(deptStudents)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   },
 
   renderDeptFacultyTab(dept) {
@@ -448,7 +485,6 @@ const adminView = {
     const sub = app.data.subjects.find(s => s.id === subjectId);
     if (!sub) return;
 
-    // Group ALL faculty by their home department
     const facultyByDeptMap = new Map();
     HARDCODED_DEPARTMENTS.forEach(d => facultyByDeptMap.set(d.id, []));
 
@@ -634,9 +670,6 @@ const adminView = {
     const s = app.data.students.find(st => st.id === studentId);
     if (!s) return;
 
-    const studentSubmissions = app.data.submissions.filter(sub => sub.studentId === s.id || sub.studentId === s.uin);
-    const studentAssignments = app.data.assignments;
-
     app.showModal(`🎓 Academic Profile: ${s.name}`, `
       <div style="display:flex; flex-direction:column; gap:16px; min-width:540px;">
         <div class="card" style="background:var(--bg-subtle); border-color:var(--border-strong); padding:16px;">
@@ -655,13 +688,168 @@ const adminView = {
     `);
   },
 
-  /* Placeholder Modal Handlers */
-  openAddStudentModal() { app.showToast('Student Modal opened', 'info'); },
-  openEditStudentModal(id) { app.showToast('Edit Student Modal opened', 'info'); },
-  openAddSubjectModal(deptId) { app.showToast('Add Subject Modal opened', 'info'); },
-  openAttainmentModal() { app.showToast('Attainment Settings Modal opened', 'info'); },
-  renderFacultyRoster(c) { c.innerHTML = `<div class="card"><h3>Faculty Roster</h3></div>`; },
-  renderDepartments(c) { this.renderAdminHome(c); },
-  renderPOAccreditation(c) { c.innerHTML = `<div class="card"><h3>PO Accreditation</h3></div>`; },
-  renderGoogleAuthSettings(c) { c.innerHTML = `<div class="card"><h3>Google Auth & Audit Trail Log</h3></div>`; }
+  /* PART 4 FIX: Full implementations for admin modals */
+  openAddStudentModal() {
+    app.showModal('Add New Student to Master Roster', `
+      <form onsubmit="adminView.saveNewStudent(event)">
+        <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-name" class="form-input" required></div>
+        <div class="form-group"><label class="form-label">UIN (Unique Identification Number)</label><input type="text" id="st-uin" class="form-input code-font" required></div>
+        <div class="form-group"><label class="form-label">Email Address</label><input type="email" id="st-email" class="form-input code-font" required></div>
+        <div class="form-group">
+          <label class="form-label">Branch</label>
+          <select id="st-branch" class="form-select" required>
+            ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group"><label class="form-label">Division</label><input type="text" id="st-div" class="form-input" value="A" required></div>
+          <div class="form-group"><label class="form-label">Batch</label><input type="text" id="st-batch" class="form-input" value="A1" required></div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Student</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveNewStudent(e) {
+    e.preventDefault();
+    const stRecord = {
+      id: 'st-' + Date.now(),
+      uin: document.getElementById('st-uin').value.trim(),
+      name: document.getElementById('st-name').value.trim(),
+      email: document.getElementById('st-email').value.trim(),
+      branch: document.getElementById('st-branch').value,
+      division: document.getElementById('st-div').value,
+      batch: document.getElementById('st-batch').value,
+      yearOfStudy: 'FE'
+    };
+
+    app.data.students.push(stRecord);
+    app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try { await supabaseClient.from('students').upsert(stRecord); } catch(err) { console.warn('Student insert notice:', err); }
+    }
+    writeAudit('created', 'student', stRecord.id, stRecord);
+    app.closeModal();
+    app.showToast(`Added student ${stRecord.name}`, 'success');
+    app.renderCurrentView();
+  },
+
+  openEditStudentModal(id) {
+    const s = app.data.students.find(st => st.id === id);
+    if (!s) return;
+    app.showModal(`Edit Student: ${s.name}`, `
+      <form onsubmit="adminView.saveEditedStudent(event, '${s.id}')">
+        <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-edit-name" class="form-input" value="${s.name}" required></div>
+        <div class="form-group"><label class="form-label">UIN</label><input type="text" id="st-edit-uin" class="form-input code-font" value="${s.uin}" required></div>
+        <div class="form-group"><label class="form-label">Email</label><input type="email" id="st-edit-email" class="form-input code-font" value="${s.email}" required></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Student</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveEditedStudent(e, id) {
+    e.preventDefault();
+    const s = app.data.students.find(st => st.id === id);
+    if (!s) return;
+    s.name = document.getElementById('st-edit-name').value;
+    s.uin = document.getElementById('st-edit-uin').value;
+    s.email = document.getElementById('st-edit-email').value;
+    app.saveState();
+    writeAudit('updated', 'student', id, s);
+    app.closeModal();
+    app.showToast('Updated student profile', 'success');
+    app.renderCurrentView();
+  },
+
+  openAddSubjectModal(deptId) {
+    app.showModal('Add New Subject Course', `
+      <form onsubmit="adminView.saveNewSubject(event, '${deptId}')">
+        <div class="form-group"><label class="form-label">Subject Code (e.g. VMD, EM)</label><input type="text" id="sub-code" class="form-input code-font" required></div>
+        <div class="form-group"><label class="form-label">Full Subject Name</label><input type="text" id="sub-fullname" class="form-input" required></div>
+        <div class="form-group">
+          <label class="form-label">Semester</label>
+          <select id="sub-sem" class="form-select" required>
+            <option value="Semester I">Semester I</option>
+            <option value="Semester II">Semester II</option>
+          </select>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Subject</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveNewSubject(e, deptId) {
+    e.preventDefault();
+    const subRecord = {
+      id: 'sub-' + Date.now(),
+      code: document.getElementById('sub-code').value.trim(),
+      name: document.getElementById('sub-fullname').value.trim(),
+      fullName: document.getElementById('sub-fullname').value.trim(),
+      departmentId: deptId,
+      semester: document.getElementById('sub-sem').value
+    };
+    app.data.subjects.push(subRecord);
+    app.saveState();
+    writeAudit('created', 'subject', subRecord.id, subRecord);
+    app.closeModal();
+    app.showToast(`Created subject ${subRecord.code}`, 'success');
+    app.renderCurrentView();
+  },
+
+  openAttainmentModal() {
+    app.showModal('⚙️ Attainment Threshold Settings', `
+      <form onsubmit="adminView.saveAttainmentSettings(event)">
+        <div class="form-group">
+          <label class="form-label">Student Target Score Threshold (%)</label>
+          <input type="number" id="threshold-student" class="form-input" value="${app.data.attainmentSettings?.studentThresholdPct || 60}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Class Attainment Target (%)</label>
+          <input type="number" id="threshold-class" class="form-input" value="${app.data.attainmentSettings?.classTargetPct || 70}" required>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+      </form>
+    `);
+  },
+
+  saveAttainmentSettings(e) {
+    e.preventDefault();
+    app.data.attainmentSettings = {
+      studentThresholdPct: parseInt(document.getElementById('threshold-student').value),
+      classTargetPct: parseInt(document.getElementById('threshold-class').value)
+    };
+    app.saveState();
+    app.closeModal();
+    app.showToast('Attainment thresholds saved!', 'success');
+  },
+
+  renderFacultyRoster(container) {
+    container.innerHTML = `
+      <div class="page-header-container"><div><h1 class="page-title">Faculty Roster</h1></div></div>
+      <div class="card">
+        <div class="table-container">
+          <table class="custom-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+            <tbody>${app.data.faculty.map(f => `<tr><td>${f.name}</td><td>${f.email}</td><td>${f.role}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
+  renderDepartments(container) { this.renderAdminHome(container); },
+  renderPOAccreditation(container) { nbaView.renderInstituteView(container); },
+  renderGoogleAuthSettings(container) { analyticsView.renderReportsTab(container); }
 };

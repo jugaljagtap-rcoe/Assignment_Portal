@@ -21,8 +21,16 @@ const studentView = {
   },
 
   getAssignmentsForStudent(student) {
-    const allAssignments = app.data.assignments || [];
+    let allAssignments = app.data.assignments || [];
     if (allAssignments.length === 0) return [];
+
+    // Part 11 Fix: Students should ONLY see published or locked assignments (no drafts)
+    if (app.currentRole === 'student') {
+      allAssignments = allAssignments.filter(a =>
+        (a.lifecycle_status || a.state || '').toLowerCase() !== 'draft'
+      );
+    }
+
     if (!student) return allAssignments;
 
     const studentYear = (student.yearOfStudy || 'FE').toUpperCase().trim();
@@ -124,7 +132,6 @@ const studentView = {
         </div>
       </div>
 
-      <!-- Horizontal Scrollable Assignment Journey Timeline -->
       <div style="margin-bottom:16px;">
         <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); display:block; margin-bottom:6px;">Assignment Journey Timeline</label>
         <div class="timeline-pills-row">
@@ -148,7 +155,6 @@ const studentView = {
         </div>
       </div>
 
-      <!-- KPI Summary Cards -->
       <div class="kpi-grid">
         <div class="kpi-card">
           <span class="kpi-label">My Class & Division</span>
@@ -180,7 +186,6 @@ const studentView = {
         </div>
       </div>
 
-      <!-- Assigned Experiments Roster Table -->
       <div class="card" style="margin-top: 16px;">
         <h2 class="card-title" style="margin-bottom:12px;">Assigned Experiments</h2>
         <div class="table-container">
@@ -258,7 +263,7 @@ const studentView = {
           <div class="card" style="padding:40px; text-align:center;">
             <h2 style="font-size:18px; margin-bottom:8px;">No Active Canvas Sheet</h2>
             <p style="color:var(--text-secondary); margin-bottom:16px;">
-              ${!student ? 'No student profile selected.' : 'There are currently no lab assignments published for your class/branch to solve.'}
+              ${!student ? 'No student profile selected.' : 'There are currently no published lab assignments for your class/branch to solve.'}
             </p>
             <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Return to Student Portal</button>
           </div>
@@ -297,7 +302,6 @@ const studentView = {
       const deadlineText = schedule.deadline ? new Date(schedule.deadline).toLocaleString() : '31/12/2026, 11:59:00 PM';
       const isLate = schedule.deadline ? new Date() > new Date(schedule.deadline) : false;
 
-      // Student Variable Map
       const studentVars = {};
       (app.data.studentVariables || []).forEach(v => {
         if (v.studentId === student.id && (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId)) {
@@ -314,7 +318,6 @@ const studentView = {
           <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
         </div>
 
-        <!-- Horizontal Scrollable Assignment Journey Timeline Pills -->
         <div class="print-hide" style="margin-bottom:16px;">
           <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); display:block; margin-bottom:6px;">Assignment Journey Timeline</label>
           <div class="timeline-pills-row">
@@ -338,7 +341,6 @@ const studentView = {
           </div>
         </div>
 
-        <!-- Dynamic Batch Deadline Banner -->
         <div class="card print-hide" style="margin-bottom:20px; background:var(--accent-blue-subtle); border-color:rgba(0,102,204,0.2);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -354,7 +356,6 @@ const studentView = {
           </div>
         </div>
 
-        <!-- Question Cards -->
         <div style="display:flex; flex-direction:column; gap:20px;">
           ${(asg.questions || []).map((q, qIndex) => `
             <div class="card" style="padding:20px;">
@@ -362,7 +363,6 @@ const studentView = {
               <div style="font-size:14px; margin-top:8px; line-height:1.6;">${app.formatQuestionText(q.text, studentVars)}</div>
               ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" style="max-width:100%; height:auto; margin-top:12px; border-radius:8px;">` : ''}
 
-              <!-- Parameter Input Fields -->
               <div style="margin-top:16px; border-top:1px solid var(--border-default); padding-top:16px;">
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Evaluation Parameters</label>
                 <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
@@ -414,7 +414,6 @@ const studentView = {
           </button>
         </div>
 
-        <!-- Part 13.h Parameter Summary Footer -->
         ${priorAttempts.length > 0 ? `
           <div class="param-summary-footer" style="margin-top:10px;">
             <span>Attempts: <strong class="mono-val">${attemptCount} / 3</strong></span>
@@ -440,7 +439,6 @@ const studentView = {
         return;
       }
 
-      const student = app.data.students.find(s => s.id === studentId);
       const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
       if (priorAttempts.length >= 3) {
         app.showToast('Maximum attempt limit reached (3/3 attempts used)', 'danger');
@@ -487,15 +485,13 @@ const studentView = {
       };
 
       app.data.submissions.push(newRecord);
-      app.saveState();
-      await app.syncSubmissionToSupabase(newRecord);
 
-      // Part 10: Upsert rolled-up completion record to assignment_submissions
+      // Part 12 Fix: Upsert rolled-up record to assignment_submissions table
       const asg = app.data.assignments.find(a => a.id === asgId);
       const allAsgParams = (asg?.questions || []).flatMap(q => q.parameters || []);
       const studentAllAsgSubs = app.data.submissions.filter(s => s.studentId === studentId && s.assignmentId === asgId);
       const uniqueParamsDone = new Set(studentAllAsgSubs.map(s => s.parameterId)).size;
-      const statusStr = uniqueParamsDone === 0 ? 'not_started' : uniqueParamsDone >= allAsgParams.length ? 'submitted' : 'partial';
+      const statusStr = uniqueParamsDone === 0 ? 'not_started' : uniqueParamsDone >= Math.max(1, allAsgParams.length) ? 'submitted' : 'partial';
 
       let totalEarned = 0;
       allAsgParams.forEach(p => {
@@ -514,6 +510,17 @@ const studentView = {
         total_marks_awarded: totalEarned,
         last_attempt_at: submittedAt
       };
+
+      let existingRolledUp = (app.data.assignmentSubmissions || []).find(as => as.id === rolledUpRecord.id);
+      if (existingRolledUp) {
+        Object.assign(existingRolledUp, rolledUpRecord);
+      } else {
+        if (!app.data.assignmentSubmissions) app.data.assignmentSubmissions = [];
+        app.data.assignmentSubmissions.push(rolledUpRecord);
+      }
+
+      app.saveState();
+      await app.syncSubmissionToSupabase(newRecord);
 
       if (typeof supabaseClient !== 'undefined' && supabaseClient) {
         try {
@@ -543,7 +550,6 @@ const studentView = {
         </div>
       </div>
 
-      <!-- Attempt History Table -->
       <div class="card" style="margin-bottom:24px;">
         <h3 class="card-title" style="margin-bottom:12px;">Attempt History — ${activeAsg ? activeAsg.code : 'All'}</h3>
         <div class="table-container">
@@ -586,7 +592,6 @@ const studentView = {
         </div>
       </div>
 
-      <!-- Student CO Attainment Section -->
       ${this.renderStudentCOAttainmentHTML(student, activeAsg)}
     `;
   },
