@@ -107,8 +107,8 @@ const analyticsView = {
 
       <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
-          <h1 class="page-title">NBA CO/PO Accreditation & Class Gradebook</h1>
-          <p class="page-subtitle">Real-Time Course Outcome Attainment & Consolidated Student Gradesheet Roster</p>
+          <h1 class="page-title">NBA CO/PO Accreditation & Reports</h1>
+          <p class="page-subtitle">Real-Time Course Outcome Attainment, Class Gradebook Roster, & Custom Reports A-E</p>
         </div>
         <div style="display:flex; gap:10px;">
           <button class="btn btn-secondary" onclick="analyticsView.exportMasterClassGradebookCSV()">
@@ -123,6 +123,16 @@ const analyticsView = {
             </button>
           ` : ''}
         </div>
+      </div>
+
+      <!-- Sub-Nav Switcher for Analytics / Reports -->
+      <div class="segmented-control" style="margin-bottom:20px;">
+        <button class="segmented-btn ${this.activeTab !== 'reports' ? 'active' : ''}" onclick="analyticsView.activeTab = 'attainment'; analyticsView.render(document.getElementById('main-content'));">
+          📊 CO/PO Attainment & Gradebook
+        </button>
+        <button class="segmented-btn ${this.activeTab === 'reports' ? 'active' : ''}" onclick="analyticsView.activeTab = 'reports'; analyticsView.renderReportsTab(document.getElementById('main-content'));">
+          📋 Drill-Down Reports (Reports A - E)
+        </button>
       </div>
 
       <div class="kpi-grid">
