@@ -637,12 +637,13 @@ const adminView = {
     `);
   },
 
-  processBulkStudentCSV(deptId) {
+  async processBulkStudentCSV(deptId) {
     const raw = document.getElementById('bulk-csv-textarea')?.value || '';
     if (!raw.trim()) { app.showToast('Please paste valid CSV data', 'warning'); return; }
 
     const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
     let imported = 0;
+    const newStudents = [];
     lines.forEach((line, idx) => {
       if (idx === 0 && line.toLowerCase().includes('uin')) return;
       const parts = line.split(',').map(p => p.trim());
@@ -659,11 +660,20 @@ const adminView = {
         const stObj = { id: existingIdx >= 0 ? app.data.students[existingIdx].id : deterministicId, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
         if (existingIdx >= 0) app.data.students[existingIdx] = stObj;
         else app.data.students.push(stObj);
+        newStudents.push(stObj);
         imported++;
       }
     });
 
     app.saveState();
+    for (const stObj of newStudents) {
+      await app.supabaseUpsert('students', {
+        id: stObj.id, uin: stObj.uin, name: stObj.name,
+        email: stObj.email, branch: stObj.branch,
+        division: stObj.division, batch: stObj.batch,
+        year_of_study: stObj.yearOfStudy, academic_year: '2026-27'
+      }, `Student ${stObj.name}`);
+    }
     app.closeModal();
     app.showToast(`Successfully enrolled ${imported} students!`, 'success');
     app.renderCurrentView();

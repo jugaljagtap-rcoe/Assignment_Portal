@@ -833,6 +833,27 @@ class AppEngine {
      STARTUP HEALTH CHECK — Verify critical Supabase tables exist.
      Shows a persistent admin-only banner for any missing table.
      ========================================================================== */
+  async syncSubmissionToSupabase(record) {
+    if (!supabaseClient) return;
+    try {
+      await supabaseClient.from('submissions').upsert({
+        id: record.id,
+        assignment_id: record.assignmentId,
+        student_id: record.studentId,
+        parameter_id: record.parameterId,
+        attempt_number: record.attemptNumber,
+        submitted_value: record.submittedValue,
+        submitted_unit: record.submittedUnit,
+        is_correct_value: record.isCorrectValue,
+        is_correct_unit: record.isCorrectUnit,
+        marks_awarded: record.marksAwarded,
+        attempt_deduction_pct: record.attemptDeductionPct,
+        verification_status: record.verificationStatus,
+        submitted_at: record.submittedAt
+      });
+    } catch(e) { console.warn('Submission sync notice:', e); }
+  }
+
   async checkSupabaseTables() {
     if (!supabaseClient) return;
     const criticalTables = [

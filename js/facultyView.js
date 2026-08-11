@@ -1043,7 +1043,7 @@ const facultyView = {
     `);
   },
 
-  saveNewAssignment(e, subId) {
+  async saveNewAssignment(e, subId) {
     e.preventDefault();
     const asgCode = document.getElementById('asg-code').value.trim();
     const sub = subId ? (app.data.subjects || []).find(s => s.id === subId) : app.data.subjects[0];
@@ -1061,6 +1061,15 @@ const facultyView = {
     };
     app.data.assignments.push(asgRecord);
     app.saveState();
+    await app.supabaseUpsert('assignments', {
+      id: asgRecord.id,
+      code: asgRecord.code,
+      title: asgRecord.title,
+      subject_id: asgRecord.subjectId,
+      lifecycle_status: 'draft',
+      questions: [],
+      schedules: []
+    }, `Assignment ${asgRecord.code}`);
     writeAudit('created', 'assignment', asgRecord.id, asgRecord);
     app.closeModal();
     app.showToast(`Created assignment ${asgRecord.code}`, 'success');
