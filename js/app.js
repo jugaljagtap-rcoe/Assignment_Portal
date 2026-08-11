@@ -159,7 +159,20 @@ class AppEngine {
         }));
       if (facultyRes.data && facultyRes.data.length > 0) this.data.faculty = facultyRes.data;
       if (subjectFacultyRes.data) this.data.subjectFaculty = subjectFacultyRes.data;
-      if (subjectsRes.data && subjectsRes.data.length > 0) this.data.subjects = subjectsRes.data;
+      if (subjectsRes.data && subjectsRes.data.length > 0) {
+        const dbSubjects = subjectsRes.data.map(s => ({
+          ...s,
+          fullName: s.full_name || s.fullName || s.name,
+          departmentId: s.department_id || s.departmentId
+        }));
+        const merged = [...dbSubjects];
+        (this.data.subjects || []).forEach(localSub => {
+          if (!merged.some(m => m.id === localSub.id || (m.code === localSub.code && (m.departmentId === localSub.departmentId || m.department_id === localSub.departmentId)))) {
+            merged.push(localSub);
+          }
+        });
+        this.data.subjects = merged;
+      }
       if (assignmentsRes.data) this.data.assignments = assignmentsRes.data;
       if (submissionsRes.data) this.data.submissions = submissionsRes.data;
       if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;

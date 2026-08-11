@@ -309,7 +309,7 @@ const adminView = {
   },
 
   renderDeptSubjectsTab(dept) {
-    const subjects = (app.data.subjects || []).filter(s => s.departmentId === dept.id);
+    const subjects = (app.data.subjects || []).filter(s => s.departmentId === dept.id || s.department_id === dept.id);
     return `
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -1089,7 +1089,15 @@ const adminView = {
     app.data.subjects.push(subRecord);
     app.saveState();
     if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-      try { await supabaseClient.from('subjects').upsert(subRecord); } catch(err) { console.warn(err); }
+      const dbRecord = {
+        id: subRecord.id,
+        code: subRecord.code,
+        name: subRecord.name,
+        full_name: subRecord.fullName,
+        department_id: subRecord.departmentId,
+        semester: subRecord.semester
+      };
+      try { await supabaseClient.from('subjects').upsert(dbRecord); } catch(err) { console.warn('Subject upsert notice:', err); }
     }
     writeAudit('created', 'subject', subRecord.id, subRecord);
     app.closeModal();
