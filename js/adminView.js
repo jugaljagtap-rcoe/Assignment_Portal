@@ -275,7 +275,7 @@ const adminView = {
   },
 
   renderDeptClassesTab(dept) {
-    const classes = (INITIAL_DATA.academicClasses || []).filter(c => c.departmentId === dept.id || dept.id === 'dept-fe');
+    const classes = (INITIAL_DATA.academicClasses || []).filter(c => c.departmentId === dept.id);
     return `
       <div class="card">
         <h3 class="card-title" style="margin-bottom:12px;">Academic Classes — ${dept.name}</h3>
@@ -358,7 +358,6 @@ const adminView = {
     `;
   },
 
-  /* PART 8 FIX: renderDeptStudentsTab returns HTML string filtered by dept branch */
   renderDeptStudentsTab(dept) {
     const deptStudents = app.data.students.filter(s => {
       const b = s.branch || '';
@@ -372,7 +371,17 @@ const adminView = {
 
     return `
       <div class="card">
-        <h3 class="card-title" style="margin-bottom:12px;">Enrolled Student Roster — ${dept.name} (${deptStudents.length} Students)</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 class="card-title">Enrolled Student Roster — ${dept.name} (${deptStudents.length} Students)</h3>
+            <p class="card-subtitle" style="font-size:12px; color:var(--text-secondary);">Manage student enrollments, bulk CSV imports, and class/branch transfers</p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="adminView.openAddStudentModal('${dept.id}')">+ Enroll Student</button>
+            <button class="btn btn-secondary btn-sm" onclick="adminView.openBulkStudentCSVModal('${dept.id}')">📥 Bulk CSV Import</button>
+            <button class="btn btn-secondary btn-sm" onclick="adminView.openTransferStudentModal('${dept.id}')">🔄 Transfer Class / Branch</button>
+          </div>
+        </div>
         <div class="table-container" style="max-height:500px; overflow-y:auto;">
           <table class="custom-table">
             <thead>
@@ -398,7 +407,13 @@ const adminView = {
     const deptFaculty = (app.data.faculty || []).filter(f => f.departmentId === dept.id || f.role === 'admin');
     return `
       <div class="card">
-        <h3 class="card-title" style="margin-bottom:12px;">Home Department Faculty Roster — ${dept.name}</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3 class="card-title">Home Department Faculty Roster — ${dept.name}</h3>
+            <p class="card-subtitle" style="font-size:12px; color:var(--text-secondary);">Faculty members permanently affiliated with ${dept.shortName}</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminView.openAddFacultyModal('${dept.id}')">+ Add / Assign Faculty</button>
+        </div>
         <div class="table-container">
           <table class="custom-table">
             <thead>
@@ -407,6 +422,7 @@ const adminView = {
                 <th>Email Address</th>
                 <th>Role</th>
                 <th>Currently Teaching</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -422,6 +438,9 @@ const adminView = {
                     <td class="mono-val" style="font-size:12px; color:var(--accent-blue);">${f.email}</td>
                     <td><span class="tag ${f.role === 'admin' ? 'tag-danger' : 'tag-co'}">${f.role.toUpperCase()}</span></td>
                     <td><span class="tag tag-bt">${subCodes.length > 0 ? subCodes.join(', ') : 'None'}</span></td>
+                    <td>
+                      <button class="btn btn-ghost btn-sm" onclick="adminView.openAddFacultyModal('${dept.id}', '${f.email}')">✏️ Reassign / Edit</button>
+                    </td>
                   </tr>
                 `;
               }).join('')}
@@ -435,22 +454,55 @@ const adminView = {
   renderDeptVisionMissionTab(dept) {
     return `
       <div class="card">
-        <h3 class="card-title" style="margin-bottom:12px;">Department Vision & Mission Statements</h3>
-        <form onsubmit="adminView.saveDeptVisionMission(event, '${dept.id}')">
-          <div class="form-group">
-            <label class="form-label">Department Vision Statement</label>
-            <textarea id="dept-vision-input" class="form-input" rows="3" required>${dept.vision || ''}</textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <h3 class="card-title">Department Vision & Mission Statements</h3>
+            <p class="card-subtitle" style="font-size:12px; color:var(--text-secondary);">Official NBA Accreditation statements for ${dept.name}</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminView.openEditVisionMissionModal('${dept.id}')">
+            ✏️ Edit Vision & Mission
+          </button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:20px;">
+          <div style="background:var(--bg-subtle); border-left:4px solid var(--accent-blue); padding:18px 22px; border-radius:var(--radius-md);">
+            <h4 style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent-blue); margin-bottom:8px;">🎯 Department Vision</h4>
+            <p style="font-size:14px; line-height:1.6; color:var(--text-primary); margin:0;">${dept.vision || 'No vision statement set.'}</p>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Department Mission Points (One per line)</label>
-            <textarea id="dept-mission-input" class="form-input" rows="5" required>${(dept.mission || []).join('\n')}</textarea>
+          <div style="background:var(--bg-subtle); border-left:4px solid var(--success); padding:18px 22px; border-radius:var(--radius-md);">
+            <h4 style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--success); margin-bottom:10px;">🚀 Department Mission Statements</h4>
+            <ol style="margin:0; padding-left:20px; display:flex; flex-direction:column; gap:10px;">
+              ${(dept.mission || []).map(m => `<li style="font-size:14px; line-height:1.5; color:var(--text-primary); font-weight:500;">${m}</li>`).join('')}
+            </ol>
           </div>
-
-          <button type="submit" class="btn btn-primary">💾 Save Vision & Mission Statements</button>
-        </form>
+        </div>
       </div>
     `;
+  },
+
+  openEditVisionMissionModal(deptId) {
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId);
+    if (!dept) return;
+
+    app.showModal(`✏️ Edit Vision & Mission — ${dept.shortName}`, `
+      <form onsubmit="adminView.saveDeptVisionMission(event, '${dept.id}')" style="min-width:560px;">
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700;">Department Vision Statement</label>
+          <textarea id="dept-vision-input" class="form-input" rows="5" style="width:100%; resize:vertical; font-size:13px; line-height:1.5;" required>${dept.vision || ''}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700;">Department Mission Points (One point per line)</label>
+          <textarea id="dept-mission-input" class="form-input" rows="8" style="width:100%; resize:vertical; font-size:13px; line-height:1.5;" required>${(dept.mission || []).join('\n')}</textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Statements</button>
+        </div>
+      </form>
+    `);
   },
 
   async saveDeptVisionMission(e, deptId) {
@@ -458,7 +510,7 @@ const adminView = {
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId);
     if (!dept) return;
 
-    dept.vision = document.getElementById('dept-vision-input').value;
+    dept.vision = document.getElementById('dept-vision-input').value.trim();
     dept.mission = document.getElementById('dept-mission-input').value.split('\n').map(l => l.trim()).filter(Boolean);
 
     app.saveState();
@@ -475,7 +527,221 @@ const adminView = {
     }
 
     writeAudit('updated', 'department', dept.id, { vision: dept.vision });
+    app.closeModal();
     app.showToast(`Updated Vision & Mission for ${dept.name}`, 'success');
+    app.renderCurrentView();
+  },
+
+  openTransferStudentModal(deptId) {
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    app.showModal(`🔄 Transfer / Reassign Student Class`, `
+      <form onsubmit="adminView.saveStudentTransfer(event, '${deptId}')">
+        <div class="form-group">
+          <label class="form-label">Select Student by UIN / Name</label>
+          <select id="transfer-student-id" class="form-select" required onchange="adminView.onTransferStudentSelectChange(this.value)">
+            <option value="">-- Choose Student to Transfer --</option>
+            ${app.data.students.map(s => `<option value="${s.id}">${s.uin} — ${s.name} (${s.branch}, Div ${s.division})</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Target Branch / Department</label>
+          <select id="transfer-branch" class="form-select" required>
+            ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Division</label>
+            <input type="text" id="transfer-division" class="form-input" value="A" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Batch</label>
+            <input type="text" id="transfer-batch" class="form-input" value="A1" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Year of Study</label>
+            <select id="transfer-year" class="form-select" required>
+              <option value="FE">FE (First Year)</option>
+              <option value="SE">SE (Second Year)</option>
+              <option value="TE">TE (Third Year)</option>
+              <option value="BE">BE (Final Year)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">🔄 Confirm Transfer</button>
+        </div>
+      </form>
+    `);
+  },
+
+  onTransferStudentSelectChange(studentId) {
+    const s = app.data.students.find(st => st.id === studentId);
+    if (!s) return;
+    const bEl = document.getElementById('transfer-branch');
+    const dEl = document.getElementById('transfer-division');
+    const btEl = document.getElementById('transfer-batch');
+    const yEl = document.getElementById('transfer-year');
+    if (bEl) bEl.value = s.branch || HARDCODED_BRANCHES[0];
+    if (dEl) dEl.value = s.division || 'A';
+    if (btEl) btEl.value = s.batch || 'A1';
+    if (yEl) yEl.value = s.yearOfStudy || 'FE';
+  },
+
+  saveStudentTransfer(e, deptId) {
+    e.preventDefault();
+    const stId = document.getElementById('transfer-student-id').value;
+    const s = app.data.students.find(st => st.id === stId);
+    if (!s) return;
+
+    s.branch = document.getElementById('transfer-branch').value;
+    s.division = document.getElementById('transfer-division').value;
+    s.batch = document.getElementById('transfer-batch').value;
+    s.yearOfStudy = document.getElementById('transfer-year').value;
+
+    app.saveState();
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      try { supabaseClient.from('students').upsert(s); } catch(err) { console.warn(err); }
+    }
+    writeAudit('updated', 'student', s.id, { transfer: true, branch: s.branch, division: s.division });
+    app.closeModal();
+    app.showToast(`Transferred ${s.name} (${s.uin}) to ${s.branch} (Div ${s.division})`, 'success');
+    app.renderCurrentView();
+  },
+
+  openBulkStudentCSVModal(deptId) {
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    let defaultBranch = HARDCODED_BRANCHES[0];
+    if (deptId === 'dept-aids') defaultBranch = 'Artificial Intelligence & Data Science';
+    else if (deptId === 'dept-civil') defaultBranch = 'Civil Engineering';
+    else if (deptId === 'dept-comp') defaultBranch = 'Computer Engineering';
+    else if (deptId === 'dept-ecs') defaultBranch = 'Electronics & Computer Science';
+    else if (deptId === 'dept-mech') defaultBranch = 'Mechanical Engineering';
+
+    app.showModal(`📥 Bulk CSV Student Onboarding — ${dept.shortName}`, `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <p style="font-size:12px; color:var(--text-secondary);">
+          Paste raw CSV lines below. Format: <code>uin, full_name, email, branch, division, batch</code>
+        </p>
+        <textarea id="bulk-csv-textarea" class="form-input code-font" rows="8" placeholder="24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,A1\n24051002,Ananya Patel,24051002@eng.rizvi.edu.in,${defaultBranch},A,A1"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="adminView.processBulkStudentCSV('${deptId}')">📥 Process & Import CSV</button>
+        </div>
+      </div>
+    `);
+  },
+
+  processBulkStudentCSV(deptId) {
+    const raw = document.getElementById('bulk-csv-textarea')?.value || '';
+    if (!raw.trim()) { app.showToast('Please paste valid CSV data', 'warning'); return; }
+
+    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    let imported = 0;
+    lines.forEach((line, idx) => {
+      if (idx === 0 && line.toLowerCase().includes('uin')) return;
+      const parts = line.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        const uin = parts[0];
+        const name = parts[1];
+        const email = parts[2] || `${uin}@eng.rizvi.edu.in`;
+        const branch = parts[3] || HARDCODED_BRANCHES[0];
+        const division = parts[4] || 'A';
+        const batch = parts[5] || 'A1';
+
+        const existingIdx = app.data.students.findIndex(s => s.uin === uin);
+        const stObj = { id: existingIdx >= 0 ? app.data.students[existingIdx].id : 'st-' + Date.now() + '-' + idx, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
+        if (existingIdx >= 0) app.data.students[existingIdx] = stObj;
+        else app.data.students.push(stObj);
+        imported++;
+      }
+    });
+
+    app.saveState();
+    app.closeModal();
+    app.showToast(`Successfully enrolled ${imported} students!`, 'success');
+    app.renderCurrentView();
+  },
+
+  openAddFacultyModal(deptId, existingEmail = null) {
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    const targetFac = existingEmail ? app.data.faculty.find(f => f.email.toLowerCase() === existingEmail.toLowerCase()) : null;
+
+    app.showModal(`👨‍🏫 Add / Assign Faculty to ${dept.name}`, `
+      <form onsubmit="adminView.saveAddFaculty(event, '${deptId}')">
+        <div style="margin-bottom:14px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); font-size:12px; color:var(--text-secondary);">
+          Select an existing faculty member or add a new faculty record to assign to <strong>${dept.name}</strong>.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Existing Faculty Roster Select (Optional)</label>
+          <select id="existing-faculty-select" class="form-select" onchange="adminView.onExistingFacultySelect(this.value)">
+            <option value="">-- Choose Existing Faculty or Enter New Below --</option>
+            ${(app.data.faculty || []).map(f => `<option value="${f.email}" ${targetFac && targetFac.email === f.email ? 'selected' : ''}>${f.name} (${f.email}) — Dept: ${f.departmentId || 'Unassigned'}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="border-top:1px solid var(--border-default); padding-top:12px; margin-top:12px;">
+          <div class="form-group"><label class="form-label">Faculty Full Name</label><input type="text" id="fac-name" class="form-input" value="${targetFac ? targetFac.name : ''}" placeholder="e.g. Prof. Jugal Jagtap" required></div>
+          <div class="form-group"><label class="form-label">Email Address (@eng.rizvi.edu.in)</label><input type="email" id="fac-email" class="form-input code-font" value="${targetFac ? targetFac.email : ''}" placeholder="jugaljagtap@eng.rizvi.edu.in" required></div>
+          <div class="form-group">
+            <label class="form-label">System Role</label>
+            <select id="fac-role" class="form-select" required>
+              <option value="faculty" ${targetFac && targetFac.role === 'faculty' ? 'selected' : ''}>Faculty Member</option>
+              <option value="admin" ${targetFac && targetFac.role === 'admin' ? 'selected' : ''}>Admin / Dual Role</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save & Assign Faculty</button>
+        </div>
+      </form>
+    `);
+  },
+
+  onExistingFacultySelect(email) {
+    if (!email) return;
+    const f = app.data.faculty.find(fac => fac.email === email);
+    if (!f) return;
+    const nEl = document.getElementById('fac-name');
+    const eEl = document.getElementById('fac-email');
+    const rEl = document.getElementById('fac-role');
+    if (nEl) nEl.value = f.name || '';
+    if (eEl) eEl.value = f.email || '';
+    if (rEl) rEl.value = f.role || 'faculty';
+  },
+
+  saveAddFaculty(e, deptId) {
+    e.preventDefault();
+    const name = document.getElementById('fac-name').value.trim();
+    const email = document.getElementById('fac-email').value.trim().toLowerCase();
+    const role = document.getElementById('fac-role').value;
+
+    const existingIdx = app.data.faculty.findIndex(f => f.email.toLowerCase() === email);
+    const facRecord = {
+      id: existingIdx >= 0 ? app.data.faculty[existingIdx].id : 'fac-' + Date.now(),
+      name,
+      email,
+      departmentId: deptId,
+      role
+    };
+
+    if (existingIdx >= 0) {
+      app.data.faculty[existingIdx] = Object.assign({}, app.data.faculty[existingIdx], facRecord);
+    } else {
+      app.data.faculty.push(facRecord);
+    }
+
+    app.saveState();
+    writeAudit('updated', 'faculty', facRecord.id, facRecord);
+    app.closeModal();
+    app.showToast(`Assigned ${name} to ${deptId}`, 'success');
+    app.renderCurrentView();
   },
 
   /* ==========================================================================
@@ -695,7 +961,14 @@ const adminView = {
   },
 
   /* PART 4 FIX: Full implementations for admin modals */
-  openAddStudentModal() {
+  openAddStudentModal(deptId = null) {
+    let preselectedBranch = HARDCODED_BRANCHES[0];
+    if (deptId === 'dept-aids') preselectedBranch = 'Artificial Intelligence & Data Science';
+    else if (deptId === 'dept-civil') preselectedBranch = 'Civil Engineering';
+    else if (deptId === 'dept-comp') preselectedBranch = 'Computer Engineering';
+    else if (deptId === 'dept-ecs') preselectedBranch = 'Electronics & Computer Science';
+    else if (deptId === 'dept-mech') preselectedBranch = 'Mechanical Engineering';
+
     app.showModal('Add New Student to Master Roster', `
       <form onsubmit="adminView.saveNewStudent(event)">
         <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-name" class="form-input" required></div>
@@ -704,7 +977,7 @@ const adminView = {
         <div class="form-group">
           <label class="form-label">Branch</label>
           <select id="st-branch" class="form-select" required>
-            ${HARDCODED_BRANCHES.map(b => `<option value="${b}">${b}</option>`).join('')}
+            ${HARDCODED_BRANCHES.map(b => `<option value="${b}" ${b === preselectedBranch ? 'selected' : ''}>${b}</option>`).join('')}
           </select>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
