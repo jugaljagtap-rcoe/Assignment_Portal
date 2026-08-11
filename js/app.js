@@ -551,8 +551,10 @@ class AppEngine {
     if (!backdrop) {
       backdrop = document.createElement('div');
       backdrop.id = 'app-modal-backdrop';
-      backdrop.className = 'modal-backdrop';
+      backdrop.className = 'modal-overlay';
       document.body.appendChild(backdrop);
+    } else {
+      backdrop.className = 'modal-overlay';
     }
     backdrop.innerHTML = `
       <div class="modal-card">

@@ -21,7 +21,16 @@ const analyticsView = {
     const partialCount = asgSubs.filter(s => s.status === 'partial').length;
     const notStartedCount = asgSubs.filter(s => s.status === 'not_started').length;
 
+    const homeHash = isAdminViewing ? '#admin-home' : '#faculty-home';
+    const homeLabel = isAdminViewing ? 'Admin Home' : 'Faculty Home';
+
     container.innerHTML = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="${homeHash}" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">${homeLabel}</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Portal-Wide Analytics & Reports</span>
+      </div>
+
       <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
           <h1 class="page-title">Operational Reports & Class Gradebook</h1>
@@ -142,7 +151,17 @@ const analyticsView = {
   renderReportsTab(container) {
     if (!this.activeReportType) this.activeReportType = 'reportA';
 
+    const isAdminViewing = app.currentRole === 'admin';
+    const homeHash = isAdminViewing ? '#admin-home' : '#faculty-home';
+    const homeLabel = isAdminViewing ? 'Admin Home' : 'Faculty Home';
+
     container.innerHTML = `
+      <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="${homeHash}" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">${homeLabel}</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">Institutional Reports</span>
+      </div>
+
       <div class="page-header-container">
         <div>
           <h1 class="page-title">Institutional Drill-Down Reports</h1>
