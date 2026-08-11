@@ -532,6 +532,10 @@ class AppEngine {
 
   reconcileUserSession() {
     if (!this.currentUser) return;
+    if (this.currentUser.googleVerified !== true) {
+      this.logout();
+      return;
+    }
     const email = this.currentUser.email ? this.currentUser.email.trim().toLowerCase() : '';
     const uin = this.currentUser.uin ? this.currentUser.uin.trim().toLowerCase() : '';
 
@@ -685,15 +689,6 @@ class AppEngine {
         <div style="display:flex; justify-content:center; margin:20px 0;">
           <div id="google-signin-btn-container"></div>
         </div>
-
-        <div style="margin-top:20px; border-top:1px solid var(--border-default); padding-top:16px;">
-          <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Quick Demo Account Selector</label>
-          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-            <button class="btn btn-primary" onclick="app.loginAsDemo('jugaljagtap@eng.rizvi.edu.in', 'admin')">
-              🛡️ Log In as Prof. Jugal Jagtap (Dual Admin & Faculty)
-            </button>
-          </div>
-        </div>
       </div>
     `);
 
@@ -709,24 +704,6 @@ class AppEngine {
         );
       }
     }, 200);
-  }
-
-  loginAsDemo(email, role) {
-    const userObj = {
-      name: email.split('@')[0],
-      email: email,
-      role: role,
-      isDualRole: HARDCODED_ADMIN_EMAILS.includes(email.trim().toLowerCase())
-    };
-    this.saveUserSession(userObj);
-    this.closeModal();
-    this.currentRole = role;
-    this.reconcileUserSession();
-    this.renderTopNavTabs();
-    this.renderRoleSwitcher();
-    this.renderSidebar();
-    this.renderCurrentView();
-    this.showToast(`Logged in as ${email}`, 'success');
   }
 
   handleGoogleCredentialResponse(response) {
@@ -746,7 +723,8 @@ class AppEngine {
       name: payload.name || email.split('@')[0],
       email: email,
       picture: payload.picture,
-      role: 'faculty'
+      role: 'faculty',
+      googleVerified: true
     };
 
     this.saveUserSession(userObj);
