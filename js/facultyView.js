@@ -18,15 +18,23 @@ const facultyView = {
       const validTabs = ['overview', 'course', 'assignments', 'students', 'schedule', 'grade', 'verify', 'reports'];
       let tab = 'overview';
       let subjectId = raw;
+      let targetAsgId = null;
 
-      for (const t of validTabs) {
-        const suffix = '-' + t;
-        if (raw.endsWith(suffix)) {
-          const candidate = raw.slice(0, raw.length - suffix.length);
-          if (candidate.length > 0) {
-            tab = t;
-            subjectId = candidate;
-            break;
+      if (raw.includes('-assignments-')) {
+        const parts = raw.split('-assignments-');
+        subjectId = parts[0];
+        targetAsgId = parts[1];
+        tab = 'assignments';
+      } else {
+        for (const t of validTabs) {
+          const suffix = '-' + t;
+          if (raw.endsWith(suffix)) {
+            const candidate = raw.slice(0, raw.length - suffix.length);
+            if (candidate.length > 0) {
+              tab = t;
+              subjectId = candidate;
+              break;
+            }
           }
         }
       }
@@ -38,7 +46,7 @@ const facultyView = {
         return;
       }
 
-      this.renderSubjectWorkspace(container, subjectId, tab);
+      this.renderSubjectWorkspace(container, subjectId, tab, targetAsgId);
     } else {
       switch(activeNav) {
         case 'course':
@@ -174,7 +182,7 @@ const facultyView = {
   /* ==========================================================================
      LEVEL 2 — SUBJECT WORKSPACE (#faculty-subject-{subjectId})
      ========================================================================== */
-  renderSubjectWorkspace(container, subjectId, activeTab = 'overview') {
+  renderSubjectWorkspace(container, subjectId, activeTab = 'overview', targetAsgId = null) {
     const sub = (app.data.subjects || []).find(s => s.id === subjectId) || (app.data.subjects[0] || { id: 'sub-vmd', code: 'VMD', fullName: 'Vector Mechanics for Engineers' });
     this.activeSubjectTab = activeTab;
 
@@ -224,11 +232,11 @@ const facultyView = {
 
     requestAnimationFrame(() => {
       const tabContentEl = document.getElementById('subject-workspace-tab-content');
-      if (tabContentEl) this.renderSubjectTabContent(sub, activeTab, tabContentEl);
+      if (tabContentEl) this.renderSubjectTabContent(sub, activeTab, tabContentEl, targetAsgId);
     });
   },
 
-  renderSubjectTabContent(sub, tab, targetEl) {
+  renderSubjectTabContent(sub, tab, targetEl, targetAsgId = null) {
     if (!targetEl) return;
 
     switch(tab) {
@@ -236,7 +244,16 @@ const facultyView = {
         this.renderCOAndModulesManager(targetEl, sub);
         break;
       case 'assignments':
-        this.renderAssignmentBuilder(targetEl, sub);
+        if (targetAsgId) {
+          const asg = (app.data.assignments || []).find(a => a.id === targetAsgId);
+          if (asg) {
+            this.renderAssignmentQuestionEditor(targetEl, sub, asg);
+          } else {
+            this.renderAssignmentBuilder(targetEl, sub);
+          }
+        } else {
+          this.renderAssignmentBuilder(targetEl, sub);
+        }
         break;
       case 'students':
         targetEl.innerHTML = this.renderSubjectStudentsTab(sub);
@@ -808,15 +825,15 @@ const facultyView = {
     app.showToast('Updated CO–PO mapping matrix', 'success');
   },
 
-  /* 2. Assignment Builder */
+  /* 2. Assignment Builder — Level 1: Cards List */
   renderAssignmentBuilder(container, sub) {
     const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
 
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Assignment Question Builder</h1>
-          <p class="page-subtitle">Design questions, formula parameters, ground truths, and templates for <strong>${sub ? sub.code : 'all subjects'}</strong></p>
+          <h1 class="page-title">Assignment Builder</h1>
+          <p class="page-subtitle">Manage assignments and experiments for <strong>${sub ? sub.code : 'all subjects'}</strong></p>
         </div>
         ${sub ? `<button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal('${sub.id}')">+ Create New Assignment</button>` : ''}
       </div>
@@ -831,17 +848,17 @@ const facultyView = {
           </div>
         </div>
       ` : `
-        <div style="display:flex; flex-direction:column; gap:20px;">
+        <div style="display:flex; flex-direction:column; gap:16px;">
           ${subAsgs.map(a => {
             const questions = Array.isArray(a.questions) ? a.questions :
               (typeof a.questions === 'string' ? (()=>{ try{return JSON.parse(a.questions);}catch(_){return [];} })() : []);
             const totalParams = questions.flatMap(q => q.parameters || []).length;
-            const isLocked = (a.lifecycle_status || a.state) === 'locked';
+            const status = a.lifecycle_status || a.state || 'draft';
+            const targetSubId = sub ? sub.id : (a.subjectId || a.subject_id || '');
 
             return `
               <div class="card">
-                <!-- Assignment Header -->
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
                   <div>
                     ${a.display_code ? `
                       <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.display_code}</span>
@@ -853,15 +870,15 @@ const facultyView = {
                     ${a.btLevel || a.bt_level ? `<span class="tag tag-bt" style="margin-left:8px;">${a.btLevel || a.bt_level}</span>` : ''}
                   </div>
                   <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
-                    ${(a.lifecycle_status || 'draft') === 'draft' ? `
+                    ${status === 'draft' ? `
                       <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish Assignment</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')">🗑️ Delete Draft</button>
-                    ` : (a.lifecycle_status || 'draft') === 'published' ? `
+                    ` : status === 'published' ? `
                       <button class="btn btn-secondary btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.retractAssignment('${a.id}')">↩ Retract</button>
-                    ` : (a.lifecycle_status || 'draft') === 'locked' ? `
+                    ` : status === 'locked' ? `
                       <span class="tag tag-purple">🔒 Locked</span>
-                    ` : (a.lifecycle_status || 'draft') === 'retracted' ? `
+                    ` : status === 'retracted' ? `
                       <span class="tag tag-warning">↩ Retracted</span>
                       <button class="btn btn-secondary btn-sm" onclick="facultyView.rebuildFromRetracted('${a.id}')">🔄 Rebuild as New Draft</button>
                     ` : ''}
@@ -869,74 +886,148 @@ const facultyView = {
                   </div>
                 </div>
 
-                <div style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; display:flex; gap:16px;">
-                  <span>Questions: <strong>${questions.length}</strong></span>
-                  <span>Parameters: <strong>${totalParams}</strong></span>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-secondary); border-top:1px solid var(--border-default); padding-top:12px;">
+                  <div style="display:flex; gap:16px; align-items:center;">
+                    <span>Questions: <strong>${questions.length}</strong></span>
+                    <span>Parameters: <strong>${totalParams}</strong></span>
+                    <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
+                  </div>
+                  <button class="btn btn-primary btn-sm" onclick="window.location.hash='#faculty-subject-${targetSubId}-assignments-${a.id}'">
+                    Manage Questions →
+                  </button>
                 </div>
-
-                <!-- Questions Tree -->
-                ${questions.length === 0 ? `
-                  <div style="text-align:center; padding:16px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px dashed var(--border-default); color:var(--text-secondary); font-size:13px;">
-                    No questions yet. Click <strong>+ Add Question</strong> to begin.
-                  </div>
-                ` : `
-                  <div style="display:flex; flex-direction:column; gap:12px;">
-                    ${questions.map((q, qi) => {
-                      const qParams = Array.isArray(q.parameters) ? q.parameters : [];
-                      return `
-                        <div style="background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default); overflow:hidden;">
-                          <!-- Question Row -->
-                          <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:12px 14px; border-bottom:1px solid var(--border-default);">
-                            <div style="flex:1; min-width:0;">
-                              <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Q${qi + 1}${q.section ? ' · ' + q.section : ''}</span>
-                              ${q.btLevel ? `<span class="tag tag-bt" style="margin-left:6px; font-size:10px;">${q.btLevel}</span>` : ''}
-                              <p style="font-size:13px; color:var(--text-primary); margin:4px 0 0; line-height:1.5; word-break:break-word;">${q.text}</p>
-                            </div>
-                            ${!isLocked ? `
-                              <button class="btn btn-ghost btn-sm" style="flex-shrink:0; margin-left:10px;"
-                                onclick="facultyView.openAddParameterModal('${a.id}', '${q.id}')">
-                                + Add Parameter
-                              </button>
-                            ` : ''}
-                          </div>
-
-                          <!-- Parameters -->
-                          ${qParams.length === 0 ? `
-                            <div style="padding:8px 14px; font-size:12px; color:var(--text-tertiary);">No parameters defined yet.</div>
-                          ` : `
-                            <div style="padding:8px 14px;">
-                              <div style="display:flex; flex-direction:column; gap:4px;">
-                                ${qParams.map((p, pi) => `
-                                  <div style="display:flex; align-items:center; gap:10px; font-size:12px; padding:6px 10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-default);">
-                                    <span style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono); min-width:20px;">P${pi+1}</span>
-                                    <span style="flex:1; font-weight:600; color:var(--text-primary);">${p.label}</span>
-                                    ${p.unitHint ? `<span class="tag tag-co" style="font-size:10px;">${p.unitHint}</span>` : ''}
-                                    <span style="color:var(--text-secondary);">Marks: <strong>${p.valueMarks}</strong></span>
-                                    ${p.correctValue ? `<span style="color:var(--success); font-family:var(--font-mono); font-weight:700;">✓ ${p.correctValue}</span>` : `<span style="color:var(--text-tertiary);">No ground truth</span>`}
-                                  </div>
-                                `).join('')}
-                              </div>
-                            </div>
-                          `}
-                        </div>
-                      `;
-                    }).join('')}
-                  </div>
-                `}
-
-                <!-- Add Question Button -->
-                ${!isLocked ? `
-                  <div style="margin-top:14px; display:flex; justify-content:flex-start;">
-                    <button class="btn btn-secondary btn-sm" onclick="facultyView.openAddQuestionModal('${a.id}')">
-                      ➕ Add Question
-                    </button>
-                  </div>
-                ` : ''}
               </div>
             `;
           }).join('')}
         </div>
       `}
+    `;
+  },
+
+  /* 2b. Assignment Builder — Level 2: Question Editor for Single Assignment */
+  renderAssignmentQuestionEditor(container, sub, asg) {
+    const questions = Array.isArray(asg.questions) ? asg.questions :
+      (typeof asg.questions === 'string' ? (()=>{ try{return JSON.parse(asg.questions);}catch(_){return [];} })() : []);
+    const totalParams = questions.flatMap(q => q.parameters || []).length;
+    const status = asg.lifecycle_status || asg.state || 'draft';
+    const isLocked = status === 'locked';
+
+    container.innerHTML = `
+      <div class="breadcrumb-container print-hide" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+        <a href="#faculty-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Faculty Home</a>
+        <span>&gt;</span>
+        <a href="#faculty-subject-${sub.id}-assignments" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">${sub.code}</a>
+        <span>&gt;</span>
+        <a href="#faculty-subject-${sub.id}-assignments" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Assignments</a>
+        <span>&gt;</span>
+        <span style="font-weight:700; color:var(--text-primary);">${asg.display_code || asg.working_title || asg.title}</span>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <h2 class="card-title" style="font-size:18px; display:flex; align-items:center; gap:10px;">
+              ${asg.display_code ? `<span class="mono-val" style="color:var(--accent-blue);">${asg.display_code}</span>` : ''}
+              <span>${asg.working_title || asg.title}</span>
+              ${!asg.display_code ? `<span class="tag tag-warning">[DRAFT]</span>` : ''}
+              ${asg.btLevel || asg.bt_level ? `<span class="tag tag-bt">${asg.btLevel || asg.bt_level}</span>` : ''}
+            </h2>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:6px; display:flex; gap:16px;">
+              <span>Questions: <strong>${questions.length}</strong></span>
+              <span>Parameters: <strong>${totalParams}</strong></span>
+              <span>Lifecycle: <strong class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</strong></span>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            ${status === 'draft' ? `
+              <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${asg.id}')">📢 Publish Assignment</button>
+              <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${asg.id}')">🗑️ Delete Draft</button>
+            ` : status === 'published' ? `
+              <button class="btn btn-secondary btn-sm" onclick="facultyView.lockAssignment('${asg.id}')">🔒 Lock</button>
+              <button class="btn btn-destructive btn-sm" onclick="facultyView.retractAssignment('${asg.id}')">↩ Retract</button>
+            ` : status === 'locked' ? `
+              <span class="tag tag-purple">🔒 Locked</span>
+            ` : status === 'retracted' ? `
+              <span class="tag tag-warning">↩ Retracted</span>
+              <button class="btn btn-secondary btn-sm" onclick="facultyView.rebuildFromRetracted('${asg.id}')">🔄 Rebuild as New Draft</button>
+            ` : ''}
+            <button class="btn btn-ghost btn-sm" onclick="facultyView.saveAsTemplate('${asg.id}')" title="Save as template">💾</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h3 class="card-title" style="margin:0;">Questions & Parameters</h3>
+          ${!isLocked ? `
+            <button class="btn btn-primary btn-sm" onclick="facultyView.openAddQuestionModal('${asg.id}')">
+              ➕ Add Question
+            </button>
+          ` : ''}
+        </div>
+
+        ${questions.length === 0 ? `
+          <div style="text-align:center; padding:24px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px dashed var(--border-default); color:var(--text-secondary); font-size:13px;">
+            No questions added to this assignment yet. Click <strong>+ Add Question</strong> to begin.
+          </div>
+        ` : `
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            ${questions.map((q, qi) => {
+              const qParams = Array.isArray(q.parameters) ? q.parameters : [];
+              return `
+                <div style="background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default); overflow:hidden;">
+                  <!-- Question Row -->
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:12px 14px; border-bottom:1px solid var(--border-default);">
+                    <div style="flex:1; min-width:0;">
+                      <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Q${qi + 1}${q.section ? ' · ' + q.section : ''}</span>
+                      ${q.btLevel ? `<span class="tag tag-bt" style="margin-left:6px; font-size:10px;">${q.btLevel}</span>` : ''}
+                      <p style="font-size:13px; color:var(--text-primary); margin:4px 0 0; line-height:1.5; word-break:break-word;">${q.text}</p>
+                      ${q.imageUrl ? `
+                        <div style="margin-top:8px;">
+                          <img src="${app.getEmbeddableImageUrl ? app.getEmbeddableImageUrl(q.imageUrl) : q.imageUrl}" alt="Question Diagram" style="max-width:100%; max-height:250px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+                        </div>
+                      ` : ''}
+                    </div>
+                    ${!isLocked ? `
+                      <button class="btn btn-ghost btn-sm" style="flex-shrink:0; margin-left:10px;"
+                        onclick="facultyView.openAddParameterModal('${asg.id}', '${q.id}')">
+                        + Add Parameter
+                      </button>
+                    ` : ''}
+                  </div>
+
+                  <!-- Parameters -->
+                  ${qParams.length === 0 ? `
+                    <div style="padding:8px 14px; font-size:12px; color:var(--text-tertiary);">No parameters defined yet.</div>
+                  ` : `
+                    <div style="padding:8px 14px;">
+                      <div style="display:flex; flex-direction:column; gap:4px;">
+                        ${qParams.map((p, pi) => `
+                          <div style="display:flex; align-items:center; gap:10px; font-size:12px; padding:6px 10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-default);">
+                            <span style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono); min-width:20px;">P${pi+1}</span>
+                            <span style="flex:1; font-weight:600; color:var(--text-primary);">${p.label}</span>
+                            ${p.unitHint ? `<span class="tag tag-co" style="font-size:10px;">${p.unitHint}</span>` : ''}
+                            <span style="color:var(--text-secondary);">Marks: <strong>${p.valueMarks}</strong></span>
+                            ${p.correctValue ? `<span style="color:var(--success); font-family:var(--font-mono); font-weight:700;">✓ ${p.correctValue}</span>` : `<span style="color:var(--text-tertiary);">No ground truth</span>`}
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+
+        ${!isLocked ? `
+          <div style="margin-top:14px; display:flex; justify-content:flex-start;">
+            <button class="btn btn-secondary btn-sm" onclick="facultyView.openAddQuestionModal('${asg.id}')">
+              ➕ Add Question
+            </button>
+          </div>
+        ` : ''}
+      </div>
     `;
   },
 
@@ -1469,6 +1560,11 @@ const facultyView = {
           <input type="text" id="q-section" class="form-input" placeholder="e.g. Section A — Numerical">
         </div>
         <div class="form-group">
+          <label class="form-label">Question Diagram Image URL <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="q-image-url" class="form-input code-font" placeholder="https://drive.google.com/file/d/...">
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">⚠️ Ensure Google Drive file access is set to 'Anyone with the link' before pasting the URL here.</div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Per-Student Variables</label>
           <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--bg-subtle); border-radius:var(--radius-md);">
             <input type="checkbox" id="q-use-vars" style="width:16px; height:16px; accent-color:var(--accent-blue);">
@@ -1512,6 +1608,7 @@ const facultyView = {
       id: qId,
       text: document.getElementById('q-text').value.trim(),
       section: document.getElementById('q-section').value.trim(),
+      imageUrl: document.getElementById('q-image-url').value.trim(),
       usePerStudentVariables: document.getElementById('q-use-vars').checked,
       variableNames: [],
       coId: document.getElementById('q-co').value,
