@@ -849,13 +849,13 @@ class AppEngine {
 
     // Step 1 — Extract and protect {{variables}}
     const varTokens = [];
-    let protected = text.replace(/\{\{(.*?)\}\}/g, (match, key) => {
+    let protectedText = text.replace(/\{\{(.*?)\}\}/g, (match, key) => {
       varTokens.push({ key: key.trim(), original: match });
       return `\x00VAR${varTokens.length - 1}\x00`;
     });
 
     // Step 2 — KaTeX segments ($...$)
-    let out = protected.replace(/\$([^\$]+)\$/g, (match, inner) => {
+    let out = protectedText.replace(/\$([^\$]+)\$/g, (match, inner) => {
       if (typeof window !== 'undefined' && window.katex && window.katex.renderToString) {
         try {
           return window.katex.renderToString(inner, { throwOnError: false, displayMode: false });
