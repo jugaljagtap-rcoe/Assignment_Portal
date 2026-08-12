@@ -1560,6 +1560,27 @@ const facultyView = {
             placeholder="e.g. Find the resultant of two concurrent forces {{F1}} N and {{F2}} N at angle {{theta}}°."
             required></textarea>
           <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">Use {{variable}} placeholders for student-specific values.</div>
+          <div style="margin-top:6px;">
+            <a href="javascript:void(0)" onclick="const g=this.nextElementSibling; g.style.display=g.style.display==='none'?'block':'none';" style="font-size:11px; color:var(--accent-blue); text-decoration:none; font-weight:600; cursor:pointer;">ℹ️ Formatting Guide</a>
+            <div style="display:none; margin-top:6px; padding:8px 10px; background:var(--bg-subtle); border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:11px;">
+              <table style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border-color);">
+                    <th style="padding:2px 4px; font-weight:600;">You type</th>
+                    <th style="padding:2px 4px; font-weight:600;">Renders as</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td style="padding:2px 4px;"><code>omega</code>, <code>theta</code>, <code>alpha</code></td><td style="padding:2px 4px;">ω, θ, α</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>x^2</code>, <code>v^{max}</code></td><td style="padding:2px 4px;">x², v^max</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>k_1</code>, <code>x_{eq}</code></td><td style="padding:2px 4px;">k₁, x_eq</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>N/(m^2)</code></td><td style="padding:2px 4px;">N/m² fraction</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>sqrt(k/m)</code></td><td style="padding:2px 4px;">√(k/m)</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>$\frac{k}{m}$</code></td><td style="padding:2px 4px;">Full KaTeX fraction</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Section Label <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
@@ -1665,6 +1686,27 @@ const facultyView = {
             placeholder="e.g. Find the resultant of two concurrent forces {{F1}} N and {{F2}} N at angle {{theta}}°."
             required>${q.text || ''}</textarea>
           <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">Use {{variable}} placeholders for student-specific values.</div>
+          <div style="margin-top:6px;">
+            <a href="javascript:void(0)" onclick="const g=this.nextElementSibling; g.style.display=g.style.display==='none'?'block':'none';" style="font-size:11px; color:var(--accent-blue); text-decoration:none; font-weight:600; cursor:pointer;">ℹ️ Formatting Guide</a>
+            <div style="display:none; margin-top:6px; padding:8px 10px; background:var(--bg-subtle); border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:11px;">
+              <table style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--border-color);">
+                    <th style="padding:2px 4px; font-weight:600;">You type</th>
+                    <th style="padding:2px 4px; font-weight:600;">Renders as</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td style="padding:2px 4px;"><code>omega</code>, <code>theta</code>, <code>alpha</code></td><td style="padding:2px 4px;">ω, θ, α</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>x^2</code>, <code>v^{max}</code></td><td style="padding:2px 4px;">x², v^max</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>k_1</code>, <code>x_{eq}</code></td><td style="padding:2px 4px;">k₁, x_eq</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>N/(m^2)</code></td><td style="padding:2px 4px;">N/m² fraction</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>sqrt(k/m)</code></td><td style="padding:2px 4px;">√(k/m)</td></tr>
+                  <tr><td style="padding:2px 4px;"><code>$\frac{k}{m}$</code></td><td style="padding:2px 4px;">Full KaTeX fraction</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Section Label <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
