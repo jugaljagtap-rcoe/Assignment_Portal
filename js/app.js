@@ -626,6 +626,13 @@ class AppEngine {
     this.showToast(`Switched active student perspective`, 'info');
   }
 
+  startAssignment(asgId) {
+    this.activeAssignmentId = asgId;
+    localStorage.setItem('rizvi_fe_active_asg_id', asgId);
+    this.activeNav = 'solver';
+    this.renderCurrentView();
+  }
+
   renderSidebar() {
     const sidebar = document.getElementById('sidebar-nav');
     if (!sidebar) return;
