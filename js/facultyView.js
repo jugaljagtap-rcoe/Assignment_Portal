@@ -1166,7 +1166,8 @@ const facultyView = {
     app.saveState();
     writeAudit('updated', 'assignment', asgId, { lifecycle_status: 'locked' });
     analyticsView.exportMasterClassGradebookCSV();
-    app.showToast(`Locked assignment ${asg ? asg.code : ''} and exported Gazette Gradebook CSV!`, 'success');
+    const asgCodeLabel = asg ? (asg.display_code || asg.working_title || asg.id) : '';
+    app.showToast(`Locked assignment ${asgCodeLabel} and exported Gazette Gradebook CSV!`, 'success');
     app.renderCurrentView();
   },
 
@@ -1174,9 +1175,11 @@ const facultyView = {
     const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
 
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
     const tRecord = {
       id: `tmpl-${Date.now()}`,
-      title: `${asg.code} Template — ${asg.title}`,
+      title: `${asgCodeLabel} Template — ${asg.title || asg.working_title || ''}`,
       subject_code: asg.subjectId,
       questions: asg.questions || [],
       created_by: app.currentUser ? app.currentUser.email : 'faculty@eng.rizvi.edu.in',
@@ -1197,7 +1200,7 @@ const facultyView = {
     }, `Template ${tRecord.title}`);
 
     writeAudit('created', 'template', tRecord.id, { title: tRecord.title });
-    app.showToast(`Saved ${asg.code} as reusable assignment template!`, 'success');
+    app.showToast(`Saved ${asgCodeLabel} as reusable assignment template!`, 'success');
   },
 
   openAddCOModal(subCode) {
@@ -1418,6 +1421,7 @@ const facultyView = {
 
     await app.supabaseUpsert('assignments', {
       id: asgRecord.id,
+      code: asgRecord.id,
       title: asgRecord.title,
       working_title: asgRecord.working_title,
       subject_id: subId,
@@ -1449,7 +1453,9 @@ const facultyView = {
       co.subject_id === asg.subject_id
     );
 
-    app.showModal(`➕ Add Question — ${asg.code}`, `
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
+    app.showModal(`➕ Add Question — ${asgCodeLabel}`, `
       <form onsubmit="facultyView.saveNewQuestion(event, '${asgId}')" style="min-width:480px;">
         <div class="form-group">
           <label class="form-label">Question Text</label>
@@ -1515,19 +1521,22 @@ const facultyView = {
     asg.questions.push(qRecord);
     app.saveState();
 
+    const asgCode = asg.display_code || asg.id;
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
     await app.supabaseUpsert('assignments', {
       id: asg.id,
-      code: asg.code,
+      code: asgCode,
       title: asg.title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
       questions: JSON.stringify(asg.questions),
       schedules: JSON.stringify(asg.schedules || [])
-    }, `Assignment ${asg.code} (questions)`);
+    }, `Assignment ${asgCodeLabel} (questions)`);
 
     writeAudit('created', 'question', qId, qRecord);
     app.closeModal();
-    app.showToast(`Added question to ${asg.code}`, 'success');
+    app.showToast(`Added question to ${asgCodeLabel}`, 'success');
     app.renderCurrentView();
   },
 
@@ -1535,7 +1544,9 @@ const facultyView = {
     const asg = (app.data.assignments || []).find(a => a.id === asgId);
     if (!asg) return;
 
-    app.showModal(`⚙️ Add Parameter — ${asg.code}`, `
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
+    app.showModal(`⚙️ Add Parameter — ${asgCodeLabel}`, `
       <form onsubmit="facultyView.saveNewParameter(event, '${asgId}', '${questionId}')" style="min-width:440px;">
         <div class="form-group">
           <label class="form-label">Parameter Label / Symbol</label>
@@ -1585,16 +1596,19 @@ const facultyView = {
     q.parameters.push(paramRecord);
     app.saveState();
 
+    const asgCode = asg.display_code || asg.id;
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
     // Upsert the full assignment (JSONB questions column)
     await app.supabaseUpsert('assignments', {
       id: asg.id,
-      code: asg.code,
+      code: asgCode,
       title: asg.title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
       questions: JSON.stringify(asg.questions),
       schedules: JSON.stringify(asg.schedules || [])
-    }, `Assignment ${asg.code} (parameters)`);
+    }, `Assignment ${asgCodeLabel} (parameters)`);
 
     writeAudit('created', 'parameter', paramId, paramRecord);
     app.closeModal();
@@ -1707,6 +1721,7 @@ const facultyView = {
 
       await app.supabaseUpsert('assignments', {
         id: asg.id,
+        code: displayCode,
         title: displayCode,
         working_title: asg.working_title,
         display_code: displayCode,
