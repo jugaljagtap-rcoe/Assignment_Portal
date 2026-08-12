@@ -973,6 +973,7 @@ const facultyView = {
         ` : `
           <div style="display:flex; flex-direction:column; gap:12px;">
             ${questions.map((q, qi) => {
+              const a = asg;
               const qParams = Array.isArray(q.parameters) ? q.parameters : [];
               return `
                 <div style="background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default); overflow:hidden;">
@@ -981,7 +982,7 @@ const facultyView = {
                     <div style="flex:1; min-width:0;">
                       <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Q${qi + 1}${q.section ? ' · ' + q.section : ''}</span>
                       ${q.btLevel ? `<span class="tag tag-bt" style="margin-left:6px; font-size:10px;">${q.btLevel}</span>` : ''}
-                      <p style="font-size:13px; color:var(--text-primary); margin:4px 0 0; line-height:1.5; word-break:break-word;">${q.text}</p>
+                      <p style="font-size:13px; color:var(--text-primary); margin:4px 0 0; line-height:1.5; word-break:break-word;">${app.formatQuestionText(q.text, {})}</p>
                       ${q.imageUrl ? `
                         <div style="margin-top:8px;">
                           <img src="${app.getEmbeddableImageUrl ? app.getEmbeddableImageUrl(q.imageUrl) : q.imageUrl}" alt="Question Diagram" style="max-width:100%; max-height:250px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
@@ -991,7 +992,7 @@ const facultyView = {
                     ${!isLocked ? `
                       <div style="display:flex; gap:6px; flex-shrink:0; margin-left:10px;">
                         <button class="btn btn-ghost btn-sm"
-                          onclick="facultyView.openEditQuestionModal('${asg.id}', '${q.id}')">
+                          onclick="facultyView.openEditQuestionModal('${a.id}', '${q.id}')">
                           ✏️ Edit Question
                         </button>
                         <button class="btn btn-ghost btn-sm"
@@ -1665,10 +1666,9 @@ const facultyView = {
   },
 
   openEditQuestionModal(asgId, qId) {
-    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
-    const questions = Array.isArray(asg.questions) ? asg.questions : [];
-    const q = questions.find(q => q.id === qId);
+    const q = (asg.questions || []).find(q => q.id === qId);
     if (!q) return;
 
     const subCOs = (app.data.courseOutcomes || []).filter(co =>
@@ -1676,9 +1676,7 @@ const facultyView = {
       co.subject_id === asg.subject_id
     );
 
-    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
-
-    app.showModal(`✏️ Edit Question — ${asgCodeLabel}`, `
+    app.showModal('✏️ Edit Question', `
       <form onsubmit="facultyView.saveEditedQuestion(event, '${asgId}', '${qId}')" style="min-width:480px;">
         <div class="form-group">
           <label class="form-label">Question Text</label>
@@ -1752,10 +1750,9 @@ const facultyView = {
 
   async saveEditedQuestion(e, asgId, qId) {
     e.preventDefault();
-    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
-    const questions = Array.isArray(asg.questions) ? asg.questions : [];
-    const q = questions.find(q => q.id === qId);
+    const q = (asg.questions || []).find(q => q.id === qId);
     if (!q) return;
 
     q.text = document.getElementById('q-text').value.trim();
@@ -1767,22 +1764,20 @@ const facultyView = {
 
     app.saveState();
 
-    const asgCode = asg.display_code || asg.id;
-    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
-
     await app.supabaseUpsert('assignments', {
       id: asg.id,
-      code: asgCode,
-      title: asg.title,
+      code: asg.display_code || asg.id,
+      title: asg.title || asg.working_title,
+      working_title: asg.working_title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
       questions: JSON.stringify(asg.questions),
       schedules: JSON.stringify(asg.schedules || [])
-    }, `Assignment ${asgCodeLabel} (update question)`);
+    }, `Assignment ${asg.display_code || asg.id}`);
 
     writeAudit('updated', 'question', qId, q);
     app.closeModal();
-    app.showToast(`Updated question in ${asgCodeLabel}`, 'success');
+    app.showToast('Question updated', 'success');
     app.renderCurrentView();
   },
 

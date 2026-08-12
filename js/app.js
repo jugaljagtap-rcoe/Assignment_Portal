@@ -847,76 +847,68 @@ class AppEngine {
   formatQuestionText(text, variablesMap = {}) {
     if (!text) return '';
 
-    // Pass 1: Extract KaTeX segments wrapped in $...$
-    const katexBlocks = [];
-    let processedText = text.replace(/\$([^\$]+)\$/g, (match, formula) => {
-      let html = match;
+    // Step 1 — Protect {{variables}}
+    const varsList = [];
+    let out = text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+      const idx = varsList.length;
+      varsList.push({ match, name: varName.trim() });
+      return `__VAR_${idx}__`;
+    });
+
+    // Step 2 — KaTeX
+    out = out.replace(/\$([^\$]+)\$/g, (match, inner) => {
       if (typeof katex !== 'undefined' && katex.renderToString) {
         try {
-          html = katex.renderToString(formula, { throwOnError: false, displayMode: false });
+          return katex.renderToString(inner, { throwOnError: false, displayMode: false });
         } catch (e) {
-          console.error("KaTeX rendering error:", e);
-          html = match;
+          return match;
         }
       }
-      const placeholder = `___KATEX_BLOCK_${katexBlocks.length}___`;
-      katexBlocks.push(html);
-      return placeholder;
+      return match;
     });
 
-    // Pass 2: Variable substitution {{varName}}
-    processedText = processedText.replace(/\{\{(.*?)\}\}/g, (match, p1) => {
-      const key = p1.trim();
-      if (variablesMap && variablesMap[key] !== undefined) {
-        return `<strong class="mono-val" style="color:var(--accent-blue);">${variablesMap[key]}</strong>`;
-      }
-      return `<code class="code-font" style="color:var(--warning);">${match}</code>`;
+    // Step 3 — Greek words using whole-word regex
+    const greekMap = {
+      omega: 'ω', theta: 'θ', alpha: 'α', beta: 'β', delta: 'δ',
+      Delta: 'Δ', mu: 'μ', sigma: 'σ', pi: 'π', phi: 'φ',
+      lambda: 'λ', rho: 'ρ'
+    };
+    for (const [word, symbol] of Object.entries(greekMap)) {
+      const regex = new RegExp(`\\b${word}\\b`, 'g');
+      out = out.replace(regex, symbol);
+    }
+
+    // Step 4 — Superscripts
+    out = out.replace(/(\w+)\^(\{[^}]+\}|\w+)/g, (m, p1, p2) => {
+      const sup = p2.startsWith('{') && p2.endsWith('}') ? p2.slice(1, -1) : p2;
+      return `${p1}<sup>${sup}</sup>`;
     });
 
-    // Pass 3: Engineering notation auto-conversion (on non-KaTeX segments)
-    // - X^{n} or X^n -> X<sup>n</sup>
-    processedText = processedText.replace(/([A-Za-z0-9]+|\))\^\{([A-Za-z0-9]+)\}/g, '$1<sup>$2</sup>');
-    processedText = processedText.replace(/([A-Za-z0-9]+|\))\^([A-Za-z0-9]+)/g, '$1<sup>$2</sup>');
-
-    // - X_{n} or X_n -> X<sub>n</sub>
-    processedText = processedText.replace(/([A-Za-z0-9]+|\))_\{([A-Za-z0-9]+)\}/g, '$1<sub>$2</sub>');
-    processedText = processedText.replace(/([A-Za-z0-9]+|\))_([A-Za-z0-9]+)/g, '$1<sub>$2</sub>');
-
-    // - Pattern A/(B) where A and B are short alphanumeric strings -> .math-frac with .num and .den
-    processedText = processedText.replace(/\b([A-Za-z0-9]+)\/\(([A-Za-z0-9\^_\+-\s]+)\)/g, '<span class="math-frac"><span class="num">$1</span><span class="den">$2</span></span>');
-
-    // - Greek letter names
-    const greeks = [
-      ['Delta', 'Δ'],
-      ['omega', 'ω'],
-      ['theta', 'θ'],
-      ['alpha', 'α'],
-      ['beta', 'β'],
-      ['delta', 'δ'],
-      ['mu', 'μ'],
-      ['sigma', 'σ'],
-      ['pi', 'π'],
-      ['phi', 'φ'],
-      ['lambda', 'λ'],
-      ['rho', 'ρ']
-    ];
-    greeks.forEach(([name, char]) => {
-      const reg = new RegExp(`\\b${name}\\b`, 'g');
-      processedText = processedText.replace(reg, char);
+    // Step 5 — Subscripts
+    out = out.replace(/(\w+)_(\{[^}]+\}|\w+)/g, (m, p1, p2) => {
+      const sub = p2.startsWith('{') && p2.endsWith('}') ? p2.slice(1, -1) : p2;
+      return `${p1}<sub>${sub}</sub>`;
     });
 
-    // - * between terms -> ×
-    processedText = processedText.replace(/(\S)\s*\*\s*(\S)/g, '$1 × $2');
+    // Step 6 — Fractions
+    out = out.replace(/([\w\s\^]+)\/\(([\w\s\^]+)\)/g, '<span class="math-frac"><span class="num">$1</span><span class="den">$2</span></span>');
 
-    // - Pattern sqrt(X) -> √(X) with overline styling
-    processedText = processedText.replace(/sqrt\(([^)]+)\)/g, '<span style="white-space:nowrap;">√<span style="text-decoration:overline;">$1</span></span>');
+    // Step 7 — sqrt
+    out = out.replace(/sqrt\(([^)]+)\)/g, '√<span style="text-decoration:overline;">$1</span>');
 
-    // Restore KaTeX blocks
-    katexBlocks.forEach((html, i) => {
-      processedText = processedText.replace(`___KATEX_BLOCK_${i}___`, html);
+    // Step 8 — Multiply
+    out = out.replace(/ \* /g, ' × ');
+
+    // Step 9 — Restore variables
+    varsList.forEach((v, i) => {
+      const val = variablesMap[v.name];
+      const chipHtml = val !== undefined
+        ? `<strong class="mono-val" style="color:var(--accent-blue);">${val}</strong>`
+        : `<code class="code-font" style="color:var(--warning);">${v.match}</code>`;
+      out = out.replace(`__VAR_${i}__`, chipHtml);
     });
 
-    return processedText;
+    return out;
   }
 
   getEmbeddableImageUrl(url) {
