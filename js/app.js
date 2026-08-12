@@ -256,10 +256,14 @@ class AppEngine {
         if (hasSupabaseModules || hasSupabaseCOs) {
           // Supabase already has data — skip migration, just mark complete
           localStorage.setItem('rizvi_supabase_migrated_v2', '1');
-        } else {
-          await this.migrateLocalStorageToSupabase();
         }
       }
+
+      // Invalidate stale localStorage cache — rewrite from fresh Supabase data only
+      try {
+        localStorage.removeItem('rizvi_fe_portal_data');
+        sessionStorage.removeItem('rizvi_fe_portal_data');
+      } catch(_) {}
 
       this.lastSyncedAt = new Date();
       this.saveState();
