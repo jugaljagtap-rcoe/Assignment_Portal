@@ -847,19 +847,18 @@ class AppEngine {
   formatQuestionText(text, variablesMap = {}) {
     if (!text) return '';
 
-    // Step 1 — Protect {{variables}}
-    const varsList = [];
-    let out = text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
-      const idx = varsList.length;
-      varsList.push({ match, name: varName.trim() });
-      return `__VAR_${idx}__`;
+    // Step 1 — Extract and protect {{variables}}
+    const varTokens = [];
+    let protected = text.replace(/\{\{(.*?)\}\}/g, (match, key) => {
+      varTokens.push({ key: key.trim(), original: match });
+      return `\x00VAR${varTokens.length - 1}\x00`;
     });
 
-    // Step 2 — KaTeX
-    out = out.replace(/\$([^\$]+)\$/g, (match, inner) => {
-      if (typeof katex !== 'undefined' && katex.renderToString) {
+    // Step 2 — KaTeX segments ($...$)
+    let out = protected.replace(/\$([^\$]+)\$/g, (match, inner) => {
+      if (typeof window !== 'undefined' && window.katex && window.katex.renderToString) {
         try {
-          return katex.renderToString(inner, { throwOnError: false, displayMode: false });
+          return window.katex.renderToString(inner, { throwOnError: false, displayMode: false });
         } catch (e) {
           return match;
         }
@@ -867,31 +866,35 @@ class AppEngine {
       return match;
     });
 
-    // Step 3 — Greek words using whole-word regex
-    const greekMap = {
-      omega: 'ω', theta: 'θ', alpha: 'α', beta: 'β', delta: 'δ',
-      Delta: 'Δ', mu: 'μ', sigma: 'σ', pi: 'π', phi: 'φ',
-      lambda: 'λ', rho: 'ρ'
-    };
-    for (const [word, symbol] of Object.entries(greekMap)) {
-      const regex = new RegExp(`\\b${word}\\b`, 'g');
-      out = out.replace(regex, symbol);
-    }
+    // Step 3 — Greek word replacements
+    const greeks = [
+      [/\bomega\b/g, 'ω'],
+      [/\btheta\b/g, 'θ'],
+      [/\balpha\b/g, 'α'],
+      [/\bbeta\b/g, 'β'],
+      [/\bdelta\b/g, 'δ'],
+      [/\bDelta\b/g, 'Δ'],
+      [/\bmu\b/g, 'μ'],
+      [/\bsigma\b/g, 'σ'],
+      [/\bpi\b/g, 'π'],
+      [/\bphi\b/g, 'φ'],
+      [/\blambda\b/g, 'λ'],
+      [/\brho\b/g, 'ρ']
+    ];
+    greeks.forEach(([reg, sym]) => {
+      out = out.replace(reg, sym);
+    });
 
     // Step 4 — Superscripts
-    out = out.replace(/(\w+)\^(\{[^}]+\}|\w+)/g, (m, p1, p2) => {
-      const sup = p2.startsWith('{') && p2.endsWith('}') ? p2.slice(1, -1) : p2;
-      return `${p1}<sup>${sup}</sup>`;
-    });
+    out = out.replace(/([A-Za-z0-9]+)\^\{([^}]+)\}/g, '$1<sup>$2</sup>');
+    out = out.replace(/([A-Za-z0-9]+)\^([A-Za-z0-9]+)/g, '$1<sup>$2</sup>');
 
     // Step 5 — Subscripts
-    out = out.replace(/(\w+)_(\{[^}]+\}|\w+)/g, (m, p1, p2) => {
-      const sub = p2.startsWith('{') && p2.endsWith('}') ? p2.slice(1, -1) : p2;
-      return `${p1}<sub>${sub}</sub>`;
-    });
+    out = out.replace(/([A-Za-z])\{([^}]+)\}/g, '$1<sub>$2</sub>');
+    out = out.replace(/([A-Za-z])_([0-9]+)/g, '$1<sub>$2</sub>');
 
     // Step 6 — Fractions
-    out = out.replace(/([\w\s\^]+)\/\(([\w\s\^]+)\)/g, '<span class="math-frac"><span class="num">$1</span><span class="den">$2</span></span>');
+    out = out.replace(/([A-Za-z0-9\s]+)\/\(([^)]+)\)/g, '<span class="math-frac"><span class="num">$1</span><span class="den">$2</span></span>');
 
     // Step 7 — sqrt
     out = out.replace(/sqrt\(([^)]+)\)/g, '√<span style="text-decoration:overline;">$1</span>');
@@ -900,12 +903,12 @@ class AppEngine {
     out = out.replace(/ \* /g, ' × ');
 
     // Step 9 — Restore variables
-    varsList.forEach((v, i) => {
-      const val = variablesMap[v.name];
-      const chipHtml = val !== undefined
+    varTokens.forEach((vt, i) => {
+      const val = variablesMap[vt.key];
+      const html = val !== undefined
         ? `<strong class="mono-val" style="color:var(--accent-blue);">${val}</strong>`
-        : `<code class="code-font" style="color:var(--warning);">${v.match}</code>`;
-      out = out.replace(`__VAR_${i}__`, chipHtml);
+        : `<code class="code-font" style="color:var(--warning);">{{${vt.key}}}</code>`;
+      out = out.replace(`\x00VAR${i}\x00`, html);
     });
 
     return out;

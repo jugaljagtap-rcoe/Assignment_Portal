@@ -10,6 +10,15 @@ const facultyView = {
   queueStudentIndex: 0,
   queueSelectedBatch: '',
 
+  getAsgQuestions(asg) {
+    if (!asg) return [];
+    if (Array.isArray(asg.questions)) return asg.questions;
+    if (typeof asg.questions === 'string') {
+      try { return JSON.parse(asg.questions); } catch(_) { return []; }
+    }
+    return [];
+  },
+
   render(container, activeNav) {
     const hash = window.location.hash || '#faculty-home';
 
@@ -850,8 +859,7 @@ const facultyView = {
       ` : `
         <div style="display:flex; flex-direction:column; gap:16px;">
           ${subAsgs.map(a => {
-            const questions = Array.isArray(a.questions) ? a.questions :
-              (typeof a.questions === 'string' ? (()=>{ try{return JSON.parse(a.questions);}catch(_){return [];} })() : []);
+            const questions = facultyView.getAsgQuestions(a);
             const totalParams = questions.flatMap(q => q.parameters || []).length;
             const status = a.lifecycle_status || a.state || 'draft';
             const targetSubId = sub ? sub.id : (a.subjectId || a.subject_id || '');
@@ -906,8 +914,7 @@ const facultyView = {
 
   /* 2b. Assignment Builder — Level 2: Question Editor for Single Assignment */
   renderAssignmentQuestionEditor(container, sub, asg) {
-    const questions = Array.isArray(asg.questions) ? asg.questions :
-      (typeof asg.questions === 'string' ? (()=>{ try{return JSON.parse(asg.questions);}catch(_){return [];} })() : []);
+    const questions = facultyView.getAsgQuestions(asg);
     const totalParams = questions.flatMap(q => q.parameters || []).length;
     const status = asg.lifecycle_status || asg.state || 'draft';
     const isLocked = status === 'locked';
@@ -1279,7 +1286,7 @@ const facultyView = {
       id: `tmpl-${Date.now()}`,
       title: `${asgCodeLabel} Template — ${asg.title || asg.working_title || ''}`,
       subject_code: asg.subjectId,
-      questions: asg.questions || [],
+      questions: facultyView.getAsgQuestions(asg),
       created_by: app.currentUser ? app.currentUser.email : 'faculty@eng.rizvi.edu.in',
       created_at: new Date().toISOString()
     };
@@ -1629,7 +1636,7 @@ const facultyView = {
     e.preventDefault();
     const asg = (app.data.assignments || []).find(a => a.id === asgId);
     if (!asg) return;
-    if (!Array.isArray(asg.questions)) asg.questions = [];
+    const questions = facultyView.getAsgQuestions(asg);
 
     const qId = `q-${asgId}-${Date.now()}`;
     const qRecord = {
@@ -1643,7 +1650,8 @@ const facultyView = {
       btLevel: document.getElementById('q-bt').value,
       parameters: []
     };
-    asg.questions.push(qRecord);
+    questions.push(qRecord);
+    asg.questions = JSON.stringify(questions);
     app.saveState();
 
     const asgCode = asg.display_code || asg.id;
@@ -1655,7 +1663,7 @@ const facultyView = {
       title: asg.title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
-      questions: JSON.stringify(asg.questions),
+      questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(asg.schedules || [])
     }, `Assignment ${asgCodeLabel} (questions)`);
 
@@ -1668,7 +1676,7 @@ const facultyView = {
   openEditQuestionModal(asgId, qId) {
     const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
-    const q = (asg.questions || []).find(q => q.id === qId);
+    const q = facultyView.getAsgQuestions(asg).find(q => q.id === qId);
     if (!q) return;
 
     const subCOs = (app.data.courseOutcomes || []).filter(co =>
@@ -1752,7 +1760,8 @@ const facultyView = {
     e.preventDefault();
     const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
-    const q = (asg.questions || []).find(q => q.id === qId);
+    const questions = facultyView.getAsgQuestions(asg);
+    const q = questions.find(q => q.id === qId);
     if (!q) return;
 
     q.text = document.getElementById('q-text').value.trim();
@@ -1762,6 +1771,7 @@ const facultyView = {
     q.coId = document.getElementById('q-co').value;
     q.btLevel = document.getElementById('q-bt').value;
 
+    asg.questions = JSON.stringify(questions);
     app.saveState();
 
     await app.supabaseUpsert('assignments', {
@@ -1771,7 +1781,7 @@ const facultyView = {
       working_title: asg.working_title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
-      questions: JSON.stringify(asg.questions),
+      questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(asg.schedules || [])
     }, `Assignment ${asg.display_code || asg.id}`);
 
@@ -1784,6 +1794,8 @@ const facultyView = {
   openAddParameterModal(asgId, questionId) {
     const asg = (app.data.assignments || []).find(a => a.id === asgId);
     if (!asg) return;
+    const q = facultyView.getAsgQuestions(asg).find(q => q.id === questionId);
+    if (!q) return;
 
     const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
 
@@ -1821,7 +1833,8 @@ const facultyView = {
     e.preventDefault();
     const asg = (app.data.assignments || []).find(a => a.id === asgId);
     if (!asg) return;
-    const q = (asg.questions || []).find(q => q.id === questionId);
+    const questions = facultyView.getAsgQuestions(asg);
+    const q = questions.find(q => q.id === questionId);
     if (!q) return;
     if (!Array.isArray(q.parameters)) q.parameters = [];
 
@@ -1835,6 +1848,7 @@ const facultyView = {
       correctValue: correctValue
     };
     q.parameters.push(paramRecord);
+    asg.questions = JSON.stringify(questions);
     app.saveState();
 
     const asgCode = asg.display_code || asg.id;
@@ -1847,7 +1861,7 @@ const facultyView = {
       title: asg.title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
-      questions: JSON.stringify(asg.questions),
+      questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(asg.schedules || [])
     }, `Assignment ${asgCodeLabel} (parameters)`);
 
@@ -1861,8 +1875,7 @@ const facultyView = {
     const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
 
-    const questions = Array.isArray(asg.questions) ? asg.questions :
-      (typeof asg.questions === 'string' ? JSON.parse(asg.questions) : []);
+    const questions = facultyView.getAsgQuestions(asg);
 
     const allParams = questions.flatMap(q => q.parameters || []);
     const paramsWithGroundTruth = allParams.filter(p => p.correctValue && p.correctValue.trim() !== '');
