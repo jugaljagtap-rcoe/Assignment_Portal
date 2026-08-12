@@ -861,7 +861,7 @@ class AppEngine {
     if (!url) return '';
     if (url.includes('drive.google.com') && url.includes('/file/d/')) {
       const fileId = url.split('/file/d/')[1].split('/')[0];
-      return `https://drive.google.com/uc?export=view&id=${fileId}`;
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
     }
     return url;
   }

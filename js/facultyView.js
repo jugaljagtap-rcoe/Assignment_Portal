@@ -989,10 +989,16 @@ const facultyView = {
                       ` : ''}
                     </div>
                     ${!isLocked ? `
-                      <button class="btn btn-ghost btn-sm" style="flex-shrink:0; margin-left:10px;"
-                        onclick="facultyView.openAddParameterModal('${asg.id}', '${q.id}')">
-                        + Add Parameter
-                      </button>
+                      <div style="display:flex; gap:6px; flex-shrink:0; margin-left:10px;">
+                        <button class="btn btn-ghost btn-sm"
+                          onclick="facultyView.openEditQuestionModal('${asg.id}', '${q.id}')">
+                          ✏️ Edit Question
+                        </button>
+                        <button class="btn btn-ghost btn-sm"
+                          onclick="facultyView.openAddParameterModal('${asg.id}', '${q.id}')">
+                          + Add Parameter
+                        </button>
+                      </div>
                     ` : ''}
                   </div>
 
@@ -1634,6 +1640,107 @@ const facultyView = {
     writeAudit('created', 'question', qId, qRecord);
     app.closeModal();
     app.showToast(`Added question to ${asgCodeLabel}`, 'success');
+    app.renderCurrentView();
+  },
+
+  openEditQuestionModal(asgId, qId) {
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+    const questions = Array.isArray(asg.questions) ? asg.questions : [];
+    const q = questions.find(q => q.id === qId);
+    if (!q) return;
+
+    const subCOs = (app.data.courseOutcomes || []).filter(co =>
+      co.subjectId === asg.subjectId || co.subject_id === asg.subjectId ||
+      co.subject_id === asg.subject_id
+    );
+
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
+    app.showModal(`✏️ Edit Question — ${asgCodeLabel}`, `
+      <form onsubmit="facultyView.saveEditedQuestion(event, '${asgId}', '${qId}')" style="min-width:480px;">
+        <div class="form-group">
+          <label class="form-label">Question Text</label>
+          <textarea id="q-text" class="form-input" rows="4"
+            placeholder="e.g. Find the resultant of two concurrent forces {{F1}} N and {{F2}} N at angle {{theta}}°."
+            required>${q.text || ''}</textarea>
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">Use {{variable}} placeholders for student-specific values.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Section Label <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="q-section" class="form-input" placeholder="e.g. Section A — Numerical" value="${q.section || ''}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Question Diagram Image URL <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
+          <input type="text" id="q-image-url" class="form-input code-font" placeholder="https://drive.google.com/file/d/..." value="${q.imageUrl || ''}">
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">⚠️ Ensure Google Drive file access is set to 'Anyone with the link' before pasting the URL here.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Per-Student Variables</label>
+          <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--bg-subtle); border-radius:var(--radius-md);">
+            <input type="checkbox" id="q-use-vars" ${q.usePerStudentVariables ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--accent-blue);">
+            <div>
+              <div style="font-size:13px; font-weight:600;">This question uses per-student variable values</div>
+              <div style="font-size:11px; color:var(--text-secondary);">e.g. F1, F2, theta differ per student. You'll upload variable assignments after saving questions.</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">CO Mapping</label>
+            <select id="q-co" class="form-select">
+              <option value="">— None —</option>
+              ${subCOs.map(co => `<option value="${co.id}" ${q.coId === co.id ? 'selected' : ''}>${co.code} — ${co.description.substring(0,40)}…</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">BT Level</label>
+            <select id="q-bt" class="form-select">
+              ${['BT1 — Remember','BT2 — Understand','BT3 — Apply','BT4 — Analyze','BT5 — Evaluate','BT6 — Create'].map((l,i)=>`<option value="BT${i+1}" ${(q.btLevel || 'BT3') === `BT${i+1}` ? 'selected':''}>BT${i+1} — ${l.split('—')[1].trim()}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveEditedQuestion(e, asgId, qId) {
+    e.preventDefault();
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+    const questions = Array.isArray(asg.questions) ? asg.questions : [];
+    const q = questions.find(q => q.id === qId);
+    if (!q) return;
+
+    q.text = document.getElementById('q-text').value.trim();
+    q.section = document.getElementById('q-section').value.trim();
+    q.imageUrl = document.getElementById('q-image-url').value.trim();
+    q.usePerStudentVariables = document.getElementById('q-use-vars').checked;
+    q.coId = document.getElementById('q-co').value;
+    q.btLevel = document.getElementById('q-bt').value;
+
+    app.saveState();
+
+    const asgCode = asg.display_code || asg.id;
+    const asgCodeLabel = asg.display_code || asg.working_title || asg.id;
+
+    await app.supabaseUpsert('assignments', {
+      id: asg.id,
+      code: asgCode,
+      title: asg.title,
+      subject_id: asg.subjectId || asg.subject_id,
+      lifecycle_status: asg.lifecycle_status || 'draft',
+      questions: JSON.stringify(asg.questions),
+      schedules: JSON.stringify(asg.schedules || [])
+    }, `Assignment ${asgCodeLabel} (update question)`);
+
+    writeAudit('updated', 'question', qId, q);
+    app.closeModal();
+    app.showToast(`Updated question in ${asgCodeLabel}`, 'success');
     app.renderCurrentView();
   },
 
