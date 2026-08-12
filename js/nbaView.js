@@ -104,12 +104,12 @@ const nbaView = {
       <div class="kpi-grid" style="margin-bottom:24px;">
         <div class="kpi-card">
           <span class="kpi-label">Program Outcomes (POs)</span>
-          <span class="kpi-value">${PO_LIST.length}</span>
+          <span class="kpi-value">${(app.data.programOutcomes || []).length}</span>
           <span class="kpi-trend positive">PO1 to PO12 Defined</span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">Program Specific Outcomes</span>
-          <span class="kpi-value">${PSO_LIST.length}</span>
+          <span class="kpi-value">${(app.data.programSpecificOutcomes || []).length}</span>
           <span class="kpi-trend positive">PSO1 & PSO2 Defined</span>
         </div>
         <div class="kpi-card">
@@ -138,7 +138,7 @@ const nbaView = {
         </div>
 
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
-          ${PO_LIST.map(po => `
+          ${(app.data.programOutcomes || []).map(po => `
             <div style="background:var(--bg-subtle); border:1px solid var(--border-default); border-radius:var(--radius-md); padding:12px 14px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <span class="tag tag-co" style="font-weight:800; font-size:12px;">${po.code}</span>
@@ -296,8 +296,8 @@ const nbaView = {
                 <tr>
                   <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${c.code}</td>
                   <td style="font-size:12px; max-width:240px;">${c.description}</td>
-                  ${PO_LIST.map(() => `<td style="text-align:center; color:var(--success); font-weight:700;">✓</td>`).join('')}
-                  ${PSO_LIST.map(() => `<td style="text-align:center; color:var(--accent-blue); font-weight:700;">✓</td>`).join('')}
+                  ${(app.data.programOutcomes || []).map(() => `<td style="text-align:center; color:var(--success); font-weight:700;">✓</td>`).join('')}
+                  ${(app.data.programSpecificOutcomes || []).map(() => `<td style="text-align:center; color:var(--accent-blue); font-weight:700;">✓</td>`).join('')}
                 </tr>
               `).join('')}
             </tbody>

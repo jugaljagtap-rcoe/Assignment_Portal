@@ -20,12 +20,24 @@ const facultyView = {
       let subjectId = raw;
 
       for (const t of validTabs) {
-        if (raw.endsWith('-' + t)) {
-          tab = t;
-          subjectId = raw.substring(0, raw.length - (t.length + 1));
-          break;
+        const suffix = '-' + t;
+        if (raw.endsWith(suffix)) {
+          const candidate = raw.slice(0, raw.length - suffix.length);
+          if (candidate.length > 0) {
+            tab = t;
+            subjectId = candidate;
+            break;
+          }
         }
       }
+
+      const knownSubject = (app.data.subjects || []).find(s => s.id === subjectId);
+      if (!knownSubject && app.data.subjects.length > 0) {
+        // hash is malformed — fall back to faculty home
+        this.renderFacultyHome(container);
+        return;
+      }
+
       this.renderSubjectWorkspace(container, subjectId, tab);
     } else {
       switch(activeNav) {
@@ -59,7 +71,20 @@ const facultyView = {
      LEVEL 1 — FACULTY HOME (#faculty-home)
      ========================================================================== */
   renderFacultyHome(container) {
-    const facultyEmail = app.currentUser ? app.currentUser.email.trim().toLowerCase() : 'jugaljagtap@eng.rizvi.edu.in';
+    if (!app.currentUser) {
+      container.innerHTML = `
+        <div class="card" style="padding:40px; text-align:center;">
+          <div class="empty-state">
+            <div class="empty-state-emoji">🔒</div>
+            <h3 class="empty-state-title">Authentication Required</h3>
+            <p class="empty-state-subtitle">Please log in to access the Faculty Workspace.</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const facultyEmail = app.currentUser.email ? app.currentUser.email.trim().toLowerCase() : '';
 
     const assignedSfs = (app.data.subjectFaculty || []).filter(sf =>
       sf.faculty_id === facultyEmail || sf.facultyId === facultyEmail
@@ -197,10 +222,10 @@ const facultyView = {
       <div id="subject-workspace-tab-content"></div>
     `;
 
-    const tabContentEl = document.getElementById('subject-workspace-tab-content');
-    if (tabContentEl) {
-      this.renderSubjectTabContent(sub, activeTab, tabContentEl);
-    }
+    requestAnimationFrame(() => {
+      const tabContentEl = document.getElementById('subject-workspace-tab-content');
+      if (tabContentEl) this.renderSubjectTabContent(sub, activeTab, tabContentEl);
+    });
   },
 
   renderSubjectTabContent(sub, tab, targetEl) {
@@ -409,7 +434,7 @@ const facultyView = {
       !sub || m.subjectId === sub?.id || m.subject_id === sub?.id
     );
 
-    const allTargets = [...PO_LIST.map(p => p.code), ...PSO_LIST.map(p => p.code)];
+    const allTargets = [...(app.data.programOutcomes || []).map(p => p.code), ...(app.data.programSpecificOutcomes || []).map(p => p.code)];
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -780,16 +805,29 @@ const facultyView = {
                 <!-- Assignment Header -->
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
                   <div>
-                    <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.code}</span>
-                    <strong style="font-size:15px; margin-left:8px;">${a.title}</strong>
-                    ${a.btLevel ? `<span class="tag tag-bt" style="margin-left:8px;">${a.btLevel}</span>` : ''}
+                    ${a.display_code ? `
+                      <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.display_code}</span>
+                      <strong style="font-size:15px; margin-left:8px;">${a.working_title || a.title}</strong>
+                    ` : `
+                      <strong style="font-size:15px; color:var(--text-primary);">${a.working_title || a.title}</strong>
+                      <span class="tag tag-warning" style="margin-left:8px; font-weight:700;">[DRAFT]</span>
+                    `}
+                    ${a.btLevel || a.bt_level ? `<span class="tag tag-bt" style="margin-left:8px;">${a.btLevel || a.bt_level}</span>` : ''}
                   </div>
                   <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
-                    <button class="btn btn-secondary btn-sm" onclick="facultyView.saveAsTemplate('${a.id}')">💾 Template</button>
-                    ${!isLocked ? `<button class="btn btn-ghost btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : a.subjectId || ''}')" title="Create another assignment">+</button>` : ''}
-                    <span class="col-pill ${isLocked ? 'pill-locked' : (a.lifecycle_status === 'published' ? 'pill-published' : 'pill-draft')}">
-                      ${(a.lifecycle_status || 'draft').toUpperCase()}
-                    </span>
+                    ${(a.lifecycle_status || 'draft') === 'draft' ? `
+                      <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish Assignment</button>
+                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')">🗑️ Delete Draft</button>
+                    ` : (a.lifecycle_status || 'draft') === 'published' ? `
+                      <button class="btn btn-secondary btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock</button>
+                      <button class="btn btn-destructive btn-sm" onclick="facultyView.retractAssignment('${a.id}')">↩ Retract</button>
+                    ` : (a.lifecycle_status || 'draft') === 'locked' ? `
+                      <span class="tag tag-purple">🔒 Locked</span>
+                    ` : (a.lifecycle_status || 'draft') === 'retracted' ? `
+                      <span class="tag tag-warning">↩ Retracted</span>
+                      <button class="btn btn-secondary btn-sm" onclick="facultyView.rebuildFromRetracted('${a.id}')">🔄 Rebuild as New Draft</button>
+                    ` : ''}
+                    <button class="btn btn-ghost btn-sm" onclick="facultyView.saveAsTemplate('${a.id}')" title="Save as template">💾</button>
                   </div>
                 </div>
 
@@ -866,7 +904,8 @@ const facultyView = {
 
   /* 3. Schedule & Access Manager */
   renderScheduleManager(container, sub) {
-    const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id);
+    const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
+    const batches = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4'];
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -876,46 +915,104 @@ const facultyView = {
         </div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:16px;">
-        ${subAsgs.map(a => {
-          const isLocked = (a.lifecycle_status || a.state) === 'locked';
+      ${subAsgs.length === 0 ? `
+        <div class="card" style="padding:40px; text-align:center;">
+          <div class="empty-state">No assignments available to schedule.</div>
+        </div>
+      ` : `
+        <div style="display:flex; flex-direction:column; gap:20px;">
+          ${subAsgs.map(a => {
+            const isLocked = (a.lifecycle_status || a.state) === 'locked';
+            const parsedSchedules = Array.isArray(a.schedules) ? a.schedules :
+              (typeof a.schedules === 'string' ? (()=>{ try{return JSON.parse(a.schedules);}catch(_){return [];} })() : []);
 
-          return `
-            <div class="card">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <div>
-                  <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.code}</span>
-                  <strong style="font-size:15px; margin-left:8px;">${a.title}</strong>
+            return `
+              <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                  <div>
+                    <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.display_code || 'Draft'}</span>
+                    <strong style="font-size:15px; margin-left:8px;">${a.working_title || a.title}</strong>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button class="btn btn-primary btn-sm" onclick="facultyView.saveAssignmentSchedule('${a.id}')">💾 Save Schedule</button>
+                    ${!isLocked ? `
+                      <button class="btn btn-destructive btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock & Finalize</button>
+                    ` : `<span class="tag tag-purple">🔒 Locked</span>`}
+                  </div>
                 </div>
-                <div style="display:flex; gap:8px;">
-                  ${!isLocked ? `
-                    <button class="btn btn-destructive btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock & Finalize Assignment</button>
-                  ` : `<span class="tag tag-purple">🔒 Locked & Finalized</span>`}
+
+                <div class="table-container">
+                  <table class="custom-table">
+                    <thead>
+                      <tr><th>Batch</th><th>Deadline</th><th>Submissions Open</th><th>Grades Released</th></tr>
+                    </thead>
+                    <tbody>
+                      ${batches.map(b => {
+                        const sch = parsedSchedules.find(s => s.scopeValue === b);
+                        const deadlineVal = sch?.deadline || '';
+                        const subOpen = sch ? (sch.submissionsOpen ?? true) : true;
+                        const gradesRel = sch ? (sch.gradesReleased ?? false) : false;
+
+                        return `
+                          <tr>
+                            <td class="mono-val" style="font-weight:700;">Batch ${b}</td>
+                            <td>
+                              <input type="datetime-local" id="deadline-${a.id}-${b}" class="form-input code-font btn-sm" value="${deadlineVal}" style="padding:4px 8px; width:220px;">
+                            </td>
+                            <td>
+                              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="submissions-open-${a.id}-${b}" ${subOpen ? 'checked' : ''} style="accent-color:var(--success); width:16px; height:16px;">
+                                <span style="font-size:12px; font-weight:600;">${subOpen ? '🟢 Open' : '🔴 Closed'}</span>
+                              </label>
+                            </td>
+                            <td>
+                              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                <input type="checkbox" id="grades-released-${a.id}-${b}" ${gradesRel ? 'checked' : ''} style="accent-color:var(--accent-blue); width:16px; height:16px;">
+                                <span style="font-size:12px; font-weight:600;">${gradesRel ? '🟢 Released' : '⚪ Hidden'}</span>
+                              </label>
+                            </td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-
-              <div class="table-container">
-                <table class="custom-table">
-                  <thead>
-                    <tr><th>Batch</th><th>Deadline</th><th>Submissions</th><th>Grades Released</th></tr>
-                  </thead>
-                  <tbody>
-                    ${['A1', 'A2', 'A3', 'A4'].map(b => `
-                      <tr>
-                        <td class="mono-val" style="font-weight:700;">Batch ${b}</td>
-                        <td class="mono-val" style="font-size:12px;">31/12/2026, 11:59 PM</td>
-                        <td><span class="tag tag-success">🟢 Open</span></td>
-                        <td><span class="tag tag-success">🟢 Released</span></td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
+            `;
+          }).join('')}
+        </div>
+      `}
     `;
+  },
+
+  async saveAssignmentSchedule(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const batches = ['A1','A2','A3','A4','B1','B2','B3','B4'];
+    const schedules = batches.map(b => ({
+      scopeType: 'batch',
+      scopeValue: b,
+      deadline: document.getElementById(`deadline-${asgId}-${b}`)?.value || '',
+      submissionsOpen: document.getElementById(`submissions-open-${asgId}-${b}`)?.checked ?? true,
+      gradesReleased: document.getElementById(`grades-released-${asgId}-${b}`)?.checked ?? false
+    })).filter(s => s.deadline !== '');
+
+    asg.schedules = schedules;
+    app.saveState();
+
+    await app.supabaseUpsert('assignments', {
+      id: asg.id,
+      title: asg.title,
+      display_code: asg.display_code || null,
+      subject_id: asg.subjectId || asg.subject_id,
+      lifecycle_status: asg.lifecycle_status || 'draft',
+      questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
+      schedules: JSON.stringify(schedules)
+    }, `Schedule for ${asg.display_code || asg.working_title}`);
+
+    writeAudit('updated', 'assignment_schedule', asgId, { schedules });
+    app.showToast('Schedule saved successfully.', 'success');
   },
 
   /* 4. Grade & Evaluate 3-Mode Pipeline */
@@ -1112,52 +1209,100 @@ const facultyView = {
   },
 
   openCreateAssignmentModal(subId) {
-    const sub = (app.data.subjects || []).find(s => s.id === subId);
+    const sub = (app.data.subjects || []).find(s => s.id === subId) || app.data.subjects[0];
     if (!sub) {
-      app.showToast('Please open a subject workspace first before creating an assignment.', 'warning');
+      app.showToast('No valid subject found to create assignment', 'warning');
       return;
     }
-    const subCOs = (app.data.courseOutcomes || []).filter(co => co.subjectId === subId || co.subject_id === subId);
-    const suggestedCode = `ASG-${(sub.code || 'SUB').toUpperCase()}-${String(((app.data.assignments || []).filter(a => a.subjectId === subId || a.subject_id === subId).length) + 1).padStart(2, '0')}`;
 
-    app.showModal(`📋 Create New Lab Assignment — ${sub.code}`, `
-      <form onsubmit="facultyView.saveNewAssignment(event, '${subId}')" style="min-width:480px;">
+    const subCOs = (app.data.courseOutcomes || []).filter(co =>
+      co.subjectId === sub.id || co.subject_id === sub.id
+    );
+    const subModules = (app.data.modules || []).filter(m =>
+      m.subjectId === sub.id || m.subject_id === sub.id
+    );
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; background:var(--bg-subtle); padding:12px; border-radius:var(--radius-md); border-left:4px solid var(--accent-blue);">
-          <div>
-            <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin-bottom:2px;">Subject</div>
-            <div style="font-size:13px; font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${sub.code}</div>
-            <div style="font-size:12px; color:var(--text-secondary);">${sub.fullName || sub.name}</div>
-          </div>
-          <div>
-            <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin-bottom:2px;">Semester</div>
-            <div style="font-size:13px; font-weight:700; color:var(--text-primary);">${sub.semester || 'Semester I'}</div>
-            <div style="font-size:12px; color:var(--text-secondary);">Academic Year 2026-27</div>
-          </div>
+    const academicYears = app.getAcademicYears();
+    const activeAy = app.getActiveAcademicYear();
+
+    const dept = (app.data.departments || HARDCODED_DEPARTMENTS).find(d => d.id === sub.departmentId);
+    const deptShort = dept ? dept.shortName : 'FE';
+
+    const defaultAbbr = sub.abbr || app.deriveAbbreviation(sub.fullName || sub.name);
+    const defaultPrefix = `${defaultAbbr}Lab`;
+
+    window.updateDisplayCodePreview = function() {
+      const prefix = (document.getElementById('asg-series-prefix')?.value || '').trim();
+      const type = document.getElementById('asg-series-type')?.value || 'L';
+      const ay = document.getElementById('asg-academic-year')?.value || activeAy;
+      const previewEl = document.getElementById('asg-code-preview');
+      if (previewEl) {
+        previewEl.textContent = `RCOE/${deptShort}/${ay}/${prefix}_${type}NNN`;
+      }
+    };
+
+    app.showModal('📋 Create New Assignment Draft', `
+      <form onsubmit="facultyView.saveNewAssignment(event, '${sub.id}')" style="min-width:520px;">
+
+        <!-- Section 1 — Identity -->
+        <div style="background:var(--bg-subtle); border-left:4px solid var(--accent-blue); padding:12px 14px; border-radius:var(--radius-md); margin-bottom:16px;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Subject Workspace</div>
+          <div style="font-size:14px; font-weight:800; color:var(--accent-blue); margin-top:2px;">${sub.code} — ${sub.fullName || sub.name}</div>
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Department: <strong>${deptShort}</strong></div>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <!-- Section 2 — Working Title -->
+        <div class="form-group">
+          <label class="form-label">Working Title <span style="font-size:11px; font-weight:400; color:var(--text-tertiary);">(internal, not shown to students)</span></label>
+          <input type="text" id="asg-working-title" class="form-input" placeholder="e.g. Experiment on Concurrent Force Systems" required>
+        </div>
+
+        <!-- Section 3 — Series Configuration -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
           <div class="form-group">
-            <label class="form-label">Assignment Code</label>
-            <input type="text" id="asg-code" class="form-input code-font" value="${suggestedCode}" placeholder="ASG-VMD-01" required>
+            <label class="form-label">Academic Year</label>
+            <select id="asg-academic-year" class="form-select" onchange="window.updateDisplayCodePreview()" required>
+              ${academicYears.map(ay => `<option value="${ay.label}" ${ay.label === activeAy ? 'selected' : ''}>${ay.label}</option>`).join('')}
+            </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Primary BT Level</label>
-            <select id="asg-bt-level" class="form-select" required>
-              ${['BT1 — Remember', 'BT2 — Understand', 'BT3 — Apply', 'BT4 — Analyze', 'BT5 — Evaluate', 'BT6 — Create'].map((lbl, i) => `<option value="BT${i+1}" ${i===2 ? 'selected' : ''}>${lbl}</option>`).join('')}
+            <label class="form-label">Series Prefix</label>
+            <input type="text" id="asg-series-prefix" class="form-input code-font" value="${defaultPrefix}" oninput="window.updateDisplayCodePreview()" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Series Type</label>
+            <select id="asg-series-type" class="form-select" onchange="window.updateDisplayCodePreview()" required>
+              <option value="A">A — Assignment</option>
+              <option value="L" selected>L — Lab Practical</option>
+              <option value="T">T — Test/Quiz</option>
+              <option value="P">P — Project</option>
             </select>
           </div>
         </div>
 
+        <!-- Section 4 — Display Code Preview -->
         <div class="form-group">
-          <label class="form-label">Assignment Title</label>
-          <input type="text" id="asg-title" class="form-input" placeholder="e.g. Experiment 1: Concurrent Force System" required>
+          <label class="form-label">Display Code Preview (NNN assigned on Publish)</label>
+          <div style="background:var(--bg-subtle); border:1px solid var(--border-default); padding:10px 14px; border-radius:var(--radius-md);">
+            <div id="asg-code-preview" style="font-size:16px; font-weight:800; font-family:var(--font-mono); color:var(--accent-blue);">
+              RCOE/${deptShort}/${activeAy}/${defaultPrefix}_LNNN
+            </div>
+            <div style="font-size:11px; color:var(--text-tertiary); margin-top:4px;">The sequence number is assigned only when you publish. You can save as Draft now.</div>
+          </div>
+        </div>
+
+        <!-- Section 5 — Academic Metadata -->
+        <div class="form-group">
+          <label class="form-label">Primary BT Level</label>
+          <select id="asg-bt-level" class="form-select" required>
+            ${['BT1 — Remember', 'BT2 — Understand', 'BT3 — Apply', 'BT4 — Analyze', 'BT5 — Evaluate', 'BT6 — Create'].map((lbl, i) => `<option value="BT${i+1}" ${i===2 ? 'selected' : ''}>${lbl}</option>`).join('')}
+          </select>
         </div>
 
         ${subCOs.length > 0 ? `
         <div class="form-group">
-          <label class="form-label">Map to Course Outcomes (select all that apply)</label>
-          <div style="display:flex; flex-direction:column; gap:6px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); border:1px solid var(--border-default); max-height:160px; overflow-y:auto;">
+          <label class="form-label">Course Outcomes Mapping</label>
+          <div style="display:flex; flex-direction:column; gap:6px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); border:1px solid var(--border-default); max-height:130px; overflow-y:auto;">
             ${subCOs.map(co => `
               <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer;">
                 <input type="checkbox" name="asg-cos" value="${co.id}" style="margin-top:2px; accent-color:var(--accent-blue);">
@@ -1166,11 +1311,25 @@ const facultyView = {
             `).join('')}
           </div>
         </div>
-        ` : `<div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; padding:8px; background:var(--bg-subtle); border-radius:var(--radius-md);">ℹ️ No Course Outcomes defined yet for ${sub.code}. You can add COs from the <strong>My Course</strong> tab and link them later.</div>`}
+        ` : ''}
+
+        ${subModules.length > 0 ? `
+        <div class="form-group">
+          <label class="form-label">Module Coverage</label>
+          <div style="display:flex; flex-direction:column; gap:6px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md); border:1px solid var(--border-default); max-height:130px; overflow-y:auto;">
+            ${subModules.map(m => `
+              <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer;">
+                <input type="checkbox" name="asg-modules" value="${m.id}" style="margin-top:2px; accent-color:var(--accent-blue);">
+                <span><strong>${m.code || m.module_code || ''}</strong> — ${m.name || m.module_name || m.title}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
 
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">📋 Create Assignment</button>
+          <button type="submit" class="btn btn-primary">💾 Save as Draft</button>
         </div>
       </form>
     `);
@@ -1178,41 +1337,66 @@ const facultyView = {
 
   async saveNewAssignment(e, subId) {
     e.preventDefault();
-    const asgCode = document.getElementById('asg-code').value.trim();
-    const sub = subId ? (app.data.subjects || []).find(s => s.id === subId) : app.data.subjects[0];
-    const subCode = sub ? (sub.code || 'sub') : 'sub';
-    const deterministicAsgId = `asg-${subCode.toLowerCase()}-${asgCode.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    const sub = (app.data.subjects || []).find(s => s.id === subId);
+    if (!sub) return;
 
-    // Collect selected CO IDs
+    const workingTitle = document.getElementById('asg-working-title').value.trim();
+    const seriesPrefix = document.getElementById('asg-series-prefix').value.trim();
+    const seriesType = document.getElementById('asg-series-type').value;
+    const academicYear = document.getElementById('asg-academic-year').value;
+    const btLevel = document.getElementById('asg-bt-level').value;
     const selectedCOIds = Array.from(document.querySelectorAll('input[name="asg-cos"]:checked')).map(cb => cb.value);
-    const btLevel = document.getElementById('asg-bt-level')?.value || 'BT3';
+    const selectedModuleIds = Array.from(document.querySelectorAll('input[name="asg-modules"]:checked')).map(cb => cb.value);
+
+    // Deterministic internal ID — timestamp-free base with Date.now() for multiple draft uniqueness
+    const deterministicAsgId = `asg-${subId}-${seriesPrefix.toLowerCase()}-${seriesType.toLowerCase()}-${Date.now()}`;
 
     const asgRecord = {
       id: deterministicAsgId,
-      code: asgCode,
-      title: document.getElementById('asg-title').value.trim(),
-      subjectId: subId || (app.data.subjects[0] ? app.data.subjects[0].id : 'sub-vmd'),
+      working_title: workingTitle,
+      title: workingTitle, // title = working_title until publish assigns display_code
+      subjectId: subId,
+      subject_id: subId,
+      series_prefix: seriesPrefix,
+      seriesPrefix: seriesPrefix,
+      series_type: seriesType,
+      seriesType: seriesType,
+      academic_year: academicYear,
       lifecycle_status: 'draft',
       state: 'Draft',
+      display_code: null, // assigned at publish
       btLevel: btLevel,
+      bt_level: btLevel,
       coIds: selectedCOIds,
+      co_ids: JSON.stringify(selectedCOIds),
+      modules_covered: JSON.stringify(selectedModuleIds),
       questions: [],
       schedules: []
     };
+
+    if (!app.data.assignments) app.data.assignments = [];
     app.data.assignments.push(asgRecord);
     app.saveState();
+
     await app.supabaseUpsert('assignments', {
       id: asgRecord.id,
-      code: asgRecord.code,
       title: asgRecord.title,
-      subject_id: asgRecord.subjectId,
+      working_title: asgRecord.working_title,
+      subject_id: subId,
+      series_prefix: seriesPrefix,
+      series_type: seriesType,
       lifecycle_status: 'draft',
+      display_code: null,
+      bt_level: btLevel,
+      co_ids: asgRecord.co_ids,
+      modules_covered: asgRecord.modules_covered,
       questions: JSON.stringify([]),
       schedules: JSON.stringify([])
-    }, `Assignment ${asgRecord.code}`);
-    writeAudit('created', 'assignment', asgRecord.id, asgRecord);
+    }, `Draft assignment — ${workingTitle}`);
+
+    writeAudit('created', 'assignment', asgRecord.id, { working_title: workingTitle, subject_id: subId });
     app.closeModal();
-    app.showToast(`✅ Created assignment ${asgRecord.code}`, 'success');
+    app.showToast(`Draft saved: "${workingTitle}" — questions can now be added.`, 'success');
     window.location.hash = `#faculty-subject-${subId}-assignments`;
   },
 
@@ -1239,6 +1423,16 @@ const facultyView = {
         <div class="form-group">
           <label class="form-label">Section Label <span style="color:var(--text-tertiary); font-weight:400;">(optional)</span></label>
           <input type="text" id="q-section" class="form-input" placeholder="e.g. Section A — Numerical">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Per-Student Variables</label>
+          <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--bg-subtle); border-radius:var(--radius-md);">
+            <input type="checkbox" id="q-use-vars" style="width:16px; height:16px; accent-color:var(--accent-blue);">
+            <div>
+              <div style="font-size:13px; font-weight:600;">This question uses per-student variable values</div>
+              <div style="font-size:11px; color:var(--text-secondary);">e.g. F1, F2, theta differ per student. You'll upload variable assignments after saving questions.</div>
+            </div>
+          </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
           <div class="form-group">
@@ -1274,6 +1468,8 @@ const facultyView = {
       id: qId,
       text: document.getElementById('q-text').value.trim(),
       section: document.getElementById('q-section').value.trim(),
+      usePerStudentVariables: document.getElementById('q-use-vars').checked,
+      variableNames: [],
       coId: document.getElementById('q-co').value,
       btLevel: document.getElementById('q-bt').value,
       parameters: []
@@ -1365,6 +1561,238 @@ const facultyView = {
     writeAudit('created', 'parameter', paramId, paramRecord);
     app.closeModal();
     app.showToast(`Added parameter "${paramRecord.label}" to question`, 'success');
+    app.renderCurrentView();
+  },
+
+  openPublishModal(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const questions = Array.isArray(asg.questions) ? asg.questions :
+      (typeof asg.questions === 'string' ? JSON.parse(asg.questions) : []);
+
+    const allParams = questions.flatMap(q => q.parameters || []);
+    const paramsWithGroundTruth = allParams.filter(p => p.correctValue && p.correctValue.trim() !== '');
+    const questionsWithVars = questions.filter(q => q.usePerStudentVariables === true);
+
+    // Check enrolled students have variables assigned for variable questions
+    const subStudents = app.getStudentsForDept(
+      (app.data.subjects || []).find(s => s.id === (asg.subjectId || asg.subject_id))?.departmentId || ''
+    );
+
+    let varCoverage = true;
+    if (questionsWithVars.length > 0) {
+      subStudents.forEach(st => {
+        const hasVars = (app.data.studentVariables || []).some(v =>
+          v.studentId === st.id && (v.assignmentId === asg.id)
+        );
+        if (!hasVars) varCoverage = false;
+      });
+    }
+
+    const checks = [
+      { label: 'At least one question added', pass: questions.length > 0 },
+      { label: 'All questions have at least one parameter', pass: questions.every(q => (q.parameters || []).length > 0) },
+      { label: `Ground truth set for ${paramsWithGroundTruth.length}/${allParams.length} parameters`, pass: paramsWithGroundTruth.length > 0, warn: paramsWithGroundTruth.length < allParams.length },
+      { label: 'Per-student variables assigned for all enrolled students', pass: varCoverage, skip: questionsWithVars.length === 0 }
+    ];
+
+    const checklistHtml = checks.map(c => {
+      if (c.skip) return `<div style="color:var(--text-tertiary); font-size:13px;">⊘ ${c.label} (not applicable)</div>`;
+      if (c.pass && !c.warn) return `<div style="color:var(--success); font-size:13px;">✓ ${c.label}</div>`;
+      if (c.warn) return `<div style="color:var(--warning); font-size:13px;">⚠ ${c.label}</div>`;
+      return `<div style="color:var(--danger); font-size:13px;">✕ ${c.label}</div>`;
+    }).join('');
+
+    const hasBlocker = checks.some(c => !c.skip && !c.pass && !c.warn);
+
+    // Series config for display code preview
+    const seriesPrefix = asg.series_prefix || asg.seriesPrefix || '';
+    const seriesType = asg.series_type || asg.seriesType || 'A';
+    const academicYear = asg.academic_year || app.getActiveAcademicYear();
+    const sub = (app.data.subjects || []).find(s => s.id === (asg.subjectId || asg.subject_id));
+    const dept = (app.data.departments || HARDCODED_DEPARTMENTS).find(d => d.id === (sub?.departmentId || sub?.department_id));
+    const deptShort = dept ? dept.shortName : 'FE';
+
+    // Get next number for preview
+    const seqId = `seq-${asg.subjectId || asg.subject_id}-${academicYear}-${seriesPrefix}-${seriesType}`.toLowerCase().replace(/[^a-z0-9\-]/g, '-');
+    const seqRecord = (app.data.assignmentSequences || []).find(s => s.id === seqId);
+    const nextNum = seqRecord ? seqRecord.last_number + 1 : 1;
+    const previewCode = `RCOE/${deptShort}/${academicYear}/${seriesPrefix}_${seriesType}${String(nextNum).padStart(3, '0')}`;
+
+    app.showModal(`📢 Publish Assignment — ${asg.working_title || asg.title}`, `
+      <div style="display:flex; flex-direction:column; gap:16px; min-width:480px;">
+
+        <div style="background:var(--accent-blue-subtle); border:1px solid var(--accent-blue); border-radius:var(--radius-md); padding:14px 18px;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--accent-blue); margin-bottom:4px;">Display Code to be Assigned</div>
+          <div style="font-size:22px; font-weight:800; font-family:var(--font-mono); color:var(--accent-blue);">${previewCode}</div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:4px;">This code is permanent and cannot be changed after publishing.</div>
+        </div>
+
+        <div style="background:var(--bg-subtle); border-radius:var(--radius-md); padding:14px 18px;">
+          <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:10px;">Pre-Publish Checklist</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">${checklistHtml}</div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="facultyView.confirmPublish('${asgId}')" ${hasBlocker ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+            📢 Confirm Publish
+          </button>
+        </div>
+      </div>
+    `);
+  },
+
+  async confirmPublish(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    app.closeModal();
+    app.showSpinner('Assigning display code & publishing…');
+
+    try {
+      const seriesPrefix = asg.series_prefix || asg.seriesPrefix || '';
+      const seriesType = asg.series_type || asg.seriesType || 'A';
+      const academicYear = asg.academic_year || app.getActiveAcademicYear();
+      const subjectId = asg.subjectId || asg.subject_id;
+
+      // This increments the counter and returns the display code
+      const displayCode = await app.generateDisplayCode(subjectId, seriesPrefix, seriesType, academicYear);
+
+      asg.display_code = displayCode;
+      asg.lifecycle_status = 'published';
+      asg.state = 'Published';
+      asg.title = displayCode; // title becomes the display code after publish
+
+      app.saveState();
+
+      await app.supabaseUpsert('assignments', {
+        id: asg.id,
+        title: displayCode,
+        working_title: asg.working_title,
+        display_code: displayCode,
+        subject_id: subjectId,
+        series_prefix: seriesPrefix,
+        series_type: seriesType,
+        lifecycle_status: 'published',
+        bt_level: asg.btLevel || asg.bt_level || '',
+        co_ids: typeof asg.co_ids === 'string' ? asg.co_ids : JSON.stringify(asg.coIds || []),
+        modules_covered: typeof asg.modules_covered === 'string' ? asg.modules_covered : JSON.stringify(asg.modulesCovered || []),
+        questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
+        schedules: typeof asg.schedules === 'string' ? asg.schedules : JSON.stringify(asg.schedules || [])
+      }, `Assignment ${displayCode}`);
+
+      writeAudit('updated', 'assignment', asgId, { display_code: displayCode, lifecycle_status: 'published' });
+      app.showToast(`✅ Published as ${displayCode} — students can now see this assignment.`, 'success');
+    } catch(err) {
+      app.showToast(`Failed to publish: ${err.message}`, 'danger');
+    } finally {
+      app.hideSpinner();
+      app.renderCurrentView();
+    }
+  },
+
+  async retractAssignment(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const subSubs = (app.data.submissions || []).filter(s => s.assignmentId === asgId || s.assignment_id === asgId);
+
+    if (subSubs.length > 0) {
+      if (!confirm(`This assignment has ${subSubs.length} student submission(s). Retracting will hide it from students but preserve all submission records. The display code ${asg.display_code} will be permanently retired. Continue?`)) return;
+    } else {
+      if (!confirm(`Retract ${asg.display_code}? This will hide it from students. Since there are no submissions, you can rebuild and republish under the same code slot by creating a new draft.`)) return;
+    }
+
+    asg.lifecycle_status = 'retracted';
+    asg.state = 'Retracted';
+    app.saveState();
+
+    await app.supabaseUpsert('assignments', {
+      id: asg.id,
+      title: asg.title,
+      display_code: asg.display_code,
+      subject_id: asg.subjectId || asg.subject_id,
+      lifecycle_status: 'retracted',
+      questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
+      schedules: typeof asg.schedules === 'string' ? asg.schedules : JSON.stringify(asg.schedules || [])
+    }, `Assignment ${asg.display_code}`);
+
+    writeAudit('updated', 'assignment', asgId, { lifecycle_status: 'retracted' });
+    app.showToast(`↩ ${asg.display_code} retracted — hidden from students.`, 'info');
+    app.renderCurrentView();
+  },
+
+  async deleteDraftAssignment(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    if ((asg.lifecycle_status || 'draft') !== 'draft') {
+      app.showToast('Only draft assignments can be deleted. Use Retract for published assignments.', 'warning');
+      return;
+    }
+
+    if (!confirm(`Delete draft "${asg.working_title || asg.title}"? This cannot be undone. No display code was assigned so the sequence is unaffected.`)) return;
+
+    // Cascade delete student_variables and student_answers for this draft
+    const draftVars = (app.data.studentVariables || []).filter(v => v.assignmentId === asgId);
+    for (const v of draftVars) {
+      await app.supabaseDelete('student_variables', v.id, `Student variable ${v.id}`);
+    }
+    app.data.studentVariables = (app.data.studentVariables || []).filter(v => v.assignmentId !== asgId);
+
+    const draftAnswers = (app.data.studentAnswers || []).filter(a => a.assignmentId === asgId);
+    for (const a of draftAnswers) {
+      await app.supabaseDelete('student_answers', a.id, `Student answer ${a.id}`);
+    }
+    app.data.studentAnswers = (app.data.studentAnswers || []).filter(a => a.assignmentId !== asgId);
+
+    // Delete the assignment
+    app.data.assignments = app.data.assignments.filter(a => a.id !== asgId);
+    await app.supabaseDelete('assignments', asgId, `Draft assignment ${asg.working_title || asg.title}`);
+
+    app.saveState();
+    writeAudit('deleted', 'assignment', asgId, { working_title: asg.working_title, reason: 'draft_deleted' });
+    app.showToast(`Deleted draft "${asg.working_title || asg.title}"`, 'info');
+    app.renderCurrentView();
+  },
+
+  async rebuildFromRetracted(asgId) {
+    const asg = app.data.assignments.find(a => a.id === asgId);
+    if (!asg) return;
+
+    const subId = asg.subjectId || asg.subject_id;
+    const newAsgId = `asg-${subId}-${(asg.series_prefix || 'asg').toLowerCase()}-${Date.now()}`;
+
+    const newDraft = {
+      ...JSON.parse(JSON.stringify(asg)),
+      id: newAsgId,
+      lifecycle_status: 'draft',
+      state: 'Draft',
+      display_code: null,
+      title: `${asg.working_title || asg.title} (Rebuilt)`
+    };
+
+    app.data.assignments.push(newDraft);
+    app.saveState();
+
+    await app.supabaseUpsert('assignments', {
+      id: newDraft.id,
+      title: newDraft.title,
+      working_title: newDraft.working_title || newDraft.title,
+      subject_id: subId,
+      series_prefix: newDraft.series_prefix || newDraft.seriesPrefix || '',
+      series_type: newDraft.series_type || newDraft.seriesType || 'A',
+      lifecycle_status: 'draft',
+      display_code: null,
+      bt_level: newDraft.bt_level || newDraft.btLevel || '',
+      questions: typeof newDraft.questions === 'string' ? newDraft.questions : JSON.stringify(newDraft.questions || []),
+      schedules: JSON.stringify([])
+    }, `Rebuilt draft assignment`);
+
+    writeAudit('created', 'assignment', newDraft.id, { rebuilt_from: asgId });
+    app.showToast(`Rebuilt as new draft: "${newDraft.title}"`, 'success');
     app.renderCurrentView();
   }
 };

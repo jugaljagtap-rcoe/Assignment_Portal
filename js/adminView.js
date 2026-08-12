@@ -923,7 +923,7 @@ const adminView = {
       subject_id: subjectId,
       faculty_id: facultyEmail,
       academic_year: '2026-27',
-      assigned_by: app.currentUser ? app.currentUser.email : 'jugaljagtap@eng.rizvi.edu.in',
+      assigned_by: app.currentUser ? app.currentUser.email : 'system',
       assigned_at: new Date().toISOString()
     };
 
@@ -1247,14 +1247,54 @@ const adminView = {
       semesterOptions = ['Semester I', 'Semester II'];
     }
 
+    const academicYears = app.getAcademicYears();
+    const activeAy = app.getActiveAcademicYear();
+
+    window.updateSubjectIdPreview = function() {
+      const code = (document.getElementById('sub-uni-code')?.value || '').trim();
+      const abbr = (document.getElementById('sub-abbr')?.value || '').trim();
+      const preview = document.getElementById('sub-id-preview');
+      if (preview) preview.textContent = app.buildSubjectId(code, abbr);
+    };
+
+    window.onFullNameInput = function(val) {
+      const abbrInput = document.getElementById('sub-abbr');
+      if (abbrInput) {
+        abbrInput.value = app.deriveAbbreviation(val);
+      }
+      window.updateSubjectIdPreview();
+    };
+
     app.showModal('Add New Subject Course', `
       <form onsubmit="adminView.saveNewSubject(event, '${deptId}')">
-        <div class="form-group"><label class="form-label">Subject Code (e.g. VMD, EM)</label><input type="text" id="sub-code" class="form-input code-font" required></div>
-        <div class="form-group"><label class="form-label">Full Subject Name</label><input type="text" id="sub-fullname" class="form-input" required></div>
+        <div class="form-group">
+          <label class="form-label">University Subject Code</label>
+          <input type="text" id="sub-uni-code" class="form-input code-font" placeholder="e.g. 24051181 or ESL101" oninput="window.updateSubjectIdPreview()" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Full Subject Name</label>
+          <input type="text" id="sub-fullname" class="form-input" placeholder="e.g. Engineering Mathematics-I" oninput="window.onFullNameInput(this.value)" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Abbreviation</label>
+          <input type="text" id="sub-abbr" class="form-input code-font" maxlength="6" style="text-transform:uppercase;" oninput="this.value = this.value.toUpperCase(); window.updateSubjectIdPreview();" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject ID (auto-generated, not editable)</label>
+          <div style="background:var(--bg-subtle); padding:8px 12px; border-radius:var(--radius-md); font-family:var(--font-mono); font-weight:700; color:var(--accent-blue);">
+            <span id="sub-id-preview">sub--</span>
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">Semester</label>
           <select id="sub-sem" class="form-select" required>
             ${semesterOptions.map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Academic Year</label>
+          <select id="sub-ay" class="form-select" required>
+            ${academicYears.map(ay => `<option value="${ay.label}" ${ay.label === activeAy ? 'selected' : ''}>${ay.label}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
@@ -1267,30 +1307,49 @@ const adminView = {
 
   async saveNewSubject(e, deptId) {
     e.preventDefault();
-    const code = document.getElementById('sub-code').value.trim();
+    const universityCode = document.getElementById('sub-uni-code').value.trim();
     const fullName = document.getElementById('sub-fullname').value.trim();
-    const deterministicSubId = `sub-${code.toLowerCase()}`;
+    const abbreviation = document.getElementById('sub-abbr').value.trim();
+    const academicYear = document.getElementById('sub-ay').value;
+    const semester = document.getElementById('sub-sem').value;
+
+    const deterministicSubId = app.buildSubjectId(universityCode, abbreviation);
+
+    const exists = (app.data.subjects || []).some(s => s.id === deterministicSubId);
+    if (exists) {
+      app.showToast('A subject with this code and abbreviation already exists', 'warning');
+      return;
+    }
+
     const subRecord = {
       id: deterministicSubId,
-      code: code,
+      code: universityCode,
       name: fullName,
       fullName: fullName,
+      abbr: abbreviation,
       departmentId: deptId,
-      semester: document.getElementById('sub-sem').value
+      semester: semester,
+      academicYear: academicYear
     };
+
+    if (!app.data.subjects) app.data.subjects = [];
     app.data.subjects.push(subRecord);
     app.saveState();
+
     await app.supabaseUpsert('subjects', {
       id: subRecord.id,
       code: subRecord.code,
       full_name: subRecord.fullName,
+      abbr: subRecord.abbr,
       department_id: subRecord.departmentId,
       semester: subRecord.semester,
+      academic_year: subRecord.academicYear,
       class_name: subRecord.className || ''
     }, `Subject ${subRecord.code}`);
+
     writeAudit('created', 'subject', subRecord.id, subRecord);
     app.closeModal();
-    app.showToast(`Created subject ${subRecord.code}`, 'success');
+    app.showToast(`Subject ${subRecord.code} created with ID ${subRecord.id}`, 'success');
     app.renderCurrentView();
   },
 

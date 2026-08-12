@@ -166,7 +166,8 @@ class AppEngine {
       const [
         studentsRes, facultyRes, subjectFacultyRes, subjectsRes, assignmentsRes,
         submissionsRes, assignmentSubmissionsRes, studentVarsRes, studentAnswersRes,
-        courseOutcomesRes, modulesRes, auditLogRes, templatesRes, coPoRes
+        courseOutcomesRes, modulesRes, auditLogRes, templatesRes, coPoRes,
+        programOutcomesRes, assignmentSequencesRes
       ] = await Promise.all([
         supabaseClient.from('students').select('*'),
         supabaseClient.from('faculty').select('*'),
@@ -181,7 +182,9 @@ class AppEngine {
         supabaseClient.from('modules').select('*'),
         supabaseClient.from('audit_log').select('*').order('changed_at', { ascending: false }).limit(500),
         supabaseClient.from('assignment_templates').select('*'),
-        supabaseClient.from('co_po_mapping').select('*')
+        supabaseClient.from('co_po_mapping').select('*'),
+        supabaseClient.from('program_outcomes').select('*').order('id'),
+        supabaseClient.from('assignment_sequences').select('*')
       ]);
 
       if (studentsRes.data && studentsRes.data.length > 0)
@@ -230,6 +233,17 @@ class AppEngine {
       if (auditLogRes.data) this.data.auditLogs = auditLogRes.data;
       if (templatesRes.data) this.data.assignmentTemplates = templatesRes.data;
       if (coPoRes && coPoRes.data) this.data.coPOMapping = coPoRes.data;
+
+      // program_outcomes — split into POs and PSOs
+      if (programOutcomesRes.data && programOutcomesRes.data.length > 0) {
+        this.data.programOutcomes = programOutcomesRes.data.filter(p => p.type === 'PO' || !p.type);
+        this.data.programSpecificOutcomes = programOutcomesRes.data.filter(p => p.type === 'PSO');
+      }
+
+      // assignment_sequences
+      if (assignmentSequencesRes.data) {
+        this.data.assignmentSequences = assignmentSequencesRes.data;
+      }
 
       // Deduplicate before persisting — this also cleans Supabase of stale duplicates
       await this.cleanDuplicateModules();
@@ -948,6 +962,77 @@ class AppEngine {
       banner.innerHTML = `⚠️ Missing DB tables: <strong>${missingTables.join(', ')}</strong>. Contact system administrator. <button onclick="document.getElementById('db-health-banner').remove()" style="margin-left:auto;background:rgba(255,255,255,0.2);border:none;color:#fff;cursor:pointer;padding:4px 10px;border-radius:4px;">Dismiss</button>`;
       document.body.prepend(banner);
     }
+  }
+
+  async generateDisplayCode(subjectId, seriesPrefix, seriesType, academicYear) {
+    // Build the unique sequence key
+    const seqId = `seq-${subjectId}-${academicYear}-${seriesPrefix}-${seriesType}`.toLowerCase().replace(/[^a-z0-9\-]/g, '-');
+
+    // Find existing sequence record
+    let seqRecord = (this.data.assignmentSequences || []).find(s => s.id === seqId);
+
+    const nextNumber = seqRecord ? seqRecord.last_number + 1 : 1;
+    const paddedNumber = String(nextNumber).padStart(3, '0');
+
+    // Get department short name via subject
+    const sub = (this.data.subjects || []).find(s => s.id === subjectId);
+    const dept = (this.data.departments || HARDCODED_DEPARTMENTS).find(d => d.id === (sub?.departmentId || sub?.department_id));
+    const deptShort = dept ? dept.shortName : 'FE';
+
+    const displayCode = `RCOE/${deptShort}/${academicYear}/${seriesPrefix}_${seriesType}${paddedNumber}`;
+
+    // Upsert sequence record to Supabase
+    const updatedSeq = {
+      id: seqId,
+      subject_id: subjectId,
+      academic_year: academicYear,
+      series_prefix: seriesPrefix,
+      series_type: seriesType,
+      last_number: nextNumber,
+      updated_at: new Date().toISOString()
+    };
+
+    // Update in-memory
+    if (seqRecord) {
+      seqRecord.last_number = nextNumber;
+      seqRecord.updated_at = updatedSeq.updated_at;
+    } else {
+      if (!this.data.assignmentSequences) this.data.assignmentSequences = [];
+      this.data.assignmentSequences.push(updatedSeq);
+    }
+
+    // Persist to Supabase
+    await this.supabaseUpsert('assignment_sequences', updatedSeq, `Sequence ${seqId}`);
+    this.saveState();
+
+    return displayCode;
+  }
+
+  deriveAbbreviation(fullName) {
+    if (!fullName) return '';
+    const skipWords = new Set(['and','of','the','for','a','an','in','to','at','by','with','from','on']);
+    const cleaned = fullName
+      .replace(/\(.*?\)/g, '')  // remove parentheses content
+      .replace(/[^a-zA-Z\s]/g, '') // remove special chars
+      .trim();
+    const words = cleaned.split(/\s+/).filter(w => w.length > 0 && !skipWords.has(w.toLowerCase()));
+    const abbr = words.map(w => w[0].toUpperCase()).join('');
+    return abbr.length >= 2 ? abbr : abbr.padEnd(2, 'X');
+  }
+
+  buildSubjectId(universityCode, abbreviation) {
+    const code = (universityCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const abbr = (abbreviation || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `sub-${code}-${abbr}`;
+  }
+
+  getAcademicYears() {
+    return this.data.academicYears || ACADEMIC_YEARS;
+  }
+
+  getActiveAcademicYear() {
+    const active = (this.data.academicYears || ACADEMIC_YEARS).find(ay => ay.active);
+    return active ? active.label : '2026-27';
   }
 }
 
