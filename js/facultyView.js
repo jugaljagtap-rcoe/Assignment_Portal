@@ -287,6 +287,46 @@ const facultyView = {
         return false;
       }).slice(0, 5);
 
+      // Type Label Map
+      const TYPE_MAP = {
+        'L': 'Lab Practicals',
+        'A': 'Assignments',
+        'T': 'Tests & Quizzes',
+        'P': 'Projects'
+      };
+
+      // Group subAsgs by series_type (defaulting to 'A' if missing)
+      const seriesOrder = ['L', 'A', 'T', 'P'];
+      const groupedAsgs = {};
+      subAsgs.forEach(asg => {
+        const type = (asg.series_type || asg.seriesType || 'A').toUpperCase();
+        if (!groupedAsgs[type]) {
+          groupedAsgs[type] = { total: 0, published: 0, draft: 0 };
+        }
+        groupedAsgs[type].total++;
+        const status = (asg.lifecycle_status || asg.state || 'draft').toLowerCase();
+        if (status === 'published') {
+          groupedAsgs[type].published++;
+        } else if (status === 'draft') {
+          groupedAsgs[type].draft++;
+        }
+      });
+
+      const dynamicCardsHtml = seriesOrder.map(type => {
+        const stats = groupedAsgs[type];
+        if (!stats || stats.total === 0) return '';
+        const label = TYPE_MAP[type] || 'Assignments';
+        return `
+          <div class="kpi-card">
+            <div class="kpi-card-content">
+              <span class="kpi-label">${label}</span>
+              <span class="kpi-value">${stats.total}</span>
+              <span class="kpi-trend" style="font-size:11px;">${stats.published} published · ${stats.draft} draft</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
       return `
         <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : ''}')">+ Create Assignment</button>
@@ -295,15 +335,13 @@ const facultyView = {
         </div>
 
         <div class="kpi-grid" style="margin-bottom:20px;">
+          ${dynamicCardsHtml}
           <div class="kpi-card">
-            <span class="kpi-label">Lab Assignments</span>
-            <span class="kpi-value">${subAsgs.length}</span>
-            <span class="kpi-trend positive">Course Experiments</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Pending Verifications</span>
-            <span class="kpi-value" style="color:${pendingCount > 0 ? 'var(--warning)' : 'var(--success)'};">${pendingCount}</span>
-            <span class="kpi-trend ${pendingCount > 0 ? 'negative' : 'positive'}">Awaiting Faculty Sign-off</span>
+            <div class="kpi-card-content">
+              <span class="kpi-label">Pending Verifications</span>
+              <span class="kpi-value" style="color:${pendingCount > 0 ? 'var(--warning)' : 'var(--success)'};">${pendingCount}</span>
+              <span class="kpi-trend ${pendingCount > 0 ? 'negative' : 'positive'}">Awaiting Faculty Sign-off</span>
+            </div>
           </div>
         </div>
 
