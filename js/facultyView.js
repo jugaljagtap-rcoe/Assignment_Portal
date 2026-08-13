@@ -868,8 +868,18 @@ const facultyView = {
             const status = a.lifecycle_status || a.state || 'draft';
             const targetSubId = sub ? sub.id : (a.subjectId || a.subject_id || '');
 
+            const isMigrated = a.is_migrated || a.isMigrated;
+
             return `
-              <div class="card">
+              <div class="card" id="asg-card-${a.id}">
+                ${isMigrated ? `
+                  <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:12px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                      ⚠️ <strong>Legacy assignment</strong> — auto-migrated to institutional rubric with default parameter types. Please review question marks and parameter types for accuracy.
+                    </div>
+                    <button class="btn btn-secondary btn-sm" style="margin-left:12px; padding:2px 8px; font-size:11px;" onclick="facultyView.dismissLegacyWarning(event, '${a.id}')">Dismiss</button>
+                  </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
                   <div>
                     ${a.display_code ? `
@@ -1834,6 +1844,9 @@ const facultyView = {
     q.coId = document.getElementById('q-co').value;
     q.btLevel = document.getElementById('q-bt').value;
 
+    delete asg.is_migrated;
+    delete asg.isMigrated;
+
     asg.questions = JSON.stringify(questions);
     app.saveState();
 
@@ -1844,6 +1857,7 @@ const facultyView = {
       working_title: asg.working_title,
       subject_id: asg.subjectId || asg.subject_id,
       lifecycle_status: asg.lifecycle_status || 'draft',
+      rubric_preset_id: asg.rubric_preset_id || asg.rubricPresetId || 'rub-inst-001',
       questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(asg.schedules || [])
     }, `Assignment ${asg.display_code || asg.id}`);
@@ -2382,6 +2396,34 @@ const facultyView = {
     writeAudit('deleted', 'rubric_preset', rubricId, { name: existing.name });
 
     app.showToast(`Deleted rubric "${existing.name}"`, 'info');
+    app.renderCurrentView();
+  },
+
+  async dismissLegacyWarning(e, asgId) {
+    if (e) e.stopPropagation();
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+
+    delete asg.is_migrated;
+    delete asg.isMigrated;
+
+    app.saveState();
+    await app.supabaseUpsert('assignments', {
+      id: asg.id,
+      code: asg.display_code || asg.code || asg.id,
+      title: asg.title || asg.working_title,
+      working_title: asg.working_title || asg.title,
+      subject_id: asg.subjectId || asg.subject_id,
+      lifecycle_status: asg.lifecycle_status || 'draft',
+      display_code: asg.display_code || null,
+      bt_level: asg.btLevel || asg.bt_level || '',
+      rubric_preset_id: asg.rubric_preset_id || asg.rubricPresetId || 'rub-inst-001',
+      questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
+      schedules: typeof asg.schedules === 'string' ? asg.schedules : JSON.stringify(asg.schedules || [])
+    }, `Dismissed legacy warning for ${asg.display_code || asg.working_title || asg.id}`);
+
+    writeAudit('updated', 'legacy_warning_dismissed', asg.id, { dismissed_at: new Date().toISOString() });
+    app.showToast('Dismissed legacy warning.', 'info');
     app.renderCurrentView();
   }
 };

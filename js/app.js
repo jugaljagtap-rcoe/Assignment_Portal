@@ -272,6 +272,9 @@ class AppEngine {
         await this.supabaseUpsert('rubric_presets', instPreset, 'Institutional Standard Rubric');
       }
 
+      // Auto-migrate legacy assignments lacking rubric/marks architecture
+      await this.autoMigrateLegacyAssignments();
+
       // Deduplicate before persisting — this also cleans Supabase of stale duplicates
       await this.cleanDuplicateModules();
       await this.cleanDuplicateCourseOutcomes();
@@ -297,6 +300,83 @@ class AppEngine {
       this.reconcileUserSession();
     } catch (e) {
       console.warn('loadAllFromSupabase fetch notice:', e);
+    }
+  }
+
+  async autoMigrateLegacyAssignments() {
+    const assignments = this.data.assignments || [];
+    const defaultRubricId = 'rub-inst-001';
+
+    for (const asg of assignments) {
+      let needsMigration = false;
+
+      // Check if assignment has no rubric_preset_id
+      if (!asg.rubric_preset_id && !asg.rubricPresetId) {
+        asg.rubric_preset_id = defaultRubricId;
+        asg.rubricPresetId = defaultRubricId;
+        needsMigration = true;
+      }
+
+      // Check questions and parameters
+      let questions = [];
+      if (Array.isArray(asg.questions)) {
+        questions = asg.questions;
+      } else if (typeof asg.questions === 'string') {
+        try { questions = JSON.parse(asg.questions); } catch(_) { questions = []; }
+      }
+
+      let questionsUpdated = false;
+      for (const q of questions) {
+        // Check max_marks on question
+        if (q.max_marks === undefined && q.maxMarks === undefined) {
+          const params = q.parameters || [];
+          let sumVal = 0;
+          params.forEach(p => {
+            if (p.valueMarks !== undefined) sumVal += parseFloat(p.valueMarks) || 0;
+          });
+          const calculatedMax = sumVal > 0 ? sumVal : 10;
+          q.max_marks = calculatedMax;
+          q.maxMarks = calculatedMax;
+          questionsUpdated = true;
+          needsMigration = true;
+        }
+
+        // Check parameter_type on parameters
+        if (Array.isArray(q.parameters)) {
+          for (const p of q.parameters) {
+            if (!p.parameter_type && !p.parameterType) {
+              p.parameter_type = 'given';
+              p.parameterType = 'given';
+              questionsUpdated = true;
+              needsMigration = true;
+            }
+          }
+        }
+      }
+
+      if (needsMigration) {
+        asg.is_migrated = true;
+        asg.questions = typeof asg.questions === 'string' ? JSON.stringify(questions) : questions;
+
+        await this.supabaseUpsert('assignments', {
+          id: asg.id,
+          code: asg.display_code || asg.code || asg.id,
+          title: asg.title || asg.working_title,
+          working_title: asg.working_title || asg.title,
+          subject_id: asg.subjectId || asg.subject_id,
+          lifecycle_status: asg.lifecycle_status || 'draft',
+          display_code: asg.display_code || null,
+          bt_level: asg.btLevel || asg.bt_level || '',
+          rubric_preset_id: asg.rubric_preset_id || defaultRubricId,
+          questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
+          schedules: typeof asg.schedules === 'string' ? asg.schedules : JSON.stringify(asg.schedules || [])
+        }, `Auto-migrated assignment ${asg.display_code || asg.working_title || asg.id}`);
+
+        writeAudit('migrated', 'assignment_rubric_architecture', asg.id, {
+          rubric_preset_id: asg.rubric_preset_id,
+          questions_count: questions.length
+        });
+      }
     }
   }
 
