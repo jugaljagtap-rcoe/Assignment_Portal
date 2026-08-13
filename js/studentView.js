@@ -108,8 +108,9 @@ const studentView = {
     const totalEarnedMarks = student ? this.calculateStudentTotalMarks(student.id) : 0;
     let totalPossibleMarks = 0;
     assignments.forEach(a => {
-      (a.questions || []).forEach(q => {
-        (q.parameters || []).forEach(p => totalPossibleMarks += (p.valueMarks || 4));
+      const qList = (a.questions || []).map(q => typeof q === 'string' ? JSON.parse(q) : q);
+      qList.forEach(q => {
+        totalPossibleMarks += (parseFloat(q.max_marks || q.maxMarks) || 10);
       });
     });
 
@@ -390,13 +391,38 @@ const studentView = {
 
   renderParameterInputField(asgId, studentId, question, param) {
     const paramId = param.id;
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    const rubric = app.getRubricPreset(asg?.rubric_preset_id || asg?.rubricPresetId);
+
+    // Multipliers
+    const gMult = rubric?.given_multiplier ?? 1;
+    const iMult = rubric?.intermediate_multiplier ?? 2;
+    const fMult = rubric?.final_multiplier ?? 3;
+
+    // Calculate parameter share of question max_marks
+    const qParams = question.parameters || [];
+    const sumMults = qParams.reduce((sum, p) => {
+      const type = p.parameter_type || p.parameterType || 'intermediate';
+      const m = type === 'given' ? gMult : type === 'final' ? fMult : iMult;
+      return sum + m;
+    }, 0) || 1;
+
+    const pType = param.parameter_type || param.parameterType || 'intermediate';
+    const pMult = pType === 'given' ? gMult : pType === 'final' ? fMult : iMult;
+    const qMaxMarks = parseFloat(question.max_marks || question.maxMarks) || 10;
+    const paramShareMarks = (pMult / sumMults) * qMaxMarks;
+
     const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
     const attemptCount = priorAttempts.length;
     const isCapped = attemptCount >= 3;
     const latestAttempt = priorAttempts.length > 0 ? priorAttempts[priorAttempts.length - 1] : null;
 
-    let bestMarks = 0;
-    priorAttempts.forEach(s => bestMarks = Math.max(bestMarks, s.marksAwarded || 0));
+    let bestRawMarks = 0;
+    let bestFinalMarks = 0;
+    priorAttempts.forEach(s => {
+      bestRawMarks = Math.max(bestRawMarks, s.rawMarks || s.raw_marks || s.marksAwarded || 0);
+      bestFinalMarks = Math.max(bestFinalMarks, s.marksAwarded || s.finalMarks || 0);
+    });
 
     const gt = app.data.studentAnswers.find(a => a.studentId === studentId && a.parameterId === paramId);
     const narrativeTags = latestAttempt ? app.computeAttemptNarrativeTag(latestAttempt, gt, param) : [];
@@ -406,7 +432,8 @@ const studentView = {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
           <div>
             <strong style="font-size:13px; color:var(--text-primary);">${param.label}</strong>
-            <span style="font-size:11px; color:var(--text-secondary); margin-left:8px;">(Max Marks: ${param.valueMarks || 4})</span>
+            <span class="tag tag-co" style="font-size:10px; margin-left:6px; text-transform:uppercase;">${pType} (${pMult}x)</span>
+            <span style="font-size:11px; color:var(--text-secondary); margin-left:8px;">(Param Share: <strong class="mono-val">${paramShareMarks.toFixed(2)}</strong> / Q Max ${qMaxMarks})</span>
           </div>
           <span class="mono-val" style="font-size:12px; font-weight:700; color:var(--accent-blue);">Attempt ${attemptCount}/3</span>
         </div>
@@ -426,8 +453,9 @@ const studentView = {
         ${priorAttempts.length > 0 ? `
           <div class="param-summary-footer" style="margin-top:10px;">
             <span>Attempts: <strong class="mono-val">${attemptCount} / 3</strong></span>
-            <span>Best Marks: <strong class="mono-val" style="color:var(--success);">${bestMarks.toFixed(1)} / ${param.valueMarks || 4}</strong></span>
-            <span>Last Submitted: <span class="mono-val">${latestAttempt ? new Date(latestAttempt.submittedAt).toLocaleTimeString() : '-'}</span></span>
+            <span>Raw Marks: <strong class="mono-val" style="color:var(--accent-blue);">${bestRawMarks.toFixed(2)} / ${paramShareMarks.toFixed(2)}</strong></span>
+            <span>Final Marks: <strong class="mono-val" style="color:var(--success);">${bestFinalMarks.toFixed(2)} / ${paramShareMarks.toFixed(2)}</strong></span>
+            ${latestAttempt && latestAttempt.attemptDeductionPct > 0 ? `<span style="color:var(--warning); font-size:11px; font-weight:600;">⚠️ ${latestAttempt.attemptDeductionPct}% attempt deduction</span>` : ''}
             <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
               ${narrativeTags.map(t => `<span class="tag tag-co" style="font-size:10px;">${t}</span>`).join('')}
             </div>
@@ -457,25 +485,91 @@ const studentView = {
       const nextAttemptNum = priorAttempts.length + 1;
       const submittedVal = parseFloat(valInput.value);
       const submittedUnit = (unitInput ? unitInput.value : '').trim();
-
       const submittedAt = new Date().toISOString();
-      const attemptDeductionPct = nextAttemptNum === 1 ? 0 : nextAttemptNum === 2 ? 10 : 20;
 
-      const gt = app.data.studentAnswers.find(a => a.studentId === studentId && a.parameterId === paramId);
-      let isCorrectValue = true;
-      let isCorrectUnit = true;
-      let marksAwarded = 4;
+      const asg = (app.data.assignments || []).find(a => a.id === asgId);
+      const rubric = app.getRubricPreset(asg?.rubric_preset_id || asg?.rubricPresetId);
 
-      if (gt) {
+      // Multipliers
+      const gMult = rubric?.given_multiplier ?? 1;
+      const iMult = rubric?.intermediate_multiplier ?? 2;
+      const fMult = rubric?.final_multiplier ?? 3;
+
+      // Find Question & Param
+      const questions = (asg?.questions || []).map(q => typeof q === 'string' ? JSON.parse(q) : q);
+      let targetQ = null;
+      let targetParam = null;
+      for (const q of questions) {
+        const p = (q.parameters || []).find(param => param.id === paramId);
+        if (p) { targetQ = q; targetParam = p; break; }
+      }
+
+      const qMaxMarks = parseFloat(targetQ?.max_marks || targetQ?.maxMarks) || 10;
+      const qParams = targetQ?.parameters || [];
+      const sumMults = qParams.reduce((sum, p) => {
+        const type = p.parameter_type || p.parameterType || 'intermediate';
+        const m = type === 'given' ? gMult : type === 'final' ? fMult : iMult;
+        return sum + m;
+      }, 0) || 1;
+
+      const pType = targetParam?.parameter_type || targetParam?.parameterType || 'intermediate';
+      const pMult = pType === 'given' ? gMult : pType === 'final' ? fMult : iMult;
+      const paramShareMarks = (pMult / sumMults) * qMaxMarks;
+
+      const numWeight = (rubric?.numerical_weight ?? 70) / 100;
+      const unitWeight = (rubric?.units_weight ?? 30) / 100;
+
+      const numericalShare = paramShareMarks * numWeight;
+      const unitsShare = paramShareMarks * unitWeight;
+
+      const tolEx = rubric?.tolerance_exemplary ?? 2;
+      const tolPr = rubric?.tolerance_proficient ?? 5;
+      const tolDev = rubric?.tolerance_developing ?? 10;
+
+      const gt = app.data.studentAnswers.find(a => a.studentId === studentId && a.parameterId === paramId) ||
+                 { correctValue: targetParam?.correctValue };
+
+      let isCorrectValue = false;
+      let numericalEarned = 0;
+
+      if (gt && gt.correctValue !== undefined && gt.correctValue !== '') {
         const expectedVal = parseFloat(gt.correctValue);
         let diffPct = 0;
         if (!isNaN(expectedVal) && expectedVal !== 0) {
           diffPct = Math.abs(submittedVal - expectedVal) / Math.abs(expectedVal) * 100;
         }
-        isCorrectValue = diffPct <= 5.0;
-        const baseMarks = isCorrectValue ? 4 : (diffPct <= 10.0 ? 2 : 0);
-        marksAwarded = Math.max(0, Math.round(baseMarks * (1 - attemptDeductionPct / 100)));
+        if (diffPct <= tolEx) {
+          isCorrectValue = true;
+          numericalEarned = numericalShare; // 100%
+        } else if (diffPct <= tolPr) {
+          isCorrectValue = true;
+          numericalEarned = numericalShare * 0.75; // 75%
+        } else if (diffPct <= tolDev) {
+          isCorrectValue = false;
+          numericalEarned = numericalShare * 0.50; // 50%
+        } else {
+          isCorrectValue = false;
+          numericalEarned = 0;
+        }
+      } else {
+        // Fallback default full credit if ground truth unconfigured
+        numericalEarned = numericalShare;
+        isCorrectValue = true;
       }
+
+      // Units correctness share: track but award full marks (deferred)
+      const unitsEarned = unitsShare;
+      const isCorrectUnit = true;
+
+      const rawMarks = numericalEarned + unitsEarned;
+
+      // Attempt deduction rule
+      let attemptDeductionPct = 0;
+      if (rubric?.attempt_deductions_enabled) {
+        attemptDeductionPct = nextAttemptNum === 1 ? 0 : nextAttemptNum === 2 ? 10 : 20;
+      }
+
+      const finalMarks = Math.max(0, rawMarks * (1 - attemptDeductionPct / 100));
 
       const newRecord = {
         id: 'subm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
@@ -487,7 +581,10 @@ const studentView = {
         submittedUnit: submittedUnit,
         isCorrectValue: isCorrectValue,
         isCorrectUnit: isCorrectUnit,
-        marksAwarded: marksAwarded,
+        rawMarks: rawMarks,
+        raw_marks: rawMarks,
+        marksAwarded: finalMarks,
+        finalMarks: finalMarks,
         attemptDeductionPct: attemptDeductionPct,
         verificationStatus: 'pending',
         submittedAt: submittedAt
@@ -495,9 +592,11 @@ const studentView = {
 
       app.data.submissions.push(newRecord);
 
-      // Part 12 Fix: Upsert rolled-up record to assignment_submissions table
-      const asg = app.data.assignments.find(a => a.id === asgId);
-      const allAsgParams = (asg?.questions || []).flatMap(q => q.parameters || []);
+      // Roll up record to assignment_submissions
+      const allAsgParams = (asg?.questions || []).flatMap(q => {
+        const parsed = typeof q === 'string' ? JSON.parse(q) : q;
+        return parsed.parameters || [];
+      });
       const studentAllAsgSubs = app.data.submissions.filter(s => s.studentId === studentId && s.assignmentId === asgId);
       const uniqueParamsDone = new Set(studentAllAsgSubs.map(s => s.parameterId)).size;
       const statusStr = uniqueParamsDone === 0 ? 'not_started' : uniqueParamsDone >= Math.max(1, allAsgParams.length) ? 'submitted' : 'partial';
@@ -570,15 +669,22 @@ const studentView = {
                 <th>Submitted Value</th>
                 <th>Submitted Unit</th>
                 <th>Narrative Tag</th>
-                <th>Marks Awarded</th>
+                <th>Raw Marks</th>
+                <th>Final Marks</th>
                 <th>Timestamp</th>
               </tr>
             </thead>
             <tbody>
               ${mySubmissions.map(s => {
                 const gt = app.data.studentAnswers.find(a => a.studentId === student?.id && a.parameterId === s.parameterId);
-                const paramObj = (app.data.assignments || []).flatMap(a => a.questions || []).flatMap(q => q.parameters || []).find(p => p.id === s.parameterId);
+                const paramObj = (app.data.assignments || []).flatMap(a => {
+                  const qList = typeof a.questions === 'string' ? JSON.parse(a.questions || '[]') : (a.questions || []);
+                  return qList.flatMap(q => q.parameters || []);
+                }).find(p => p.id === s.parameterId);
                 const narrativeTags = app.computeAttemptNarrativeTag(s, gt, paramObj);
+
+                const rawVal = (s.rawMarks ?? s.raw_marks ?? s.marksAwarded ?? 0);
+                const finalVal = (s.marksAwarded ?? s.finalMarks ?? 0);
 
                 return `
                   <tr>
@@ -591,7 +697,8 @@ const studentView = {
                         ${narrativeTags.map(t => `<span class="tag tag-co" style="font-size:10px;">${t}</span>`).join('')}
                       </div>
                     </td>
-                    <td class="mono-val" style="font-weight:800; color:var(--success);">${s.marksAwarded}</td>
+                    <td class="mono-val" style="font-weight:800; color:var(--accent-blue);">${rawVal.toFixed(2)}</td>
+                    <td class="mono-val" style="font-weight:800; color:var(--success);">${finalVal.toFixed(2)}</td>
                     <td class="mono-val" style="font-size:11px;">${new Date(s.submittedAt).toLocaleString()}</td>
                   </tr>
                 `;

@@ -51,27 +51,29 @@ const nbaView = {
     // Compute Institute-wide CO stats
     const paramMap = {};
     (app.data.assignments || []).forEach(asg => {
-      (asg.questions || []).forEach(q => {
+      const qList = (asg.questions || []).map(q => typeof q === 'string' ? JSON.parse(q) : q);
+      qList.forEach(q => {
         (q.parameters || []).forEach(p => {
-          paramMap[p.id] = { coId: q.coId || 'CO1', valueMarks: p.valueMarks || 4, btLevel: q.btLevel || 'BT2' };
+          paramMap[p.id] = { coId: q.coId || 'CO1', btLevel: q.btLevel || 'BT2' };
         });
       });
     });
 
     const coSummary = (app.data.courseOutcomes || []).map(co => {
       const relevantPids = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
-      const maxMarksForCO = relevantPids.reduce((sum, pid) => sum + (paramMap[pid].valueMarks || 4), 0);
       let passingStudents = 0;
 
       app.data.students.forEach(st => {
-        let earned = 0;
+        let earnedRaw = 0;
+        let possibleRaw = 0;
         relevantPids.forEach(pid => {
           const attempts = app.data.submissions.filter(s => (s.studentId === st.id || s.studentId === st.uin) && s.parameterId === pid);
           if (attempts.length === 0) return;
-          const best = attempts.reduce((b, s) => (s.marksAwarded || 0) > (b.marksAwarded || 0) ? s : b, attempts[0]);
-          earned += (best.marksAwarded || 0);
+          const best = attempts.reduce((b, s) => (s.rawMarks ?? s.raw_marks ?? s.marksAwarded ?? 0) > (b.rawMarks ?? b.raw_marks ?? b.marksAwarded ?? 0) ? s : b, attempts[0]);
+          earnedRaw += (best.rawMarks ?? best.raw_marks ?? best.marksAwarded ?? 0);
+          possibleRaw += 10; // Normalized baseline
         });
-        const pct = maxMarksForCO > 0 ? (earned / maxMarksForCO * 100) : 0;
+        const pct = possibleRaw > 0 ? (earnedRaw / possibleRaw * 100) : 0;
         if (pct >= studentThreshold) passingStudents++;
       });
 

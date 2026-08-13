@@ -24,7 +24,7 @@ const facultyView = {
 
     if (hash.startsWith('#faculty-subject-')) {
       const raw = hash.replace('#faculty-subject-', '');
-      const validTabs = ['overview', 'course', 'assignments', 'students', 'schedule', 'grade', 'verify', 'reports'];
+      const validTabs = ['overview', 'course', 'assignments', 'rubrics', 'students', 'schedule', 'grade', 'verify', 'reports'];
       let tab = 'overview';
       let subjectId = raw;
       let targetAsgId = null;
@@ -229,6 +229,7 @@ const facultyView = {
         <button class="segmented-btn ${activeTab === 'overview' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-overview'">Overview</button>
         <button class="segmented-btn ${activeTab === 'course' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-course'">My Course</button>
         <button class="segmented-btn ${activeTab === 'assignments' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-assignments'">Assignments</button>
+        <button class="segmented-btn ${activeTab === 'rubrics' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-rubrics'">Rubric Manager</button>
         <button class="segmented-btn ${activeTab === 'students' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-students'">Students</button>
         <button class="segmented-btn ${activeTab === 'schedule' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-schedule'">Schedule</button>
         <button class="segmented-btn ${activeTab === 'grade' ? 'active' : ''}" onclick="window.location.hash='#faculty-subject-${sub.id}-grade'">Grade & Evaluate</button>
@@ -263,6 +264,9 @@ const facultyView = {
         } else {
           this.renderAssignmentBuilder(targetEl, sub);
         }
+        break;
+      case 'rubrics':
+        this.renderRubricManager(targetEl, sub);
         break;
       case 'students':
         targetEl.innerHTML = this.renderSubjectStudentsTab(sub);
@@ -1186,40 +1190,68 @@ const facultyView = {
   /* 5. Verification Layer */
   renderVerificationLayer(container, sub) {
     const pendingSubs = app.data.submissions.filter(s => (s.verificationStatus || 'pending').toLowerCase() === 'pending');
+    const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
 
     container.innerHTML = `
       <div class="page-header-container">
         <div>
-          <h1 class="page-title">Submission Verification Layer</h1>
+          <h1 class="page-title">Submission Verification & Deductions Layer</h1>
           <p class="page-subtitle">Audit sign-off for evaluated lab submission records (${pendingSubs.length} Pending Sign-off)</p>
         </div>
-        <button class="btn btn-primary" onclick="facultyView.verifyAllPending()">✅ Admin Verify All Pending</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-secondary" onclick="facultyView.applySemesterEndDeductions('${sub ? sub.id : ''}')">⚡ Semester-End Apply Deductions</button>
+          <button class="btn btn-primary" onclick="facultyView.verifyAllPending()">✅ Admin Verify All Pending</button>
+        </div>
       </div>
 
       <div class="card">
         <div class="table-container" style="max-height:500px; overflow-y:auto;">
           <table class="custom-table">
             <thead>
-              <tr><th>Student UIN</th><th>Parameter ID</th><th>Submitted Value</th><th>Marks</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Student UIN</th><th>Parameter ID</th><th>Submitted Value</th><th>Raw Marks</th><th>Final Marks (After Deductions)</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              ${pendingSubs.length === 0 ? `<tr><td colspan="6" style="text-align:center; padding:20px;">🟢 All submissions verified and finalized!</td></tr>` : pendingSubs.map(s => `
-                <tr>
-                  <td class="mono-val" style="font-weight:700;">${s.studentId}</td>
-                  <td class="mono-val">${s.parameterId}</td>
-                  <td class="mono-val">${s.submittedValue}</td>
-                  <td class="mono-val" style="font-weight:700; color:var(--success);">${s.marksAwarded}</td>
-                  <td><span class="tag tag-warning">${(s.verificationStatus || 'Pending').toUpperCase()}</span></td>
-                  <td>
-                    <button class="btn btn-primary btn-sm" onclick="facultyView.verifySingleSubmission('${s.id}')">✓ Verify</button>
-                  </td>
-                </tr>
-              `).join('')}
+              ${pendingSubs.length === 0 ? `<tr><td colspan="7" style="text-align:center; padding:20px;">🟢 All submissions verified and finalized!</td></tr>` : pendingSubs.map(s => {
+                const rawVal = (s.rawMarks ?? s.raw_marks ?? s.marksAwarded ?? 0);
+                const finalVal = (s.marksAwarded ?? s.finalMarks ?? 0);
+                return `
+                  <tr>
+                    <td class="mono-val" style="font-weight:700;">${s.studentId}</td>
+                    <td class="mono-val">${s.parameterId}</td>
+                    <td class="mono-val">${s.submittedValue}</td>
+                    <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${rawVal.toFixed(2)}</td>
+                    <td class="mono-val" style="font-weight:700; color:var(--success);">${finalVal.toFixed(2)}</td>
+                    <td><span class="tag tag-warning">${(s.verificationStatus || 'Pending').toUpperCase()}</span></td>
+                    <td>
+                      <button class="btn btn-primary btn-sm" onclick="facultyView.verifySingleSubmission('${s.id}')">✓ Verify</button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
       </div>
     `;
+  },
+
+  async applySemesterEndDeductions(subId) {
+    if (!confirm('Apply attempt & late penalty deductions to all completed assignment submissions for this semester? All audit logs will be updated.')) return;
+
+    let count = 0;
+    app.data.submissions.forEach(s => {
+      const raw = s.rawMarks ?? s.raw_marks ?? s.marksAwarded ?? 0;
+      const attDed = s.attemptDeductionPct || 0;
+      const final = Math.max(0, raw * (1 - attDed / 100));
+      s.marksAwarded = final;
+      s.finalMarks = final;
+      count++;
+    });
+
+    app.saveState();
+    writeAudit('updated', 'semester_deductions', subId || 'all_subjects', { submissions_processed: count, applied_at: new Date().toISOString() });
+    app.showToast(`Applied semester-end deductions to ${count} submission records. Audit logged.`, 'success');
+    app.renderCurrentView();
   },
 
   async verifySingleSubmission(subId) {
@@ -1437,12 +1469,27 @@ const facultyView = {
           </div>
         </div>
 
-        <!-- Section 5 — Academic Metadata -->
-        <div class="form-group">
-          <label class="form-label">Primary BT Level</label>
-          <select id="asg-bt-level" class="form-select" required>
-            ${['BT1 — Remember', 'BT2 — Understand', 'BT3 — Apply', 'BT4 — Analyze', 'BT5 — Evaluate', 'BT6 — Create'].map((lbl, i) => `<option value="BT${i+1}" ${i===2 ? 'selected' : ''}>${lbl}</option>`).join('')}
-          </select>
+        <!-- Section 5 — Academic Metadata & Rubric -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Primary BT Level</label>
+            <select id="asg-bt-level" class="form-select" required>
+              ${['BT1 — Remember', 'BT2 — Understand', 'BT3 — Apply', 'BT4 — Analyze', 'BT5 — Evaluate', 'BT6 — Create'].map((lbl, i) => `<option value="BT${i+1}" ${i===2 ? 'selected' : ''}>${lbl}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Grading Rubric Preset</label>
+            <div style="display:flex; gap:6px;">
+              <select id="asg-rubric-preset" class="form-select" style="flex:1;" required>
+                ${(app.data.rubricPresets || []).map(r => `
+                  <option value="${r.id}" ${r.is_preset ? 'selected' : ''}>
+                    ${r.name} ${r.is_preset ? '(Institutional Standard)' : ''}
+                  </option>
+                `).join('')}
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="app.closeModal(); facultyView.openRubricModal();" title="Create New Rubric">+ New</button>
+            </div>
+          </div>
         </div>
 
         ${subCOs.length > 0 ? `
@@ -1491,6 +1538,7 @@ const facultyView = {
     const seriesType = document.getElementById('asg-series-type').value;
     const academicYear = document.getElementById('asg-academic-year').value;
     const btLevel = document.getElementById('asg-bt-level').value;
+    const rubricPresetId = document.getElementById('asg-rubric-preset').value;
     const selectedCOIds = Array.from(document.querySelectorAll('input[name="asg-cos"]:checked')).map(cb => cb.value);
     const selectedModuleIds = Array.from(document.querySelectorAll('input[name="asg-modules"]:checked')).map(cb => cb.value);
 
@@ -1513,6 +1561,8 @@ const facultyView = {
       display_code: null, // assigned at publish
       btLevel: btLevel,
       bt_level: btLevel,
+      rubric_preset_id: rubricPresetId,
+      rubricPresetId: rubricPresetId,
       coIds: selectedCOIds,
       co_ids: JSON.stringify(selectedCOIds),
       modules_covered: JSON.stringify(selectedModuleIds),
@@ -1535,6 +1585,7 @@ const facultyView = {
       lifecycle_status: 'draft',
       display_code: null,
       bt_level: btLevel,
+      rubric_preset_id: rubricPresetId,
       co_ids: asgRecord.co_ids,
       modules_covered: asgRecord.modules_covered,
       questions: JSON.stringify([]),
@@ -1609,7 +1660,11 @@ const facultyView = {
             </div>
           </div>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Question Max Marks</label>
+            <input type="number" id="q-max-marks" class="form-input" min="1" step="0.5" value="10" placeholder="e.g. 10" required>
+          </div>
           <div class="form-group">
             <label class="form-label">CO Mapping</label>
             <select id="q-co" class="form-select">
@@ -1646,6 +1701,8 @@ const facultyView = {
       imageUrl: document.getElementById('q-image-url').value.trim(),
       usePerStudentVariables: document.getElementById('q-use-vars').checked,
       variableNames: [],
+      max_marks: parseFloat(document.getElementById('q-max-marks').value) || 10,
+      maxMarks: parseFloat(document.getElementById('q-max-marks').value) || 10,
       coId: document.getElementById('q-co').value,
       btLevel: document.getElementById('q-bt').value,
       parameters: []
@@ -1733,7 +1790,11 @@ const facultyView = {
             </div>
           </div>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Question Max Marks</label>
+            <input type="number" id="q-max-marks" class="form-input" min="1" step="0.5" value="${q.max_marks || q.maxMarks || 10}" placeholder="e.g. 10" required>
+          </div>
           <div class="form-group">
             <label class="form-label">CO Mapping</label>
             <select id="q-co" class="form-select">
@@ -1768,6 +1829,8 @@ const facultyView = {
     q.section = document.getElementById('q-section').value.trim();
     q.imageUrl = document.getElementById('q-image-url').value.trim();
     q.usePerStudentVariables = document.getElementById('q-use-vars').checked;
+    q.max_marks = parseFloat(document.getElementById('q-max-marks').value) || 10;
+    q.maxMarks = q.max_marks;
     q.coId = document.getElementById('q-co').value;
     q.btLevel = document.getElementById('q-bt').value;
 
@@ -1811,8 +1874,12 @@ const facultyView = {
             <input type="text" id="param-unit" class="form-input code-font" placeholder="e.g. N, m/s², kN·m">
           </div>
           <div class="form-group">
-            <label class="form-label">Value Marks</label>
-            <input type="number" id="param-marks" class="form-input" min="0" step="0.5" value="2" required>
+            <label class="form-label">Parameter Type</label>
+            <select id="param-type" class="form-select" required>
+              <option value="given">Given (1x multiplier)</option>
+              <option value="intermediate" selected>Intermediate (2x multiplier)</option>
+              <option value="final">Final (3x multiplier)</option>
+            </select>
           </div>
         </div>
         <div class="form-group">
@@ -1840,11 +1907,13 @@ const facultyView = {
 
     const paramId = `param-${questionId}-${Date.now()}`;
     const correctValue = document.getElementById('param-correct').value.trim();
+    const paramType = document.getElementById('param-type').value;
     const paramRecord = {
       id: paramId,
       label: document.getElementById('param-label').value.trim(),
       unitHint: document.getElementById('param-unit').value.trim(),
-      valueMarks: parseFloat(document.getElementById('param-marks').value) || 2,
+      parameter_type: paramType,
+      parameterType: paramType,
       correctValue: correctValue
     };
     q.parameters.push(paramRecord);
@@ -2100,6 +2169,219 @@ const facultyView = {
 
     writeAudit('created', 'assignment', newDraft.id, { rebuilt_from: asgId });
     app.showToast(`Rebuilt as new draft: "${newDraft.title}"`, 'success');
+    app.renderCurrentView();
+  },
+
+  /* ==========================================================================
+     RUBRIC MANAGER
+     ========================================================================== */
+  renderRubricManager(container, sub) {
+    const rubrics = app.data.rubricPresets || [];
+    const currentUserEmail = (app.currentUser?.email || '').trim().toLowerCase();
+
+    container.innerHTML = `
+      <div class="page-header-container">
+        <div>
+          <h1 class="page-title">Grading Rubric Manager</h1>
+          <p class="page-subtitle">Global pool of rubric presets for auto-evaluation, band tolerances, and deduction rules</p>
+        </div>
+        <button class="btn btn-primary" onclick="facultyView.openRubricModal()">+ Create New Rubric</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:16px;">
+        ${rubrics.map(r => {
+          const isInst = r.is_preset || r.isPreset;
+
+          return `
+            <div class="card" style="padding:18px; position:relative; ${isInst ? 'border-left:4px solid var(--accent-blue);' : ''}">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                <div>
+                  <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin:0;">
+                    ${isInst ? '🔒 ' : ''}${r.name}
+                  </h3>
+                  <span style="font-size:11px; color:var(--text-secondary);">
+                    By: <strong>${r.created_by || 'Institutional'}</strong> ${isInst ? '<span class="tag tag-co" style="font-size:9px;">Preset</span>' : ''}
+                  </span>
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px; margin:12px 0; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md);">
+                <div>Tolerances: <br><strong class="mono-val">Ex: ±${r.tolerance_exemplary}% | Pr: ±${r.tolerance_proficient}% | Dev: ±${r.tolerance_developing}%</strong></div>
+                <div>Weight Distribution: <br><strong class="mono-val">Num: ${r.numerical_weight}% | Unit: ${r.units_weight}%</strong></div>
+                <div>Param Multipliers: <br><strong class="mono-val">G:${r.given_multiplier}x | I:${r.intermediate_multiplier}x | F:${r.final_multiplier}x</strong></div>
+                <div>Deduction Rules: <br><strong style="color:${r.attempt_deductions_enabled ? 'var(--warning)' : 'var(--text-tertiary)'};">Att: ${r.attempt_deductions_enabled ? 'ON' : 'OFF'}</strong> | <strong style="color:${r.late_penalty_enabled ? 'var(--warning)' : 'var(--text-tertiary)'};">Late: ${r.late_penalty_enabled ? 'ON' : 'OFF'}</strong></div>
+              </div>
+
+              <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button class="btn btn-secondary btn-sm" onclick="facultyView.cloneRubric('${r.id}')">📋 Clone</button>
+                ${!isInst ? `
+                  <button class="btn btn-ghost btn-sm" onclick="facultyView.openRubricModal('${r.id}')">✏️ Edit</button>
+                  <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteRubric('${r.id}')">🗑️ Delete</button>
+                ` : `<span style="font-size:11px; color:var(--text-tertiary); align-self:center;">Protected Institutional Preset</span>`}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  openRubricModal(rubricId = null) {
+    const existing = rubricId ? (app.data.rubricPresets || []).find(r => r.id === rubricId) : null;
+    const isEdit = !!existing;
+
+    app.showModal(`${isEdit ? '✏️ Edit Rubric' : '➕ Create New Rubric'}`, `
+      <form onsubmit="facultyView.saveRubric(event, ${isEdit ? `'${existing.id}'` : 'null'})" style="min-width:480px;">
+        <div class="form-group">
+          <label class="form-label">Rubric Name</label>
+          <input type="text" id="rub-name" class="form-input" placeholder="e.g. Mechanical Lab Calculation Rubric" value="${existing ? existing.name : ''}" required>
+        </div>
+
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin:14px 0 6px 0;">Tolerance Bands (% Error)</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Exemplary (100%)</label>
+            <input type="number" id="rub-tol-ex" class="form-input" min="0" step="0.5" value="${existing ? existing.tolerance_exemplary : 2}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Proficient (75%)</label>
+            <input type="number" id="rub-tol-pr" class="form-input" min="0" step="0.5" value="${existing ? existing.tolerance_proficient : 5}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Developing (50%)</label>
+            <input type="number" id="rub-tol-dev" class="form-input" min="0" step="0.5" value="${existing ? existing.tolerance_developing : 10}" required>
+          </div>
+        </div>
+
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin:14px 0 6px 0;">Parameter Multipliers</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Given (1x)</label>
+            <input type="number" id="rub-mult-given" class="form-input" min="0.5" step="0.5" value="${existing ? existing.given_multiplier : 1}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Intermediate (2x)</label>
+            <input type="number" id="rub-mult-inter" class="form-input" min="0.5" step="0.5" value="${existing ? existing.intermediate_multiplier : 2}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Final (3x)</label>
+            <input type="number" id="rub-mult-final" class="form-input" min="0.5" step="0.5" value="${existing ? existing.final_multiplier : 3}" required>
+          </div>
+        </div>
+
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin:14px 0 6px 0;">Weight Share (% total parameter mark)</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Numerical Weight %</label>
+            <input type="number" id="rub-weight-num" class="form-input" min="0" max="100" value="${existing ? existing.numerical_weight : 70}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Units Weight % (Tracked)</label>
+            <input type="number" id="rub-weight-unit" class="form-input" min="0" max="100" value="${existing ? existing.units_weight : 30}" required>
+          </div>
+        </div>
+
+        <div style="font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin:14px 0 6px 0;">Deduction Rules</div>
+        <div style="display:flex; flex-direction:column; gap:8px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-md);">
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="rub-ded-att" ${existing?.attempt_deductions_enabled ? 'checked' : ''} style="accent-color:var(--accent-blue);">
+            <span>Enable Attempt Deductions (Attempt 2: -10%, Attempt 3: -20%)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="rub-ded-late" ${existing?.late_penalty_enabled ? 'checked' : ''} style="accent-color:var(--accent-blue);">
+            <span>Enable Late Penalty (≤24h: -10%, ≤48h: -20%, >48h: -30%)</span>
+          </label>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Rubric</button>
+        </div>
+      </form>
+    `);
+  },
+
+  async saveRubric(e, rubricId) {
+    e.preventDefault();
+    const isEdit = !!rubricId;
+    const rubId = isEdit ? rubricId : `rub-${Date.now()}`;
+    const currentUserEmail = (app.currentUser?.email || 'jugaljagtap@eng.rizvi.edu.in').trim().toLowerCase();
+
+    const rubricRecord = {
+      id: rubId,
+      name: document.getElementById('rub-name').value.trim(),
+      created_by: currentUserEmail,
+      is_preset: false,
+      tolerance_exemplary: parseFloat(document.getElementById('rub-tol-ex').value) || 2,
+      tolerance_proficient: parseFloat(document.getElementById('rub-tol-pr').value) || 5,
+      tolerance_developing: parseFloat(document.getElementById('rub-tol-dev').value) || 10,
+      given_multiplier: parseFloat(document.getElementById('rub-mult-given').value) || 1,
+      intermediate_multiplier: parseFloat(document.getElementById('rub-mult-inter').value) || 2,
+      final_multiplier: parseFloat(document.getElementById('rub-mult-final').value) || 3,
+      numerical_weight: parseFloat(document.getElementById('rub-weight-num').value) || 70,
+      units_weight: parseFloat(document.getElementById('rub-weight-unit').value) || 30,
+      attempt_deductions_enabled: document.getElementById('rub-ded-att').checked,
+      late_penalty_enabled: document.getElementById('rub-ded-late').checked,
+      created_at: new Date().toISOString()
+    };
+
+    if (!app.data.rubricPresets) app.data.rubricPresets = [];
+    const idx = app.data.rubricPresets.findIndex(r => r.id === rubId);
+    if (idx >= 0) app.data.rubricPresets[idx] = rubricRecord;
+    else app.data.rubricPresets.push(rubricRecord);
+
+    app.saveState();
+    await app.supabaseUpsert('rubric_presets', rubricRecord, `Rubric ${rubricRecord.name}`);
+    writeAudit(isEdit ? 'updated' : 'created', 'rubric_preset', rubId, rubricRecord);
+
+    app.closeModal();
+    app.showToast(`Saved rubric "${rubricRecord.name}"`, 'success');
+    app.renderCurrentView();
+  },
+
+  async cloneRubric(rubricId) {
+    const existing = (app.data.rubricPresets || []).find(r => r.id === rubricId);
+    if (!existing) return;
+
+    const newId = `rub-${Date.now()}`;
+    const currentUserEmail = (app.currentUser?.email || 'jugaljagtap@eng.rizvi.edu.in').trim().toLowerCase();
+
+    const cloned = {
+      ...JSON.parse(JSON.stringify(existing)),
+      id: newId,
+      name: `${existing.name} (Copy)`,
+      created_by: currentUserEmail,
+      is_preset: false,
+      created_at: new Date().toISOString()
+    };
+
+    app.data.rubricPresets.push(cloned);
+    app.saveState();
+
+    await app.supabaseUpsert('rubric_presets', cloned, `Rubric ${cloned.name}`);
+    writeAudit('created', 'rubric_preset', newId, { cloned_from: rubricId });
+
+    app.showToast(`Cloned rubric as "${cloned.name}"`, 'success');
+    app.renderCurrentView();
+  },
+
+  async deleteRubric(rubricId) {
+    const existing = (app.data.rubricPresets || []).find(r => r.id === rubricId);
+    if (!existing) return;
+    if (existing.is_preset || existing.isPreset) {
+      app.showToast('Institutional preset rubric cannot be deleted.', 'warning');
+      return;
+    }
+
+    if (!confirm(`Delete rubric "${existing.name}"? This cannot be undone.`)) return;
+
+    app.data.rubricPresets = app.data.rubricPresets.filter(r => r.id !== rubricId);
+    app.saveState();
+
+    await app.supabaseDelete('rubric_presets', rubricId, `Rubric ${existing.name}`);
+    writeAudit('deleted', 'rubric_preset', rubricId, { name: existing.name });
+
+    app.showToast(`Deleted rubric "${existing.name}"`, 'info');
     app.renderCurrentView();
   }
 };

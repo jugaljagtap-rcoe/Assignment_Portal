@@ -167,7 +167,7 @@ class AppEngine {
         studentsRes, facultyRes, subjectFacultyRes, subjectsRes, assignmentsRes,
         submissionsRes, assignmentSubmissionsRes, studentVarsRes, studentAnswersRes,
         courseOutcomesRes, modulesRes, auditLogRes, templatesRes, coPoRes,
-        programOutcomesRes, assignmentSequencesRes
+        programOutcomesRes, assignmentSequencesRes, rubricPresetsRes
       ] = await Promise.all([
         supabaseClient.from('students').select('*'),
         supabaseClient.from('faculty').select('*'),
@@ -184,7 +184,8 @@ class AppEngine {
         supabaseClient.from('assignment_templates').select('*'),
         supabaseClient.from('co_po_mapping').select('*'),
         supabaseClient.from('program_outcomes').select('*').order('id'),
-        supabaseClient.from('assignment_sequences').select('*')
+        supabaseClient.from('assignment_sequences').select('*'),
+        supabaseClient.from('rubric_presets').select('*')
       ]);
 
       if (studentsRes.data && studentsRes.data.length > 0)
@@ -243,6 +244,32 @@ class AppEngine {
       // assignment_sequences
       if (assignmentSequencesRes.data) {
         this.data.assignmentSequences = assignmentSequencesRes.data;
+      }
+
+      // rubric_presets
+      if (rubricPresetsRes && rubricPresetsRes.data && rubricPresetsRes.data.length > 0) {
+        this.data.rubricPresets = rubricPresetsRes.data;
+      } else {
+        // Seed institutional preset if table is empty
+        const instPreset = {
+          id: "rub-inst-001",
+          name: "RCOE Institutional Standard Rubric",
+          created_by: "jugaljagtap@eng.rizvi.edu.in",
+          is_preset: true,
+          tolerance_exemplary: 2,
+          tolerance_proficient: 5,
+          tolerance_developing: 10,
+          numerical_weight: 70,
+          units_weight: 30,
+          given_multiplier: 1,
+          intermediate_multiplier: 2,
+          final_multiplier: 3,
+          attempt_deductions_enabled: false,
+          late_penalty_enabled: false,
+          created_at: new Date().toISOString()
+        };
+        this.data.rubricPresets = [instPreset];
+        await this.supabaseUpsert('rubric_presets', instPreset, 'Institutional Standard Rubric');
       }
 
       // Deduplicate before persisting — this also cleans Supabase of stale duplicates
@@ -414,6 +441,14 @@ class AppEngine {
     } catch(err) {
       console.warn('Migration warning:', err);
     }
+  }
+
+  getRubricPreset(rubricId) {
+    const presets = this.data.rubricPresets || [];
+    if (!rubricId) {
+      return presets.find(r => r.is_preset || r.isPreset) || presets[0] || null;
+    }
+    return presets.find(r => r.id === rubricId) || presets.find(r => r.is_preset || r.isPreset) || presets[0] || null;
   }
 
   /* ==========================================================================
