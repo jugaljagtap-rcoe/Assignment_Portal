@@ -317,45 +317,29 @@ const facultyView = {
         return false;
       }).slice(0, 5);
 
-      // Type Label Map
+      // KPI Counts
+      const totalAsgs = subAsgs.length;
+      const publishedCount = subAsgs.filter(a => (a.lifecycle_status || a.state || 'draft').toLowerCase() === 'published').length;
+      const draftCount = subAsgs.filter(a => (a.lifecycle_status || a.state || 'draft').toLowerCase() === 'draft').length;
+
+      // Group assignments by series_type
       const TYPE_MAP = {
-        'L': 'Lab Practicals',
-        'A': 'Assignments',
-        'T': 'Tests & Quizzes',
-        'P': 'Projects'
+        'L': 'Lab Practicals (L)',
+        'A': 'Assignments (A)',
+        'T': 'Tests & Quizzes (T)',
+        'P': 'Projects (P)'
       };
 
-      // Group subAsgs by series_type (defaulting to 'A' if missing)
       const seriesOrder = ['L', 'A', 'T', 'P'];
-      const groupedAsgs = {};
-      subAsgs.forEach(asg => {
-        const type = (asg.series_type || asg.seriesType || 'A').toUpperCase();
-        if (!groupedAsgs[type]) {
-          groupedAsgs[type] = { total: 0, published: 0, draft: 0 };
-        }
-        groupedAsgs[type].total++;
-        const status = (asg.lifecycle_status || asg.state || 'draft').toLowerCase();
-        if (status === 'published') {
-          groupedAsgs[type].published++;
-        } else if (status === 'draft') {
-          groupedAsgs[type].draft++;
-        }
+      const groupedAsgs = { 'L': [], 'A': [], 'T': [], 'P': [] };
+
+      subAsgs.forEach(a => {
+        let type = (a.series_type || a.seriesType || 'A').toUpperCase();
+        if (!groupedAsgs[type]) type = 'A';
+        groupedAsgs[type].push(a);
       });
 
-      const dynamicCardsHtml = seriesOrder.map(type => {
-        const stats = groupedAsgs[type];
-        if (!stats || stats.total === 0) return '';
-        const label = TYPE_MAP[type] || 'Assignments';
-        return `
-          <div class="kpi-card">
-            <div class="kpi-card-content">
-              <span class="kpi-label">${label}</span>
-              <span class="kpi-value">${stats.total}</span>
-              <span class="kpi-trend" style="font-size:11px;">${stats.published} published · ${stats.draft} draft</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+      const rubricPresets = (app.data && app.data.rubricPresets) || [];
 
       return `
         <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
@@ -365,18 +349,38 @@ const facultyView = {
         </div>
 
         <div class="kpi-grid" style="margin-bottom:20px;">
-          ${dynamicCardsHtml}
+          <div class="kpi-card">
+            <div class="kpi-card-content">
+              <span class="kpi-label">Total Assignments</span>
+              <span class="kpi-value">${totalAsgs}</span>
+              <span class="kpi-trend" style="font-size:11px;">All series types combined</span>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-content">
+              <span class="kpi-label">Published</span>
+              <span class="kpi-value" style="color:var(--success);">${publishedCount}</span>
+              <span class="kpi-trend positive" style="font-size:11px;">Live & active</span>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card-content">
+              <span class="kpi-label">Drafts</span>
+              <span class="kpi-value" style="color:var(--warning);">${draftCount}</span>
+              <span class="kpi-trend" style="font-size:11px;">In preparation</span>
+            </div>
+          </div>
           <div class="kpi-card">
             <div class="kpi-card-content">
               <span class="kpi-label">Pending Verifications</span>
-              <span class="kpi-value" style="color:${pendingCount > 0 ? 'var(--warning)' : 'var(--success)'};">${pendingCount}</span>
-              <span class="kpi-trend ${pendingCount > 0 ? 'negative' : 'positive'}">Awaiting Faculty Sign-off</span>
+              <span class="kpi-value" style="color:${pendingCount > 0 ? 'var(--warning)' : 'var(--text-primary)'};">${pendingCount}</span>
+              <span class="kpi-trend ${pendingCount > 0 ? 'negative' : 'positive'}" style="font-size:11px;">Awaiting Sign-off</span>
             </div>
           </div>
         </div>
 
         <div class="card" style="margin-bottom:20px;">
-          <h3 class="card-title" style="margin-bottom:12px;">Experiments & Assignments Status</h3>
+          <h3 class="card-title" style="margin-bottom:16px;">Experiments & Assignments Status</h3>
           ${subAsgs.length === 0 ? `
             <div class="empty-state" style="padding:24px; text-align:center;">
               <p style="font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">No assignments created for this subject yet.</p>
@@ -384,24 +388,60 @@ const facultyView = {
               <button class="btn btn-primary btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : ''}')">+ Create Assignment</button>
             </div>
           ` : `
-            <div style="display:flex; flex-direction:column; gap:8px;">
-              ${subAsgs.map(a => {
-                const status = a.lifecycle_status || a.state || 'draft';
-                const isLocked = status === 'locked';
-                const isPublished = status === 'published';
+            <div style="display:flex; flex-direction:column; gap:20px;">
+              ${seriesOrder.map(type => {
+                const list = groupedAsgs[type];
+                if (!list || list.length === 0) return '';
+                const typeTitle = TYPE_MAP[type] || 'Assignments';
 
                 return `
-                  <div class="session-strip" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border:1px solid var(--border-default); border-radius:var(--radius-md); background:var(--bg-surface);">
-                    <div>
-                      <span class="mono-val" style="font-weight:700; color:var(--accent-blue);">${a.code}</span>
-                      <strong style="margin-left:8px;">${a.title}</strong>
-                    </div>
+                  <div>
+                    <h4 style="font-size:13px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em; margin:0 0 10px 0;">${typeTitle} (${list.length})</h4>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                      ${list.map(a => {
+                        const questions = facultyView.getAsgQuestions(a);
+                        const totalParams = questions.flatMap(q => q.parameters || []).length;
+                        const totalMaxMarks = questions.reduce((sum, q) => sum + (q.max_marks || q.maxMarks || 10), 0);
+                        const status = (a.lifecycle_status || a.state || 'draft').toLowerCase();
+                        const isDraft = status === 'draft';
+                        const titleText = isDraft
+                          ? (a.working_title || a.title || 'Untitled Draft')
+                          : (a.display_code || a.working_title || a.title || 'Assignment');
 
-                    <div style="display:flex; gap:10px; align-items:center;">
-                      <span class="col-pill ${isLocked ? 'pill-locked' : isPublished ? 'pill-published' : 'pill-draft'}">
-                        ${status.toUpperCase()}
-                      </span>
-                      <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#faculty-subject-${sub ? sub.id : ''}-grade'">Grade Mode →</button>
+                        const rubricId = a.rubric_preset_id || a.rubricPresetId;
+                        const rubric = rubricId ? rubricPresets.find(r => r.id === rubricId) : null;
+                        let rubricName = 'No Rubric';
+                        if (rubric) {
+                          if (rubric.is_preset || rubric.isPreset || rubric.id === 'rub-inst-001') {
+                            rubricName = 'Institutional Rubric';
+                          } else {
+                            rubricName = rubric.name || 'Custom Rubric';
+                          }
+                        }
+
+                        return `
+                          <div class="session-strip" style="display:flex; justify-content:space-between; align-items:center;">
+                            <div class="session-strip-info">
+                              <div class="session-strip-title">
+                                <span>${titleText}</span>
+                              </div>
+                              <div class="session-strip-meta">
+                                ${questions.length} Questions &nbsp;·&nbsp; ${totalParams} Parameters &nbsp;·&nbsp; ${totalMaxMarks} Marks
+                              </div>
+                            </div>
+
+                            <div class="session-strip-pills">
+                              ${a.btLevel || a.bt_level ? `<span class="tag tag-bt">${a.btLevel || a.bt_level}</span>` : ''}
+                              <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
+                              <span class="tag tag-co">${rubricName}</span>
+                            </div>
+
+                            <div class="session-strip-actions">
+                              <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#faculty-subject-${sub ? sub.id : ''}-grade'">Grade Mode →</button>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
                     </div>
                   </div>
                 `;
