@@ -841,6 +841,7 @@ const facultyView = {
   /* 2. Assignment Builder — Level 1: Cards List */
   renderAssignmentBuilder(container, sub) {
     const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
+    const migratedAsgs = subAsgs.filter(a => a.is_migrated || a.isMigrated);
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -850,6 +851,19 @@ const facultyView = {
         </div>
         ${sub ? `<button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal('${sub.id}')">+ Create New Assignment</button>` : ''}
       </div>
+
+      ${migratedAsgs.length > 0 ? `
+        <div style="margin-bottom:16px;">
+          ${migratedAsgs.map(a => `
+            <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                ⚠️ <strong>Legacy assignment (${a.display_code || a.working_title || a.title || 'Draft'})</strong> — auto-migrated to institutional rubric with default parameter types. Please review question marks and parameter types for accuracy.
+              </div>
+              <button class="btn btn-secondary btn-sm" style="margin-left:12px; padding:2px 8px; font-size:11px;" onclick="facultyView.dismissLegacyWarning(event, '${a.id}')">Dismiss</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
 
       ${subAsgs.length === 0 ? `
         <div class="card" style="padding:40px; text-align:center;">
@@ -861,60 +875,57 @@ const facultyView = {
           </div>
         </div>
       ` : `
-        <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="dept-blocks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px; margin-bottom:28px;">
           ${subAsgs.map(a => {
             const questions = facultyView.getAsgQuestions(a);
             const totalParams = questions.flatMap(q => q.parameters || []).length;
+            const totalMaxMarks = questions.reduce((sum, q) => sum + (q.max_marks || q.maxMarks || 10), 0);
             const status = a.lifecycle_status || a.state || 'draft';
             const targetSubId = sub ? sub.id : (a.subjectId || a.subject_id || '');
 
-            const isMigrated = a.is_migrated || a.isMigrated;
+            const isDraft = status === 'draft';
+            const titleText = isDraft
+              ? (a.working_title || a.title || 'Untitled Draft')
+              : (a.display_code || a.working_title || a.title || 'Assignment');
 
             const rubricId = a.rubric_preset_id || a.rubricPresetId;
             const rubricPresets = (app.data && app.data.rubricPresets) || [];
             const rubric = rubricId ? rubricPresets.find(r => r.id === rubricId) : null;
 
-            let rubricPillHtml = '';
-            if (!rubricId || !rubric) {
-              rubricPillHtml = `<span class="tag tag-warning">No Rubric</span>`;
-            } else if (rubric.is_preset || rubric.isPreset || rubric.id === 'rub-inst-001') {
-              rubricPillHtml = `<span class="tag tag-blue">Institutional Rubric</span>`;
-            } else {
-              rubricPillHtml = `<span class="tag tag-purple">${rubric.name || 'Custom Rubric'}</span>`;
+            let rubricName = 'No Rubric';
+            if (rubric) {
+              if (rubric.is_preset || rubric.isPreset || rubric.id === 'rub-inst-001') {
+                rubricName = 'Institutional Rubric';
+              } else {
+                rubricName = rubric.name || 'Custom Rubric';
+              }
             }
 
             return `
-              <div id="asg-card-${a.id}">
-                ${isMigrated ? `
-                  <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                      ⚠️ <strong>Legacy assignment</strong> — auto-migrated to institutional rubric with default parameter types. Please review question marks and parameter types for accuracy.
-                    </div>
-                    <button class="btn btn-secondary btn-sm" style="margin-left:12px; padding:2px 8px; font-size:11px;" onclick="facultyView.dismissLegacyWarning(event, '${a.id}')">Dismiss</button>
-                  </div>
-                ` : ''}
-
-                <div class="session-strip">
-                  <div class="session-strip-info">
-                    <div class="session-strip-title">
-                      ${a.display_code || a.code ? `<span class="mono-val" style="font-size:15px; font-weight:800; color:var(--accent-blue); margin-right:6px;">${a.display_code || a.code}</span>` : ''}
-                      <span>${a.working_title || a.title}</span>
-                    </div>
-                    <div class="session-strip-meta">
-                      Questions: <strong>${questions.length}</strong> &nbsp;•&nbsp; Parameters: <strong>${totalParams}</strong>
-                    </div>
-                  </div>
-
-                  <div class="session-strip-pills">
-                    ${a.btLevel || a.bt_level ? `<span class="tag tag-bt">${a.btLevel || a.bt_level}</span>` : ''}
+              <div class="card" id="asg-card-${a.id}" style="padding:18px; display:flex; flex-direction:column; justify-content:space-between; transition:all 0.15s ease;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span class="tag tag-bt">${a.btLevel || a.bt_level || 'BT'}</span>
                     <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
-                    ${rubricPillHtml}
                   </div>
 
-                  <div class="session-strip-actions">
+                  <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin-bottom:12px; line-height:1.35; word-break:break-word;">
+                    ${titleText}
+                  </h3>
+                </div>
+
+                <div>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; font-size:12px; color:var(--text-secondary); margin-top:12px; padding-top:12px; border-top:1px solid var(--border-default);">
+                    <div>Questions: <strong class="mono-val" style="color:var(--text-primary);">${questions.length}</strong></div>
+                    <div>Parameters: <strong class="mono-val" style="color:var(--text-primary);">${totalParams}</strong></div>
+                    <div>Max Marks: <strong class="mono-val" style="color:var(--text-primary);">${totalMaxMarks}</strong></div>
+                    <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${rubricName}">Rubric: <strong style="color:var(--text-primary);">${rubricName}</strong></div>
+                  </div>
+
+                  <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--border-default);">
                     ${status === 'draft' ? `
-                      <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish Assignment</button>
-                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')">🗑️ Delete Draft</button>
+                      <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish</button>
+                      <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')" title="Delete Draft">🗑️</button>
                     ` : status === 'published' ? `
                       <button class="btn btn-secondary btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.retractAssignment('${a.id}')">↩ Retract</button>
@@ -922,10 +933,10 @@ const facultyView = {
                       <span class="tag tag-purple">🔒 Locked</span>
                     ` : status === 'retracted' ? `
                       <span class="tag tag-warning">↩ Retracted</span>
-                      <button class="btn btn-secondary btn-sm" onclick="facultyView.rebuildFromRetracted('${a.id}')">🔄 Rebuild as New Draft</button>
+                      <button class="btn btn-secondary btn-sm" onclick="facultyView.rebuildFromRetracted('${a.id}')">🔄 Rebuild</button>
                     ` : ''}
                     <button class="btn btn-ghost btn-sm" onclick="facultyView.saveAsTemplate('${a.id}')" title="Save as template">💾</button>
-                    <button class="btn btn-primary btn-sm" onclick="window.location.hash='#faculty-subject-${targetSubId}-assignments-${a.id}'">
+                    <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="window.location.hash='#faculty-subject-${targetSubId}-assignments-${a.id}'">
                       Manage Questions →
                     </button>
                   </div>
@@ -933,8 +944,6 @@ const facultyView = {
               </div>
             `;
           }).join('')}
-        </div>
-      `}
     `;
   },
 
