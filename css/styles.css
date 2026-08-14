@@ -714,9 +714,9 @@ h1.page-title {
   white-space: nowrap;
 }
 
-.tag-co { background: var(--purple-subtle); color: var(--purple); }
+.tag-co, .tag-purple { background: var(--purple-subtle); color: var(--purple); }
 .tag-lo { background: var(--success-subtle); color: var(--success); }
-.tag-bt { background: var(--accent-blue-subtle); color: var(--accent-blue); }
+.tag-bt, .tag-blue { background: var(--accent-blue-subtle); color: var(--accent-blue); }
 .tag-success { background: var(--success-subtle); color: var(--success); }
 .tag-warning { background: var(--warning-subtle); color: var(--warning); }
 .tag-danger { background: var(--danger-subtle); color: var(--danger); }

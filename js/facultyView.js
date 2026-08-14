@@ -861,7 +861,7 @@ const facultyView = {
           </div>
         </div>
       ` : `
-        <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; flex-direction:column; gap:12px;">
           ${subAsgs.map(a => {
             const questions = facultyView.getAsgQuestions(a);
             const totalParams = questions.flatMap(q => q.parameters || []).length;
@@ -870,28 +870,48 @@ const facultyView = {
 
             const isMigrated = a.is_migrated || a.isMigrated;
 
+            const rubricId = a.rubric_preset_id || a.rubricPresetId;
+            const rubricPresets = (app.data && app.data.rubricPresets) || [];
+            const rubric = rubricId ? rubricPresets.find(r => r.id === rubricId) : null;
+
+            let rubricPillHtml = '';
+            if (!rubricId || !rubric) {
+              rubricPillHtml = `<span class="tag tag-warning">No Rubric</span>`;
+            } else if (rubric.is_preset || rubric.isPreset || rubric.id === 'rub-inst-001') {
+              rubricPillHtml = `<span class="tag tag-blue">Institutional Rubric</span>`;
+            } else {
+              rubricPillHtml = `<span class="tag tag-purple">${rubric.name || 'Custom Rubric'}</span>`;
+            }
+
             return `
-              <div class="card" id="asg-card-${a.id}">
+              <div id="asg-card-${a.id}">
                 ${isMigrated ? `
-                  <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:12px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
+                  <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
                     <div>
                       ⚠️ <strong>Legacy assignment</strong> — auto-migrated to institutional rubric with default parameter types. Please review question marks and parameter types for accuracy.
                     </div>
                     <button class="btn btn-secondary btn-sm" style="margin-left:12px; padding:2px 8px; font-size:11px;" onclick="facultyView.dismissLegacyWarning(event, '${a.id}')">Dismiss</button>
                   </div>
                 ` : ''}
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-                  <div>
-                    ${a.display_code ? `
-                      <span class="mono-val" style="font-size:16px; font-weight:800; color:var(--accent-blue);">${a.display_code}</span>
-                      <strong style="font-size:15px; margin-left:8px;">${a.working_title || a.title}</strong>
-                    ` : `
-                      <strong style="font-size:15px; color:var(--text-primary);">${a.working_title || a.title}</strong>
-                      <span class="tag tag-warning" style="margin-left:8px; font-weight:700;">[DRAFT]</span>
-                    `}
-                    ${a.btLevel || a.bt_level ? `<span class="tag tag-bt" style="margin-left:8px;">${a.btLevel || a.bt_level}</span>` : ''}
+
+                <div class="session-strip">
+                  <div class="session-strip-info">
+                    <div class="session-strip-title">
+                      ${a.display_code || a.code ? `<span class="mono-val" style="font-size:15px; font-weight:800; color:var(--accent-blue); margin-right:6px;">${a.display_code || a.code}</span>` : ''}
+                      <span>${a.working_title || a.title}</span>
+                    </div>
+                    <div class="session-strip-meta">
+                      Questions: <strong>${questions.length}</strong> &nbsp;•&nbsp; Parameters: <strong>${totalParams}</strong>
+                    </div>
                   </div>
-                  <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+
+                  <div class="session-strip-pills">
+                    ${a.btLevel || a.bt_level ? `<span class="tag tag-bt">${a.btLevel || a.bt_level}</span>` : ''}
+                    <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
+                    ${rubricPillHtml}
+                  </div>
+
+                  <div class="session-strip-actions">
                     ${status === 'draft' ? `
                       <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish Assignment</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')">🗑️ Delete Draft</button>
@@ -905,18 +925,10 @@ const facultyView = {
                       <button class="btn btn-secondary btn-sm" onclick="facultyView.rebuildFromRetracted('${a.id}')">🔄 Rebuild as New Draft</button>
                     ` : ''}
                     <button class="btn btn-ghost btn-sm" onclick="facultyView.saveAsTemplate('${a.id}')" title="Save as template">💾</button>
+                    <button class="btn btn-primary btn-sm" onclick="window.location.hash='#faculty-subject-${targetSubId}-assignments-${a.id}'">
+                      Manage Questions →
+                    </button>
                   </div>
-                </div>
-
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-secondary); border-top:1px solid var(--border-default); padding-top:12px;">
-                  <div style="display:flex; gap:16px; align-items:center;">
-                    <span>Questions: <strong>${questions.length}</strong></span>
-                    <span>Parameters: <strong>${totalParams}</strong></span>
-                    <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
-                  </div>
-                  <button class="btn btn-primary btn-sm" onclick="window.location.hash='#faculty-subject-${targetSubId}-assignments-${a.id}'">
-                    Manage Questions →
-                  </button>
                 </div>
               </div>
             `;
