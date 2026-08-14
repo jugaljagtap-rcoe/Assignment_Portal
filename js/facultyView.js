@@ -942,8 +942,9 @@ const facultyView = {
                   </div>
                 </div>
               </div>
-            `;
           }).join('')}
+        </div>
+      `}
     `;
   },
 
