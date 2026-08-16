@@ -1307,10 +1307,17 @@ sub {
   }
 
   .questions-section-printable {
-    page-break-before: always !important;
-    break-before: page !important;
     margin-top: 0 !important;
     padding-top: 10px !important;
+  }
+
+  .sheet-questions-table thead {
+    display: table-header-group !important;
+  }
+
+  .sheet-questions-table tbody tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   table, tr, .question-block {
@@ -2445,5 +2452,17 @@ th.sortable.desc::after {
   background: #E8E8E8;
   font-weight: 700;
   text-align: left;
+}
+
+.sheet-questions-table thead {
+  display: table-header-group;
+}
+
+.sheet-questions-table th {
+  background: #F0F0F0;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid #000;
+  padding: 6px 10px;
 }
 
