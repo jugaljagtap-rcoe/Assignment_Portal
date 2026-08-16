@@ -980,15 +980,14 @@ const facultyView = {
                   </div>
 
                   <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:14px; padding-top:12px; border-top:1px solid var(--border-default);">
+                    <button class="btn btn-secondary btn-sm" onclick="app.renderAssignmentSheet('${a.id}', null)">${status === 'draft' ? '👁 Preview Sheet' : '👁 View Sheet'}</button>
                     ${status === 'draft' ? `
                       <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')" title="Delete Draft">🗑️</button>
                     ` : status === 'published' ? `
-                      <button class="btn btn-secondary btn-sm" onclick="app.renderAssignmentSheet('${a.id}', null)">👁 View Sheet</button>
                       <button class="btn btn-secondary btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.retractAssignment('${a.id}')">↩ Retract</button>
                     ` : status === 'locked' ? `
-                      <button class="btn btn-secondary btn-sm" onclick="app.renderAssignmentSheet('${a.id}', null)">👁 View Sheet</button>
                       <span class="tag tag-purple">🔒 Locked</span>
                     ` : status === 'retracted' ? `
                       <span class="tag tag-warning">↩ Retracted</span>

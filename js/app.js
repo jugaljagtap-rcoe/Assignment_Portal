@@ -1249,7 +1249,7 @@ class AppEngine {
     if (!student) {
       // Faculty preview mode or fallback: use first enrolled student for subject/branch
       const enrolled = this.getStudentsForDept(deptId);
-      student = enrolled.length > 0 ? enrolled[0] : ((this.data.students || [])[0] || { uin: '2026FE001', name: 'Sample Student' });
+      student = enrolled.length > 0 ? enrolled[0] : null;
     }
 
     const studentVars = {};
@@ -1260,6 +1260,8 @@ class AppEngine {
         }
       });
     }
+
+    const isDraft = (assignment.lifecycle_status || assignment.state || 'draft').toLowerCase() === 'draft';
 
     // 4. Portal settings images
     const collegeLogoUrl = this.getPortalSetting('college_logo');
@@ -1347,10 +1349,21 @@ class AppEngine {
       <div id="assignment-sheet-modal-overlay" class="assignment-sheet-modal-overlay">
         <div class="assignment-sheet-modal-container">
           <div class="assignment-sheet-modal-actions print-hide">
+            ${isDraft ? `
+              <div style="margin-right:auto; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--warning);">
+                <span>⚠️ Preview Mode — This assignment is still a draft</span>
+              </div>
+            ` : ''}
             <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
             <button class="btn btn-secondary" onclick="app.closeAssignmentSheetModal()">✕ Close</button>
           </div>
           
+          ${isDraft ? `
+            <div class="print-hide" style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 16px; font-size:13px; font-weight:600; color:var(--warning); display:flex; align-items:center; gap:8px;">
+              ⚠️ Draft Preview — Variables and parameters may be incomplete
+            </div>
+          ` : ''}
+
           <div class="assignment-sheet-printable">
 
             <!-- A. COLLEGE HEADER -->
@@ -1452,7 +1465,11 @@ class AppEngine {
 
             <!-- G. STUDENT IDENTITY ROW -->
             <div class="sheet-student-row">
-              <strong>UIN & Name:</strong> <span class="mono-val">${student.uin || '2026FE001'}</span> — <strong>${student.name || 'Student Name'}</strong>
+              ${student ? `
+                <strong>UIN & Name:</strong> <span class="mono-val">${student.uin}</span> — <strong>${student.name}</strong>
+              ` : `
+                <strong>UIN & Name:</strong> <span class="mono-val">____________________</span> — <strong>________________________________________</strong>
+              `}
             </div>
 
             <!-- H. NOTICE BOXES -->
