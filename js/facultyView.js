@@ -388,60 +388,72 @@ const facultyView = {
               <button class="btn btn-primary btn-sm" onclick="facultyView.openCreateAssignmentModal('${sub ? sub.id : ''}')">+ Create Assignment</button>
             </div>
           ` : `
-            <div style="display:flex; flex-direction:column; gap:20px;">
+            <div style="display:flex; flex-direction:column; gap:12px;">
               ${seriesOrder.map(type => {
                 const list = groupedAsgs[type];
                 if (!list || list.length === 0) return '';
-                const typeTitle = TYPE_MAP[type] || 'Assignments';
+                const groupNameMap = {
+                  'L': 'Lab Practicals (L)',
+                  'A': 'Assignments (A)',
+                  'T': 'Tests & Quizzes (T)',
+                  'P': 'Projects (P)'
+                };
+                const groupName = groupNameMap[type] || 'Assignments';
 
                 return `
-                  <div>
-                    <h4 style="font-size:13px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em; margin:0 0 10px 0;">${typeTitle} (${list.length})</h4>
-                    <div style="display:flex; flex-direction:column; gap:8px;">
-                      ${list.map(a => {
-                        const questions = facultyView.getAsgQuestions(a);
-                        const totalParams = questions.flatMap(q => q.parameters || []).length;
-                        const totalMaxMarks = questions.reduce((sum, q) => sum + (q.max_marks || q.maxMarks || 10), 0);
-                        const status = (a.lifecycle_status || a.state || 'draft').toLowerCase();
-                        const isDraft = status === 'draft';
-                        const titleText = isDraft
-                          ? (a.working_title || a.title || 'Untitled Draft')
-                          : (a.display_code || a.working_title || a.title || 'Assignment');
+                  <div class="subject-group-card">
+                    <div class="subject-group-header" onclick="facultyView.toggleSubjectGroup(this)">
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <h4 class="subject-title-text">${groupName} (${list.length})</h4>
+                      </div>
+                      <span class="subject-group-toggle-icon">▶</span>
+                    </div>
+                    <div class="subject-group-body" style="display:none; padding:16px;">
+                      <div class="dept-blocks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:16px;">
+                        ${list.map(a => {
+                          const questions = facultyView.getAsgQuestions(a);
+                          const totalParams = questions.flatMap(q => q.parameters || []).length;
+                          const totalMaxMarks = questions.reduce((sum, q) => sum + (q.max_marks || q.maxMarks || 10), 0);
+                          const status = (a.lifecycle_status || a.state || 'draft').toLowerCase();
+                          const isDraft = status === 'draft';
+                          const titleText = isDraft
+                            ? (a.working_title || a.title || 'Untitled Draft')
+                            : (a.display_code || a.working_title || a.title || 'Assignment');
 
-                        const rubricId = a.rubric_preset_id || a.rubricPresetId;
-                        const rubric = rubricId ? rubricPresets.find(r => r.id === rubricId) : null;
-                        let rubricName = 'No Rubric';
-                        if (rubric) {
-                          if (rubric.is_preset || rubric.isPreset || rubric.id === 'rub-inst-001') {
-                            rubricName = 'Institutional Rubric';
-                          } else {
-                            rubricName = rubric.name || 'Custom Rubric';
+                          const rubricId = a.rubric_preset_id || a.rubricPresetId;
+                          const rubric = rubricId ? rubricPresets.find(r => r.id === rubricId) : null;
+                          let rubricName = 'No Rubric';
+                          if (rubric) {
+                            if (rubric.is_preset || rubric.isPreset || rubric.id === 'rub-inst-001') {
+                              rubricName = 'Institutional Rubric';
+                            } else {
+                              rubricName = rubric.name || 'Custom Rubric';
+                            }
                           }
-                        }
 
-                        return `
-                          <div class="session-strip" style="display:flex; justify-content:space-between; align-items:center;">
-                            <div class="session-strip-info">
-                              <div class="session-strip-title">
-                                <span>${titleText}</span>
+                          const btText = a.btLevel || a.bt_level || 'BT';
+                          const subId = sub ? sub.id : '';
+
+                          return `
+                            <div class="card" style="padding:14px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; transition:all 0.15s ease;" onclick="window.location.hash='#faculty-subject-${subId}-assignments-${a.id}'">
+                              <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                  <span class="tag tag-bt" style="font-weight:700;">${btText}</span>
+                                  <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
+                                </div>
+                                <h4 style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:12px; line-height:1.3;">${titleText}</h4>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+                                  <div>Questions: <strong class="mono-val" style="color:var(--text-primary);">${questions.length}</strong></div>
+                                  <div>Parameters: <strong class="mono-val" style="color:var(--text-primary);">${totalParams}</strong></div>
+                                  <div>Total Marks: <strong class="mono-val" style="color:var(--text-primary);">${totalMaxMarks}</strong></div>
+                                  <div>Rubric: <strong class="mono-val" style="color:var(--accent-blue);">${rubricName}</strong></div>
+                                </div>
                               </div>
-                              <div class="session-strip-meta">
-                                ${questions.length} Questions &nbsp;·&nbsp; ${totalParams} Parameters &nbsp;·&nbsp; ${totalMaxMarks} Marks
-                              </div>
+                              <button class="btn btn-secondary btn-sm" style="width:100%; margin-top:4px;" onclick="event.stopPropagation(); window.location.hash='#faculty-subject-${subId}-grade'">Grade Mode →</button>
                             </div>
-
-                            <div class="session-strip-pills">
-                              ${a.btLevel || a.bt_level ? `<span class="tag tag-bt">${a.btLevel || a.bt_level}</span>` : ''}
-                              <span class="col-pill ${status === 'locked' ? 'pill-locked' : status === 'published' ? 'pill-published' : 'pill-draft'}">${status.toUpperCase()}</span>
-                              <span class="tag tag-co">${rubricName}</span>
-                            </div>
-
-                            <div class="session-strip-actions">
-                              <button class="btn btn-secondary btn-sm" onclick="window.location.hash='#faculty-subject-${sub ? sub.id : ''}-grade'">Grade Mode →</button>
-                            </div>
-                          </div>
-                        `;
-                      }).join('')}
+                          `;
+                        }).join('')}
+                      </div>
                     </div>
                   </div>
                 `;
@@ -2488,5 +2500,20 @@ const facultyView = {
     writeAudit('updated', 'legacy_warning_dismissed', asg.id, { dismissed_at: new Date().toISOString() });
     app.showToast('Dismissed legacy warning.', 'info');
     app.renderCurrentView();
+  },
+
+  toggleSubjectGroup(headerEl) {
+    if (!headerEl) return;
+    const body = headerEl.nextElementSibling;
+    const icon = headerEl.querySelector('.subject-group-toggle-icon');
+    if (!body) return;
+
+    if (body.style.display === 'none' || !body.style.display) {
+      body.style.display = 'block';
+      if (icon) icon.textContent = '▼';
+    } else {
+      body.style.display = 'none';
+      if (icon) icon.textContent = '▶';
+    }
   }
 };
