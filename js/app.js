@@ -1598,10 +1598,7 @@ class AppEngine {
 
                     return `
                       <tr>
-                        <td style="text-align:center; font-weight:700; vertical-align:top;">
-                          Q${idx + 1}
-                          <div style="font-size:11px; font-weight:700; color:#000; margin-top:4px;">(${parseFloat(q.max_marks || q.maxMarks || 0)} M)</div>
-                        </td>
+                        <td style="text-align:center; font-weight:700; vertical-align:top;">Q${idx + 1}</td>
                         <td style="vertical-align:top;">
                           <div class="question-text">${formattedQText}</div>
                           <div style="text-align:right; font-size:11px; font-weight:700; color:#000; margin-top:6px;">[Max Marks: ${parseFloat(q.max_marks || q.maxMarks || 0)}]</div>
