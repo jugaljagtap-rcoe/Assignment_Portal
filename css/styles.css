@@ -1155,6 +1155,27 @@ sub {
     color: #000 !important;
   }
 
+  /* Side-by-side grid in print mode */
+  .sheet-side-by-side-grid {
+    display: grid !important;
+    grid-template-columns: 60% 40% !important;
+    gap: 12px !important;
+    margin-bottom: 12px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Page break rules */
+  .assignment-sheet-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .sheet-rubric-container, .sheet-rubric-table {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
   img {
     max-width: 100% !important;
     page-break-inside: avoid !important;
@@ -2242,13 +2263,28 @@ th.sortable.desc::after {
   font-size: 13px;
 }
 
+/* Side-by-Side Grid Layout: Vision & Mission (60%) | Bloom's Taxonomy (40%) */
+.sheet-side-by-side-grid {
+  display: grid;
+  grid-template-columns: 60% 40%;
+  gap: 12px;
+  margin-bottom: 12px;
+  align-items: stretch;
+}
+
+@media (max-width: 768px) {
+  .sheet-side-by-side-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Bloom's Section */
 .sheet-blooms-section {
   text-align: center;
   margin-bottom: 12px;
-  padding: 8px 0;
-  border-top: 1px solid #CCC;
-  border-bottom: 1px solid #CCC;
+  padding: 8px 10px;
+  border: 1px solid #CCC;
+  background: #FAFAFA;
 }
 
 .sheet-section-title {

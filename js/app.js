@@ -1381,28 +1381,34 @@ class AppEngine {
             <!-- B. ASSIGNMENT NO & DATE TABLE -->
             <table class="sheet-table sheet-no-date-table">
               <tr>
-                <td style="width:50%; font-weight:700;">Assignment No: <span class="mono-val">${assignment.display_code || assignment.code || assignment.id}</span></td>
+                <td style="width:50%; font-weight:700;">
+                  Assignment No: 
+                  ${assignment.display_code ? `<span class="mono-val">${assignment.display_code}</span>` : `<span class="mono-val" style="color:var(--warning); font-weight:700;">[DRAFT — Unpublished]</span>`}
+                </td>
                 <td style="width:50%; text-align:right; font-weight:700;">Date: <span class="mono-val">${formattedDate}</span></td>
               </tr>
             </table>
 
-            <!-- C. BLOOM'S TAXONOMY SECTION -->
-            <div class="sheet-section sheet-blooms-section">
-              <div class="sheet-section-title">Bloom's Taxonomy Levels:</div>
-              <div class="sheet-blooms-legend">R - Remember, U - Understand, AP - Apply, AN - Analyze, E - Evaluate, C – Create</div>
-              ${bloomsPyramidUrl ? `<img src="${bloomsPyramidUrl}" alt="Bloom's Taxonomy Pyramid" class="sheet-blooms-img">` : ''}
-            </div>
-
-            <!-- D. VISION & MISSION -->
-            <div class="sheet-section sheet-vision-mission">
-              <div class="vision-block">
-                <strong>Vision:</strong> <em>${department.vision || ''}</em>
+            <!-- C & D. SIDE-BY-SIDE LAYOUT: VISION & MISSION (60%) | BLOOM'S TAXONOMY (40%) -->
+            <div class="sheet-side-by-side-grid">
+              <!-- Left Column: Vision & Mission -->
+              <div class="sheet-section sheet-vision-mission" style="margin-bottom:0;">
+                <div class="vision-block">
+                  <strong>Vision:</strong> <em>${department.vision || ''}</em>
+                </div>
+                <div class="mission-block" style="margin-top:6px;">
+                  <strong>Mission:</strong>
+                  <ol style="margin-left:20px; margin-top:2px;">
+                    ${(department.mission || []).map(m => `<li><em>${m}</em></li>`).join('')}
+                  </ol>
+                </div>
               </div>
-              <div class="mission-block" style="margin-top:6px;">
-                <strong>Mission:</strong>
-                <ol style="margin-left:20px; margin-top:2px;">
-                  ${(department.mission || []).map(m => `<li><em>${m}</em></li>`).join('')}
-                </ol>
+
+              <!-- Right Column: Bloom's Taxonomy -->
+              <div class="sheet-section sheet-blooms-section" style="margin-bottom:0;">
+                <div class="sheet-section-title">Bloom's Taxonomy Levels:</div>
+                <div class="sheet-blooms-legend">R - Remember, U - Understand, AP - Apply, AN - Analyze, E - Evaluate, C – Create</div>
+                ${bloomsPyramidUrl ? `<img src="${bloomsPyramidUrl}" alt="Bloom's Taxonomy Pyramid" class="sheet-blooms-img">` : ''}
               </div>
             </div>
 
@@ -1428,7 +1434,7 @@ class AppEngine {
             </table>
 
             <!-- F. RUBRIC TABLE -->
-            <div class="sheet-section">
+            <div class="sheet-section sheet-rubric-container">
               <div class="sheet-table-title">Rubrics for Numerical Problems</div>
               <table class="sheet-table sheet-rubric-table">
                 <thead>
@@ -1463,8 +1469,8 @@ class AppEngine {
               </table>
             </div>
 
-            <!-- G. STUDENT IDENTITY ROW -->
-            <div class="sheet-student-row">
+            <!-- G. STUDENT IDENTITY ROW (Page 2 Start) -->
+            <div class="sheet-student-row assignment-sheet-page-break">
               ${student ? `
                 <strong>UIN & Name:</strong> <span class="mono-val">${student.uin}</span> — <strong>${student.name}</strong>
               ` : `
