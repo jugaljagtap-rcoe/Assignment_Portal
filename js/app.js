@@ -1598,7 +1598,10 @@ class AppEngine {
 
                     return `
                       <tr>
-                        <td style="text-align:center; font-weight:700; vertical-align:top;">Q${idx + 1}</td>
+                        <td style="text-align:center; font-weight:700; vertical-align:top;">
+                          Q${idx + 1}
+                          <div style="font-size:11px; font-weight:700; color:#000; margin-top:4px;">(${parseFloat(q.max_marks || q.maxMarks || 0)} M)</div>
+                        </td>
                         <td style="vertical-align:top;">
                           <div class="question-text">${formattedQText}</div>
                           ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image" style="border:none; background:transparent; display:block; margin:8px auto;"></div>` : ''}
