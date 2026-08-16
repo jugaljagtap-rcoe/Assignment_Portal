@@ -1320,6 +1320,47 @@ sub {
     break-inside: avoid !important;
   }
 
+  .sheet-student-row {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    margin-bottom: 4px !important;
+  }
+
+  .sheet-notice-container {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    margin-bottom: 4px !important;
+  }
+
+  .sheet-notice-box {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    margin-bottom: 4px !important;
+    padding: 4px 8px !important;
+  }
+
+  .assignment-sheet-page2 {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .assignment-sheet-page2 > * {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .sheet-questions-table {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    margin-top: 4px !important;
+  }
+
   table, tr, .question-block {
     break-inside: avoid;
     page-break-inside: avoid;
