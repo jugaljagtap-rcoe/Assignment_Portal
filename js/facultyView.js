@@ -910,9 +910,9 @@ const facultyView = {
       </div>
 
       ${migratedAsgs.length > 0 ? `
-        <div style="margin-bottom:16px;">
+        <div style="margin-bottom:16px;" class="legacy-warning-banner print-hide">
           ${migratedAsgs.map(a => `
-            <div style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
+            <div class="legacy-warning-banner print-hide" style="background:var(--warning-subtle); border:1px solid var(--warning); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:8px; font-size:12px; color:var(--warning); display:flex; justify-content:space-between; align-items:center;">
               <div>
                 ⚠️ <strong>Legacy assignment (${a.display_code || a.working_title || a.title || 'Draft'})</strong> — auto-migrated to institutional rubric with default parameter types. Please review question marks and parameter types for accuracy.
               </div>

@@ -1095,6 +1095,7 @@ sub {
   .role-switcher,
   .header-controls,
   .print-hide,
+  .legacy-warning-banner,
   .btn,
   .btn-primary,
   .btn-secondary,
