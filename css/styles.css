@@ -1171,10 +1171,33 @@ sub {
     color: #000 !important;
   }
 
-  /* Compact margins for print */
+  .sheet-college-logo {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    max-height: 60px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
   .sheet-header {
-    margin-bottom: 6px !important;
     padding-bottom: 6px !important;
+    margin-bottom: 6px !important;
+    gap: 10px !important;
+  }
+
+  .sheet-header-text .res-title,
+  .sheet-header-text .college-subtext,
+  .sheet-header-text .nba-badge-text,
+  .sheet-header-text .dept-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.2 !important;
+  }
+
+  .sheet-header-text .college-title {
+    margin: 1px 0 !important;
+    line-height: 1.2 !important;
   }
 
   .sheet-table {
