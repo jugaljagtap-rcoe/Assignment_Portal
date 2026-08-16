@@ -1209,6 +1209,11 @@ sub {
     margin-bottom: 0 !important;
   }
 
+  .sheet-vision-mission {
+    border-left: none !important;
+    border: none !important;
+  }
+
   .sheet-rubric-container, .sheet-rubric-table, .sheet-rubric-footnotes {
     page-break-inside: avoid !important;
     break-inside: avoid !important;

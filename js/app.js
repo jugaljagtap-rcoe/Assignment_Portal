@@ -1402,7 +1402,7 @@ class AppEngine {
                 <span>⚠️ Preview Mode — This assignment is still a draft</span>
               </div>
             ` : ''}
-            <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+            <button class="btn btn-primary" onclick="(function(){ const prev = document.title; document.title = '${(assignment.display_code || 'DRAFT')}_${student ? student.uin : 'UIN'}_${student ? student.name.replace(/\s+/g, '_') : 'Name'}'; window.print(); window.onafterprint = function(){ document.title = prev; }; })()">🖨️ Print / Save as PDF</button>
             <button class="btn btn-secondary" onclick="app.closeAssignmentSheetModal()">✕ Close</button>
           </div>
           
