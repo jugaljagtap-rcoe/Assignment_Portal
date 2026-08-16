@@ -1253,8 +1253,310 @@ const facultyView = {
     app.showToast('Schedule saved successfully.', 'success');
   },
 
+  /* Mode A: Per-Student Variable CSV Pipeline Helpers */
+  getAssignmentVariables(asg) {
+    const questions = this.getAsgQuestions(asg);
+    const varsSet = new Set();
+    questions.forEach(q => {
+      const text = q.text || q.questionText || '';
+      const regex = /\{\{(.*?)\}\}/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        if (match[1]) {
+          const v = match[1].trim();
+          if (v) varsSet.add(v);
+        }
+      }
+    });
+    return Array.from(varsSet);
+  },
+
+  renderCSVModeA(modeACardContainer, sub, selectedAsgId = null) {
+    const subObj = typeof sub === 'object' && sub !== null
+      ? sub
+      : (app.data.subjects || []).find(s => s.id === sub) || null;
+    const subAsgs = (app.data.assignments || []).filter(a => !subObj || a.subjectId === subObj.id || a.subject_id === subObj.id);
+
+    // Filter assignments that have at least one {{variable}} placeholder
+    const variableAssignments = subAsgs.filter(asg => {
+      const vars = this.getAssignmentVariables(asg);
+      return vars.length > 0;
+    });
+
+    if (variableAssignments.length === 0) {
+      modeACardContainer.innerHTML = `
+        <h3 class="card-title">Mode A: Per-Student Variable CSV Pipeline</h3>
+        <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">
+          Assign custom per-student values for question variables (e.g. {{A}}, {{m}}, {{P}}).
+        </p>
+        <div style="padding:30px; text-align:center; color:var(--text-tertiary);">
+          <div class="empty-state">No assignments with {{variable}} placeholders found for this subject.</div>
+        </div>
+      `;
+      return;
+    }
+
+    let activeAsg = variableAssignments.find(a => a.id === selectedAsgId) ||
+                    variableAssignments.find(a => a.id === this.activeCSVAssignmentId) ||
+                    variableAssignments[0];
+    this.activeCSVAssignmentId = activeAsg.id;
+
+    const variableNames = this.getAssignmentVariables(activeAsg);
+
+    // Resolve subject & enrolled students via app.getStudentsForDept
+    const currentSubject = subObj || (app.data.subjects || []).find(s => s.id === (activeAsg.subjectId || activeAsg.subject_id)) || (app.data.subjects || [])[0];
+    const deptId = currentSubject ? (currentSubject.departmentId || currentSubject.department_id || '') : '';
+    const enrolledStudents = app.getStudentsForDept(deptId);
+
+    // Compute coverage: students fully assigned (has value for ALL variables)
+    let fullyAssignedCount = 0;
+    enrolledStudents.forEach(s => {
+      const isFullyAssigned = variableNames.length > 0 && variableNames.every(vName => {
+        const rec = (app.data.studentVariables || []).find(v =>
+          v.studentId === s.id &&
+          (v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId) &&
+          v.key === vName
+        );
+        return rec && rec.value !== undefined && rec.value !== null && String(rec.value).trim() !== '';
+      });
+      if (isFullyAssigned) fullyAssignedCount++;
+    });
+
+    const subIdArg = subObj ? `'${subObj.id}'` : (typeof sub === 'string' ? `'${sub}'` : 'null');
+
+    modeACardContainer.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div>
+          <h3 class="card-title">Mode A: Per-Student Variable CSV Pipeline</h3>
+          <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
+            Download template, upload custom variable values per student UIN, and track assignment coverage.
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 1 — Assignment Selector -->
+      <div style="margin-bottom:20px; max-width:480px;">
+        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 1 — Select Assignment with Variables</label>
+        <select id="mode-a-asg-select" class="form-control" onchange="facultyView.activeCSVAssignmentId = this.value; facultyView.renderCSVModeA(document.getElementById('mode-a-container'), ${subIdArg}, this.value);">
+          ${variableAssignments.map(a => `
+            <option value="${a.id}" ${a.id === activeAsg.id ? 'selected' : ''}>
+              ${a.display_code || a.code || a.working_title || a.title || a.id} (${this.getAssignmentVariables(a).length} variables)
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <!-- Step 2 & Step 3 — Template Download & CSV Upload -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px; padding:16px; background:var(--surface-hover); border-radius:8px; border:1px solid var(--border-color);">
+        <div>
+          <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 2 — Download CSV Template</label>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+            Generates a pre-formatted CSV with headers (<code>uin, ${variableNames.join(', ')}</code>) and enrolled student UINs.
+          </p>
+          <button class="btn btn-secondary" onclick="facultyView.downloadVariableCSVTemplate('${activeAsg.id}', '${deptId}')">
+            📥 Download CSV Template
+          </button>
+        </div>
+
+        <div>
+          <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 3 — Upload Filled CSV</label>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
+            Upload completed CSV with student variable assignments.
+          </p>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="file" id="mode-a-csv-file-input" accept=".csv" class="form-control" style="max-width:240px; font-size:12px;">
+            <button class="btn btn-primary" onclick="facultyView.uploadVariableCSV('${activeAsg.id}', ${subIdArg})">
+              📤 Upload & Save Variables
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 — Coverage Display -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+          <h4 style="margin:0; font-size:14px; font-weight:700;">Step 4 — Variable Assignment Coverage</h4>
+          <div style="font-size:13px; font-weight:600; color:var(--text-primary);">
+            📊 <strong>${fullyAssignedCount} of ${enrolledStudents.length} students fully assigned.</strong>
+          </div>
+        </div>
+
+        ${enrolledStudents.length === 0 ? `
+          <div style="padding:20px; text-align:center; color:var(--text-tertiary);">No students enrolled in this department.</div>
+        ` : `
+          <div class="table-container" style="max-height:400px; overflow-y:auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>UIN</th>
+                  <th>Student Name</th>
+                  ${variableNames.map(v => `<th>${v}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${enrolledStudents.map(st => {
+                  return `
+                    <tr>
+                      <td class="mono-val" style="font-weight:700;">${st.uin || st.id}</td>
+                      <td>${st.name || st.fullName || 'Student'}</td>
+                      ${variableNames.map(vName => {
+                        const rec = (app.data.studentVariables || []).find(v =>
+                          v.studentId === st.id &&
+                          (v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId) &&
+                          v.key === vName
+                        );
+                        const val = rec ? rec.value : null;
+                        const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
+                        return `
+                          <td>
+                            ${hasVal ? `<span class="mono-val">${val}</span>` : `<span class="tag tag-danger">Missing</span>`}
+                          </td>
+                        `;
+                      }).join('')}
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+  },
+
+  downloadVariableCSVTemplate(asgId, deptId) {
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+    const variableNames = this.getAssignmentVariables(asg);
+    const enrolledStudents = app.getStudentsForDept(deptId);
+
+    const header = ['uin', ...variableNames].join(',');
+    const rows = enrolledStudents.map(s => [s.uin || s.id, ...variableNames.map(() => '')].join(','));
+    const csvContent = [header, ...rows].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `variable_template_${asg.code || asg.display_code || asg.id}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async uploadVariableCSV(asgId, sub) {
+    const fileInput = document.getElementById('mode-a-csv-file-input');
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      app.showToast('Please select a CSV file to upload.', 'warning');
+      return;
+    }
+
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length < 2) {
+      app.showToast('CSV file is empty or missing data rows.', 'warning');
+      return;
+    }
+
+    const parseLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim().replace(/^["']|["']$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim().replace(/^["']|["']$/g, ''));
+      return result;
+    };
+
+    const headerCols = parseLine(lines[0]);
+    if (headerCols.length < 2) {
+      app.showToast('Invalid CSV structure. Expected header: uin, variable1, variable2...', 'warning');
+      return;
+    }
+
+    const variableNames = headerCols.slice(1);
+    let recordCount = 0;
+    const uniqueStudentIds = new Set();
+    const missingUins = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const rowCols = parseLine(lines[i]);
+      if (rowCols.length === 0 || !rowCols[0]) continue;
+      const uinVal = rowCols[0].trim();
+      if (!uinVal) continue;
+
+      const student = (app.data.students || []).find(st => String(st.uin || '').trim() === uinVal);
+      if (!student) {
+        missingUins.push(uinVal);
+        continue;
+      }
+
+      uniqueStudentIds.add(student.id);
+
+      for (let j = 1; j < headerCols.length; j++) {
+        const varName = headerCols[j].trim();
+        if (!varName) continue;
+        const val = rowCols[j] !== undefined ? String(rowCols[j]).trim() : '';
+
+        const rawId = `sv-${student.id}-${asgId}-${varName}`;
+        const deterministicId = rawId.toLowerCase().replace(/[^a-z0-9\-]/g, '-');
+
+        const record = {
+          id: deterministicId,
+          student_id: student.id,
+          studentId: student.id,
+          assignment_id: asgId,
+          assignmentId: asgId,
+          key: varName,
+          value: val
+        };
+
+        // Memory upsert
+        const existingIdx = (app.data.studentVariables || []).findIndex(v => v.id === deterministicId);
+        if (existingIdx >= 0) {
+          app.data.studentVariables[existingIdx] = record;
+        } else {
+          if (!app.data.studentVariables) app.data.studentVariables = [];
+          app.data.studentVariables.push(record);
+        }
+
+        // Supabase upsert
+        await app.supabaseUpsert('student_variables', record, `Variable ${varName} for ${uinVal}`);
+        recordCount++;
+      }
+    }
+
+    app.saveState();
+    writeAudit('bulk_upsert', 'student_variables', asgId, { count: recordCount, students_processed: uniqueStudentIds.size, variables_count: variableNames.length });
+
+    if (missingUins.length > 0) {
+      app.showToast(`Warning: Skipped ${missingUins.length} UIN(s) not found: ${missingUins.join(', ')}`, 'warning');
+    }
+
+    app.showToast(`Saved variables for ${uniqueStudentIds.size} students across ${variableNames.length} parameters.`, 'success');
+
+    // Re-render Mode A in place
+    const containerEl = document.getElementById('mode-a-container');
+    if (containerEl) {
+      this.renderCSVModeA(containerEl, sub, asgId);
+    }
+  },
+
   /* 4. Grade & Evaluate 3-Mode Pipeline */
   renderCSVPipeline(container, sub) {
+    const subIdArg = sub ? (typeof sub === 'string' ? `'${sub}'` : `'${sub.id}'`) : 'null';
+
     container.innerHTML = `
       <div class="page-header-container">
         <div>
@@ -1264,18 +1566,27 @@ const facultyView = {
       </div>
 
       <div class="segmented-control print-hide" style="margin-bottom:20px;">
-        <button class="segmented-btn ${this.gradingMode === 'bulk' ? 'active' : ''}" onclick="facultyView.gradingMode = 'bulk'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content'), ${sub ? `'${sub.id}'` : 'null'});">📁 Mode A: Bulk CSV</button>
-        <button class="segmented-btn ${this.gradingMode === 'queue' ? 'active' : ''}" onclick="facultyView.gradingMode = 'queue'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content'), ${sub ? `'${sub.id}'` : 'null'});">👤 Mode B: Student Queue</button>
-        <button class="segmented-btn ${this.gradingMode === 'roster' ? 'active' : ''}" onclick="facultyView.gradingMode = 'roster'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content'), ${sub ? `'${sub.id}'` : 'null'});">📋 Mode C: Roster Override</button>
+        <button class="segmented-btn ${this.gradingMode === 'bulk' ? 'active' : ''}" onclick="facultyView.gradingMode = 'bulk'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">📁 Mode A: Bulk CSV</button>
+        <button class="segmented-btn ${this.gradingMode === 'queue' ? 'active' : ''}" onclick="facultyView.gradingMode = 'queue'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">👤 Mode B: Student Queue</button>
+        <button class="segmented-btn ${this.gradingMode === 'roster' ? 'active' : ''}" onclick="facultyView.gradingMode = 'roster'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">📋 Mode C: Roster Override</button>
       </div>
 
-      <div class="card">
-        <h3 class="card-title">${this.gradingMode === 'bulk' ? 'Mode A: Bulk CSV Solution Key Upload' : this.gradingMode === 'queue' ? 'Mode B: Student Queue Step-by-Step Evaluation' : 'Mode C: Class Roster Override Table'}</h3>
-        <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">
-          ${this.gradingMode === 'bulk' ? 'Upload personalized student variables and 2-row solution CSV key templates to auto-evaluate submission batches.' : this.gradingMode === 'queue' ? 'Step through students one by one in UIN order with variable substitution, question canvas, and inline override inputs.' : 'Override calculated marks directly in a full class grid and batch save overrides.'}
-        </p>
+      <div class="card" id="mode-a-container">
+        ${this.gradingMode === 'bulk' ? '' : `
+          <h3 class="card-title">${this.gradingMode === 'queue' ? 'Mode B: Student Queue Step-by-Step Evaluation' : 'Mode C: Class Roster Override Table'}</h3>
+          <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">
+            ${this.gradingMode === 'queue' ? 'Step through students one by one in UIN order with variable substitution, question canvas, and inline override inputs.' : 'Override calculated marks directly in a full class grid and batch save overrides.'}
+          </p>
+        `}
       </div>
     `;
+
+    if (this.gradingMode === 'bulk') {
+      const modeAContainer = document.getElementById('mode-a-container');
+      if (modeAContainer) {
+        this.renderCSVModeA(modeAContainer, sub, this.activeCSVAssignmentId);
+      }
+    }
   },
 
   /* 5. Verification Layer */

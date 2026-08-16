@@ -222,7 +222,13 @@ class AppEngine {
       if (assignmentsRes.data) this.data.assignments = assignmentsRes.data;
       if (submissionsRes.data) this.data.submissions = submissionsRes.data;
       if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;
-      if (studentVarsRes.data) this.data.studentVariables = studentVarsRes.data;
+      if (studentVarsRes.data) {
+        this.data.studentVariables = studentVarsRes.data.map(v => ({
+          ...v,
+          studentId: v.student_id || v.studentId || '',
+          assignmentId: v.assignment_id || v.assignmentId || ''
+        }));
+      }
       if (studentAnswersRes.data) this.data.studentAnswers = studentAnswersRes.data;
       if (courseOutcomesRes.data) {
         this.data.courseOutcomes = courseOutcomesRes.data.map(co => ({
@@ -1157,7 +1163,8 @@ class AppEngine {
     const criticalTables = [
       'subjects', 'students', 'faculty', 'subject_faculty',
       'course_outcomes', 'modules', 'co_po_mapping',
-      'assignments', 'submissions', 'assignment_submissions'
+      'assignments', 'submissions', 'assignment_submissions',
+      'student_variables'
     ];
     const missingTables = [];
     for (const table of criticalTables) {
