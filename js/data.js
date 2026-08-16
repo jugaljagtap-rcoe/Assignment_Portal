@@ -160,5 +160,7 @@ const INITIAL_DATA = {
   attainmentSettings: {
     studentThresholdPct: 60,
     classTargetPct: 70
-  }
+  },
+
+  portalSettings: {}
 };

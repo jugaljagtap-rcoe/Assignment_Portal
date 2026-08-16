@@ -167,7 +167,7 @@ class AppEngine {
         studentsRes, facultyRes, subjectFacultyRes, subjectsRes, assignmentsRes,
         submissionsRes, assignmentSubmissionsRes, studentVarsRes, studentAnswersRes,
         courseOutcomesRes, modulesRes, auditLogRes, templatesRes, coPoRes,
-        programOutcomesRes, assignmentSequencesRes, rubricPresetsRes
+        programOutcomesRes, assignmentSequencesRes, rubricPresetsRes, portalSettingsRes
       ] = await Promise.all([
         supabaseClient.from('students').select('*'),
         supabaseClient.from('faculty').select('*'),
@@ -185,8 +185,17 @@ class AppEngine {
         supabaseClient.from('co_po_mapping').select('*'),
         supabaseClient.from('program_outcomes').select('*').order('id'),
         supabaseClient.from('assignment_sequences').select('*'),
-        supabaseClient.from('rubric_presets').select('*')
+        supabaseClient.from('rubric_presets').select('*'),
+        supabaseClient.from('portal_settings').select('*')
       ]);
+
+      if (portalSettingsRes && portalSettingsRes.data) {
+        const settingsObj = {};
+        portalSettingsRes.data.forEach(row => {
+          if (row.key) settingsObj[row.key] = row.value;
+        });
+        this.data.portalSettings = settingsObj;
+      }
 
       if (studentsRes.data && studentsRes.data.length > 0)
         this.data.students = studentsRes.data.map(s => ({
@@ -1038,6 +1047,11 @@ class AppEngine {
     return url;
   }
 
+  getPortalSetting(key) {
+    const rawVal = (this.data && this.data.portalSettings && this.data.portalSettings[key]) || '';
+    return this.getEmbeddableImageUrl(rawVal);
+  }
+
   getAssignmentSchedule(asgId, batchName = 'A1') {
     const asg = this.data.assignments.find(a => a.id === asgId);
     if (!asg || !asg.schedules || asg.schedules.length === 0) {
@@ -1209,6 +1223,351 @@ class AppEngine {
   getActiveAcademicYear() {
     const active = (this.data.academicYears || ACADEMIC_YEARS).find(ay => ay.active);
     return active ? active.label : '2026-27';
+  }
+
+  /* ==========================================================================
+     ASSIGNMENT SHEET RENDERER & MODAL OVERLAY
+     ========================================================================== */
+  renderAssignmentSheet(assignmentId, studentId = null) {
+    // 1. Fetch assignment
+    const assignment = (this.data.assignments || []).find(a => a.id === assignmentId || a.code === assignmentId || (a.originalId && a.originalId === assignmentId));
+    if (!assignment) {
+      this.showToast('Assignment not found for rendering sheet.', 'danger');
+      return;
+    }
+
+    // 2. Fetch subject & department
+    const subject = (this.data.subjects || []).find(s => s.id === (assignment.subjectId || assignment.subject_id)) || null;
+    const deptId = subject ? (subject.departmentId || subject.department_id) : 'dept-fe';
+    const department = (this.data.departments || HARDCODED_DEPARTMENTS).find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+
+    // 3. Determine student profile & variables
+    let student = null;
+    if (studentId) {
+      student = (this.data.students || []).find(s => s.id === studentId);
+    }
+    if (!student) {
+      // Faculty preview mode or fallback: use first enrolled student for subject/branch
+      const enrolled = this.getStudentsForDept(deptId);
+      student = enrolled.length > 0 ? enrolled[0] : ((this.data.students || [])[0] || { uin: '2026FE001', name: 'Sample Student' });
+    }
+
+    const studentVars = {};
+    if (student && student.id) {
+      (this.data.studentVariables || []).forEach(v => {
+        if (v.studentId === student.id && (v.assignmentId === assignment.id || v.assignmentId === assignment.code || v.assignmentId === assignment.originalId)) {
+          studentVars[v.key] = v.value;
+        }
+      });
+    }
+
+    // 4. Portal settings images
+    const collegeLogoUrl = this.getPortalSetting('college_logo');
+    const bloomsPyramidUrl = this.getPortalSetting('blooms_taxonomy_image');
+
+    // 5. Parse questions
+    let questions = [];
+    if (Array.isArray(assignment.questions)) {
+      questions = assignment.questions;
+    } else if (typeof assignment.questions === 'string') {
+      try { questions = JSON.parse(assignment.questions); } catch(_) { questions = []; }
+    }
+
+    // Check if any question uses per-student variables
+    let usePerStudentVariables = false;
+    questions.forEach(q => {
+      if (Array.isArray(q.parameters)) {
+        q.parameters.forEach(p => {
+          const mode = p.variation_mode || p.variationMode || 'individual';
+          if (mode === 'individual' || mode === 'per_student') {
+            usePerStudentVariables = true;
+          }
+        });
+      }
+    });
+
+    // 6. Assignment Metadata
+    // Format published date as DD/MM/YYYY
+    let formattedDate = 'N/A';
+    if (assignment.created_at || assignment.createdAt || assignment.published_at || assignment.publishedAt) {
+      const rawDate = new Date(assignment.created_at || assignment.createdAt || assignment.published_at || assignment.publishedAt);
+      if (!isNaN(rawDate.getTime())) {
+        const day = String(rawDate.getDate()).padStart(2, '0');
+        const month = String(rawDate.getMonth() + 1).padStart(2, '0');
+        const year = rawDate.getFullYear();
+        formattedDate = `${day}/${month}/${year}`;
+      }
+    }
+
+    // Class | Semester lookup
+    let className = 'First Year Engineering (FE)';
+    let semesterName = 'Semester I';
+    if (subject) {
+      if (subject.className || subject.class_name) className = subject.className || subject.class_name;
+      if (subject.semester) semesterName = subject.semester;
+    }
+
+    // Modules covered
+    const modulesCoveredIds = assignment.modules_covered || assignment.modulesCovered || assignment.module_ids || [];
+    const moduleNamesList = (this.data.modules || [])
+      .filter(m => modulesCoveredIds.includes(m.id) || modulesCoveredIds.includes(m.code))
+      .map(m => m.module_name || m.name || m.title || m.code);
+    const modulesCoveredStr = moduleNamesList.length > 0 ? moduleNamesList.join(', ') : 'All Modules';
+
+    // COs covered
+    const coIds = assignment.co_ids || assignment.coIds || [];
+    const coList = (this.data.courseOutcomes || [])
+      .filter(co => coIds.includes(co.id) || coIds.includes(co.code))
+      .map(co => `${co.code}${co.description ? ' - ' + co.description : ''}`);
+    const cosCoveredStr = coList.length > 0 ? coList.join(', ') : 'All Course Outcomes';
+
+    // 7. Rubric lookup
+    const rubricPresetId = assignment.rubric_preset_id || assignment.rubricPresetId;
+    const rubric = this.getRubricPreset(rubricPresetId) || {
+      tolerance_exemplary: 2,
+      tolerance_proficient: 5,
+      tolerance_developing: 10
+    };
+    const tolExemplary = rubric.tolerance_exemplary !== undefined ? rubric.tolerance_exemplary : 2;
+    const tolProficient = rubric.tolerance_proficient !== undefined ? rubric.tolerance_proficient : 5;
+    const tolDeveloping = rubric.tolerance_developing !== undefined ? rubric.tolerance_developing : 10;
+
+    // BT Level labels
+    const btLabelsMap = {
+      'R': 'R - Remember',
+      'U': 'U - Understand',
+      'AP': 'AP - Apply',
+      'AN': 'AN - Analyze',
+      'E': 'E - Evaluate',
+      'C': 'C - Create'
+    };
+
+    // Construct Sheet HTML
+    const html = `
+      <div id="assignment-sheet-modal-overlay" class="assignment-sheet-modal-overlay">
+        <div class="assignment-sheet-modal-container">
+          <div class="assignment-sheet-modal-actions print-hide">
+            <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+            <button class="btn btn-secondary" onclick="app.closeAssignmentSheetModal()">✕ Close</button>
+          </div>
+          
+          <div class="assignment-sheet-printable">
+
+            <!-- A. COLLEGE HEADER -->
+            <div class="sheet-header">
+              ${collegeLogoUrl ? `<img src="${collegeLogoUrl}" alt="College Logo" class="sheet-college-logo">` : ''}
+              <div class="sheet-header-text">
+                <div class="res-title">RIZVI EDUCATION SOCIETY's</div>
+                <div class="college-title">RIZVI COLLEGE OF ENGINEERING</div>
+                <div class="college-subtext">Approved by AICTE | Recognized by DTE | Affiliated to University of Mumbai</div>
+                <div class="nba-badge-text">Accredited by NBA</div>
+                <div class="dept-title">DEPARTMENT OF ${(department.name || 'FIRST YEAR ENGINEERING').toUpperCase()}</div>
+              </div>
+            </div>
+
+            <!-- B. ASSIGNMENT NO & DATE TABLE -->
+            <table class="sheet-table sheet-no-date-table">
+              <tr>
+                <td style="width:50%; font-weight:700;">Assignment No: <span class="mono-val">${assignment.display_code || assignment.code || assignment.id}</span></td>
+                <td style="width:50%; text-align:right; font-weight:700;">Date: <span class="mono-val">${formattedDate}</span></td>
+              </tr>
+            </table>
+
+            <!-- C. BLOOM'S TAXONOMY SECTION -->
+            <div class="sheet-section sheet-blooms-section">
+              <div class="sheet-section-title">Bloom's Taxonomy Levels:</div>
+              <div class="sheet-blooms-legend">R - Remember, U - Understand, AP - Apply, AN - Analyze, E - Evaluate, C – Create</div>
+              ${bloomsPyramidUrl ? `<img src="${bloomsPyramidUrl}" alt="Bloom's Taxonomy Pyramid" class="sheet-blooms-img">` : ''}
+            </div>
+
+            <!-- D. VISION & MISSION -->
+            <div class="sheet-section sheet-vision-mission">
+              <div class="vision-block">
+                <strong>Vision:</strong> <em>${department.vision || ''}</em>
+              </div>
+              <div class="mission-block" style="margin-top:6px;">
+                <strong>Mission:</strong>
+                <ol style="margin-left:20px; margin-top:2px;">
+                  ${(department.mission || []).map(m => `<li><em>${m}</em></li>`).join('')}
+                </ol>
+              </div>
+            </div>
+
+            <!-- E. ASSIGNMENT META TABLE -->
+            <table class="sheet-table sheet-meta-table">
+              <tr>
+                <td><strong>Class:</strong> ${className}</td>
+                <td><strong>Semester:</strong> ${semesterName}</td>
+              </tr>
+              <tr>
+                <td><strong>Lab Name:</strong> ${subject ? subject.name : 'Engineering Lab'}</td>
+                <td><strong>Lab Code:</strong> ${subject ? subject.code : 'ESL101'}</td>
+              </tr>
+              <tr>
+                <td colspan="2"><strong>Type of assessment:</strong> Direct</td>
+              </tr>
+              <tr>
+                <td colspan="2"><strong>Modules covered:</strong> ${modulesCoveredStr}</td>
+              </tr>
+              <tr>
+                <td colspan="2"><strong>Lab Outcome/s covered:</strong> ${cosCoveredStr}</td>
+              </tr>
+            </table>
+
+            <!-- F. RUBRIC TABLE -->
+            <div class="sheet-section">
+              <div class="sheet-table-title">Rubrics for Numerical Problems</div>
+              <table class="sheet-table sheet-rubric-table">
+                <thead>
+                  <tr>
+                    <th style="width:25%;">Level / Marks</th>
+                    <th style="width:40%;">Criteria 01 (Answers)</th>
+                    <th style="width:35%;">Criteria 02 (Units)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Unsatisfactory (00)</strong></td>
+                    <td>Beyond ±${tolDeveloping}%</td>
+                    <td>Wrong/missing units</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Developing (01)</strong></td>
+                    <td>Within ±${tolDeveloping}%</td>
+                    <td>50%-90% units correct</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Proficient (02)</strong></td>
+                    <td>Within ±${tolProficient}%</td>
+                    <td>More than 90% units correct</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Exemplary (03)</strong></td>
+                    <td>Within ±${tolExemplary}%</td>
+                    <td>All units correct</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- G. STUDENT IDENTITY ROW -->
+            <div class="sheet-student-row">
+              <strong>UIN & Name:</strong> <span class="mono-val">${student.uin || '2026FE001'}</span> — <strong>${student.name || 'Student Name'}</strong>
+            </div>
+
+            <!-- H. NOTICE BOXES -->
+            <div class="sheet-notice-container">
+              ${usePerStudentVariables ? `
+                <div class="sheet-notice-box notice-box-unique">
+                  ⚠️ <strong>Notice:</strong> Your data is unique. The values given in your questions are assigned only to you. Do not share or compare with others.
+                </div>
+              ` : ''}
+              <div class="sheet-notice-box notice-box-submission">
+                📌 <strong>Important:</strong> Portal submission is not enough. You must also submit your assignment sheets with complete solutions, diagrams, and working to finish your submission.
+              </div>
+            </div>
+
+            <!-- I. QUESTIONS TABLE -->
+            <div class="sheet-section" style="margin-top:12px;">
+              <table class="sheet-table sheet-questions-table">
+                <thead>
+                  <tr>
+                    <th style="width:6%;">Q.No</th>
+                    <th style="width:54%;">Question</th>
+                    <th style="width:12%;">CO</th>
+                    <th style="width:14%;">BT Level</th>
+                    <th style="width:14%;">Module</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${questions.map((q, idx) => {
+                    // Substitute variables in question text
+                    let qText = q.text || q.question_text || '';
+                    // Find placeholders like {{var_name}}
+                    qText = qText.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, varName) => {
+                      if (studentVars && studentVars[varName] !== undefined && studentVars[varName] !== null) {
+                        return `<strong class="var-val">${studentVars[varName]}</strong>`;
+                      }
+                      return `<strong style="color:red; font-weight:700;">[??]</strong>`;
+                    });
+
+                    // Image rendering
+                    const qImgUrl = q.imageUrl || q.image_url ? this.getEmbeddableImageUrl(q.imageUrl || q.image_url) : '';
+
+                    // Parameters table
+                    const params = q.parameters || [];
+
+                    // Lookups
+                    const coObj = (this.data.courseOutcomes || []).find(co => co.id === q.coId || co.code === q.coId);
+                    const coCode = coObj ? coObj.code : (q.coId || 'CO1');
+
+                    const btCode = q.btLevel || q.bt_level || 'AP';
+                    const btFull = btLabelsMap[btCode] || btCode;
+
+                    const modObj = (this.data.modules || []).find(m => m.id === q.moduleId || m.code === q.moduleId);
+                    const modCode = modObj ? (modObj.code || modObj.module_code) : (q.moduleId || 'M1');
+
+                    return `
+                      <tr>
+                        <td style="text-align:center; font-weight:700;">Q${idx + 1}</td>
+                        <td>
+                          <div class="question-text">${qText}</div>
+                          ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image"></div>` : ''}
+                          ${params.length > 0 ? `
+                            <div class="question-params-subtable-container" style="margin-top:8px;">
+                              <table class="question-params-subtable">
+                                <thead>
+                                  <tr>
+                                    <th>Variable Name</th>
+                                    <th>Value</th>
+                                    <th>Unit</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  ${params.map(p => {
+                                    const pKey = p.key || p.name || '';
+                                    const val = (studentVars && studentVars[pKey] !== undefined) ? studentVars[pKey] : (p.defaultValue || p.default_value || '[??]');
+                                    return `
+                                      <tr>
+                                        <td>${p.label || pKey}</td>
+                                        <td><strong>${val}</strong></td>
+                                        <td>${p.unit || ''}</td>
+                                      </tr>
+                                    `;
+                                  }).join('')}
+                                </tbody>
+                              </table>
+                            </div>
+                          ` : ''}
+                        </td>
+                        <td style="text-align:center;">${coCode}</td>
+                        <td style="text-align:center;">${btFull}</td>
+                        <td style="text-align:center;">${modCode}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Remove old modal if exists
+    const oldModal = document.getElementById('assignment-sheet-modal-overlay');
+    if (oldModal) oldModal.remove();
+
+    // Append new modal overlay to body
+    const div = document.createElement('div');
+    div.innerHTML = html.trim();
+    document.body.appendChild(div.firstChild);
+  }
+
+  closeAssignmentSheetModal() {
+    const modal = document.getElementById('assignment-sheet-modal-overlay');
+    if (modal) modal.remove();
   }
 }
 

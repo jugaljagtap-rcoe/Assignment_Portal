@@ -449,7 +449,12 @@ const facultyView = {
                                   <div>Rubric: <strong class="mono-val" style="color:var(--accent-blue);">${rubricName}</strong></div>
                                 </div>
                               </div>
-                              <button class="btn btn-secondary btn-sm" style="width:100%; margin-top:4px;" onclick="event.stopPropagation(); window.location.hash='#faculty-subject-${subId}-grade'">Grade Mode →</button>
+                              <div style="display:flex; gap:6px; margin-top:4px;">
+                                ${status === 'published' ? `
+                                  <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="event.stopPropagation(); app.renderAssignmentSheet('${a.id}', null)">👁 View Sheet</button>
+                                ` : ''}
+                                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="event.stopPropagation(); window.location.hash='#faculty-subject-${subId}-grade'">Grade Mode →</button>
+                              </div>
                             </div>
                           `;
                         }).join('')}
@@ -979,9 +984,11 @@ const facultyView = {
                       <button class="btn btn-primary btn-sm" onclick="facultyView.openPublishModal('${a.id}')">📢 Publish</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.deleteDraftAssignment('${a.id}')" title="Delete Draft">🗑️</button>
                     ` : status === 'published' ? `
+                      <button class="btn btn-secondary btn-sm" onclick="app.renderAssignmentSheet('${a.id}', null)">👁 View Sheet</button>
                       <button class="btn btn-secondary btn-sm" onclick="facultyView.lockAssignment('${a.id}')">🔒 Lock</button>
                       <button class="btn btn-destructive btn-sm" onclick="facultyView.retractAssignment('${a.id}')">↩ Retract</button>
                     ` : status === 'locked' ? `
+                      <button class="btn btn-secondary btn-sm" onclick="app.renderAssignmentSheet('${a.id}', null)">👁 View Sheet</button>
                       <span class="tag tag-purple">🔒 Locked</span>
                     ` : status === 'retracted' ? `
                       <span class="tag tag-warning">↩ Retracted</span>

@@ -1102,6 +1102,7 @@ sub {
   .btn-destructive,
   .toast-container,
   .modal-overlay,
+  .assignment-sheet-modal-actions,
   select,
   .page-header-container,
   .card,
@@ -1113,6 +1114,61 @@ sub {
   header,
   nav {
     display: none !important;
+  }
+
+  /* Fullscreen overlay wrapper styling when printing */
+  .assignment-sheet-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .assignment-sheet-modal-container {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .assignment-sheet-printable {
+    font-family: 'Times New Roman', Times, Georgia, serif !important;
+    color: #000 !important;
+    background: #FFF !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .sheet-table, .sheet-questions-table, .sheet-rubric-table, .sheet-meta-table, .sheet-no-date-table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  .sheet-table th, .sheet-table td {
+    border: 1px solid #000 !important;
+    color: #000 !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .sheet-vision-mission {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .sheet-questions-table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   body, html {
@@ -2049,5 +2105,265 @@ th.sortable.desc::after {
   background: var(--accent-blue-subtle);
   color: var(--accent-blue);
   font-weight: 700;
+}
+
+/* ==========================================================================
+   ASSIGNMENT SHEET MODAL & PRINTABLE STYLES (Screen View)
+   ========================================================================== */
+.assignment-sheet-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 30px 16px;
+  overflow-y: auto;
+}
+
+.assignment-sheet-modal-container {
+  background: transparent;
+  width: 100%;
+  max-width: 920px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.assignment-sheet-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: #FFF;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-level-2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.assignment-sheet-printable {
+  background: #FFFFFF;
+  color: #1A1A1A;
+  padding: 32px 40px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-level-3);
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.5;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Sheet College Header */
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.sheet-college-logo {
+  max-height: 75px;
+  object-fit: contain;
+}
+
+.sheet-header-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sheet-header-text .res-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.sheet-header-text .college-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #000;
+  margin: 2px 0;
+  letter-spacing: 0.5px;
+}
+
+.sheet-header-text .college-subtext {
+  font-size: 10px;
+  color: #333;
+}
+
+.sheet-header-text .nba-badge-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #000;
+  margin-top: 2px;
+}
+
+.sheet-header-text .dept-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 4px;
+  color: #000;
+  letter-spacing: 0.5px;
+}
+
+/* Sheet Common Tables */
+.sheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.sheet-table th, .sheet-table td {
+  border: 1px solid #000;
+  padding: 6px 10px;
+  vertical-align: top;
+}
+
+.sheet-table th {
+  background-color: #F0F0F0;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sheet-no-date-table td {
+  border: none !important;
+  padding: 4px 0 !important;
+  font-size: 13px;
+}
+
+/* Bloom's Section */
+.sheet-blooms-section {
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #CCC;
+  border-bottom: 1px solid #CCC;
+}
+
+.sheet-section-title {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.sheet-blooms-legend {
+  font-size: 11px;
+  color: #444;
+  margin-top: 2px;
+}
+
+.sheet-blooms-img {
+  max-height: 120px;
+  margin-top: 6px;
+  object-fit: contain;
+}
+
+/* Vision & Mission */
+.sheet-vision-mission {
+  font-size: 11px;
+  font-style: italic;
+  background: #FAF9F6;
+  border-left: 3px solid #000;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+}
+
+.sheet-vision-mission strong {
+  font-style: normal;
+  font-size: 11px;
+}
+
+.sheet-table-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.sheet-rubric-table tbody tr:nth-child(even) {
+  background-color: #FAFAFA;
+}
+
+.sheet-student-row {
+  border: 2px solid #000;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  background: #FFF8E7;
+}
+
+.sheet-notice-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.sheet-notice-box {
+  border: 1px solid #000;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: 4px;
+}
+
+.notice-box-unique {
+  background-color: #FFF3CD;
+  border-color: #FFEBAA;
+  color: #856404;
+}
+
+.notice-box-submission {
+  background-color: #D1ECF1;
+  border-color: #BEE5EB;
+  color: #0C5460;
+}
+
+/* Question cell subtable for parameters */
+.question-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #000;
+}
+
+.question-image {
+  max-width: 100%;
+  max-height: 250px;
+  object-fit: contain;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+}
+
+.question-params-subtable-container {
+  overflow-x: auto;
+}
+
+.question-params-subtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  background: var(--bg-subtle, #F5F5F3);
+  border: 1px solid #CCC;
+}
+
+.question-params-subtable th, .question-params-subtable td {
+  border: 1px solid #DDD;
+  padding: 4px 8px;
+}
+
+.question-params-subtable th {
+  background: #E8E8E8;
+  font-weight: 700;
+  text-align: left;
 }
 

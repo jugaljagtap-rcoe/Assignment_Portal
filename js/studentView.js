@@ -325,7 +325,10 @@ const studentView = {
             <h1 class="page-title">Solve Assignment</h1>
             <p class="page-subtitle">${asg.code} — ${asg.title}</p>
           </div>
-          <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" onclick="app.renderAssignmentSheet('${asg.id}', '${student ? student.id : ''}')">📄 View Assignment Sheet</button>
+            <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
+          </div>
         </div>
 
         <div class="print-hide" style="margin-bottom:16px;">
