@@ -1145,6 +1145,22 @@ sub {
     width: 100% !important;
   }
 
+  /* Print Layout & Page Breakdown Rules */
+  .assignment-sheet-page1 {
+    page-break-inside: avoid-if-possible !important;
+    break-inside: avoid-page !important;
+  }
+
+  .assignment-sheet-page1 > * {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .assignment-sheet-page2 {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
   .sheet-table, .sheet-questions-table, .sheet-rubric-table, .sheet-meta-table, .sheet-no-date-table {
     border-collapse: collapse !important;
     width: 100% !important;
@@ -1155,34 +1171,51 @@ sub {
     color: #000 !important;
   }
 
+  /* Compact margins for print */
+  .sheet-header {
+    margin-bottom: 6px !important;
+    padding-bottom: 6px !important;
+  }
+
+  .sheet-table {
+    margin-bottom: 6px !important;
+  }
+
+  .sheet-meta-table {
+    margin-bottom: 8px !important;
+  }
+
+  .sheet-rubric-table {
+    margin-bottom: 0 !important;
+  }
+
+  .sheet-section {
+    margin-bottom: 8px !important;
+  }
+
   /* Side-by-side grid in print mode */
   .sheet-side-by-side-grid {
     display: grid !important;
     grid-template-columns: 55% 45% !important;
-    gap: 12px !important;
-    margin-bottom: 12px !important;
+    gap: 10px !important;
+    margin-bottom: 8px !important;
+    padding: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
-  /* Page break rules */
-  .assignment-sheet-page-break {
-    page-break-before: always !important;
-    break-before: page !important;
+  .sheet-vision-mission, .sheet-blooms-section {
+    padding: 6px 8px !important;
+    margin-bottom: 0 !important;
   }
 
-  .sheet-rubric-container, .sheet-rubric-table {
+  .sheet-rubric-container, .sheet-rubric-table, .sheet-rubric-footnotes {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
   img {
     max-width: 100% !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .sheet-vision-mission {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

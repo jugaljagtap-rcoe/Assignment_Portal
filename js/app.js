@@ -1414,154 +1414,159 @@ class AppEngine {
 
           <div class="assignment-sheet-printable">
 
-            <!-- A. COLLEGE HEADER -->
-            <div class="sheet-header">
-              ${collegeLogoUrl ? `<img src="${collegeLogoUrl}" alt="College Logo" class="sheet-college-logo">` : ''}
-              <div class="sheet-header-text">
-                <div class="res-title">RIZVI EDUCATION SOCIETY's</div>
-                <div class="college-title">RIZVI COLLEGE OF ENGINEERING</div>
-                <div class="college-subtext">Approved by AICTE | Recognized by DTE | Affiliated to University of Mumbai</div>
-                <div class="nba-badge-text">Accredited by NBA</div>
-                <div class="dept-title">DEPARTMENT OF ${(department.name || 'FIRST YEAR ENGINEERING').toUpperCase()}</div>
-              </div>
-            </div>
-
-            <!-- B. ASSIGNMENT NO & DATE TABLE -->
-            <table class="sheet-table sheet-no-date-table">
-              <tr>
-                <td style="width:50%; font-weight:700;">
-                  Assignment No: 
-                  ${assignment.display_code ? `<span class="mono-val">${assignment.display_code}</span>` : `<span class="mono-val" style="color:var(--warning); font-weight:700;">[DRAFT — Unpublished]</span>`}
-                </td>
-                <td style="width:50%; text-align:right; font-weight:700;">Date: <span class="mono-val">${formattedDate}</span></td>
-              </tr>
-            </table>
-
-            <!-- C & D. SIDE-BY-SIDE LAYOUT: VISION & MISSION (55%) | BLOOM'S TAXONOMY (45%) -->
-            <div class="sheet-side-by-side-grid">
-              <!-- Left Column: Vision & Mission -->
-              <div class="sheet-section sheet-vision-mission" style="margin-bottom:0;">
-                <div class="vision-block">
-                  <strong>Vision:</strong> <em>${department.vision || ''}</em>
-                </div>
-                <div class="mission-block" style="margin-top:6px;">
-                  <strong>Mission:</strong>
-                  <ol style="margin-left:20px; margin-top:2px;">
-                    ${(department.mission || []).map(m => `<li><em>${m}</em></li>`).join('')}
-                  </ol>
+            <!-- PAGE 1 CONTENT WRAPPER -->
+            <div class="assignment-sheet-page1">
+              <!-- A. COLLEGE HEADER -->
+              <div class="sheet-header">
+                ${collegeLogoUrl ? `<img src="${collegeLogoUrl}" alt="College Logo" class="sheet-college-logo">` : ''}
+                <div class="sheet-header-text">
+                  <div class="res-title">RIZVI EDUCATION SOCIETY's</div>
+                  <div class="college-title">RIZVI COLLEGE OF ENGINEERING</div>
+                  <div class="college-subtext">Approved by AICTE | Recognized by DTE | Affiliated to University of Mumbai</div>
+                  <div class="nba-badge-text">Accredited by NBA</div>
+                  <div class="dept-title">DEPARTMENT OF ${(department.name || 'FIRST YEAR ENGINEERING').toUpperCase()}</div>
                 </div>
               </div>
 
-              <!-- Right Column: Bloom's Taxonomy -->
-              <div class="sheet-section sheet-blooms-section" style="margin-bottom:0;">
-                <div class="sheet-section-title">Bloom's Taxonomy Levels:</div>
-                <div class="sheet-blooms-legend">R - Remember, U - Understand, AP - Apply, AN - Analyze, E - Evaluate, C – Create</div>
-                ${bloomsPyramidUrl ? `<img src="${bloomsPyramidUrl}" alt="Bloom's Taxonomy Pyramid" class="sheet-blooms-img">` : ''}
-              </div>
-            </div>
-
-            <!-- E. ASSIGNMENT META TABLE -->
-            <table class="sheet-table sheet-meta-table">
-              <tr>
-                <td><strong>Class:</strong> ${className}</td>
-                <td><strong>Semester:</strong> ${semesterName}</td>
-              </tr>
-              <tr>
-                <td><strong>Lab Name:</strong> ${labName}</td>
-                <td><strong>Lab Code:</strong> ${labCode}</td>
-              </tr>
-              <tr>
-                <td colspan="2"><strong>Type of assessment:</strong> Direct</td>
-              </tr>
-              <tr>
-                <td colspan="2"><strong>Modules covered:</strong> ${modulesCoveredStr}</td>
-              </tr>
-              <tr>
-                <td colspan="2"><strong>Lab Outcome/s covered:</strong> ${cosCoveredStr}</td>
-              </tr>
-            </table>
-
-            <!-- F. RUBRIC TABLE -->
-            <div class="sheet-section sheet-rubric-container">
-              <div class="sheet-total-marks-banner" style="background:var(--accent-blue-subtle, #EBF4FF); border:1px solid var(--accent-blue, #1889E6); border-radius:var(--radius-sm, 4px); padding:8px 12px; margin-bottom:8px; font-size:13px; color:#000;">
-                ${totalMarksText}
-              </div>
-
-              <div class="sheet-table-title">Rubrics for Numerical Problems</div>
-              <table class="sheet-table sheet-rubric-table">
-                <thead>
-                  <tr>
-                    <th style="width:20%;">Level / Marks</th>
-                    <th style="width:32%;">Criteria 01 (Answers)</th>
-                    <th style="width:28%;">Criteria 02 (Units)</th>
-                    <th style="width:20%;">Marks Awarded</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>Unsatisfactory (00)</strong></td>
-                    <td>Beyond ±${tolDeveloping}%</td>
-                    <td>Wrong or missing unit</td>
-                    <td>0 marks</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Developing (01)</strong></td>
-                    <td>Within ±${tolDeveloping}%</td>
-                    <td>Unit partially correct or wrong notation</td>
-                    <td>50% of parameter marks</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Proficient (02)</strong></td>
-                    <td>Within ±${tolProficient}%</td>
-                    <td>Correct unit, minor notation difference</td>
-                    <td>75% of parameter marks</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Exemplary (03)</strong></td>
-                    <td>Within ±${tolExemplary}%</td>
-                    <td>Exact correct unit as specified</td>
-                    <td>100% of parameter marks</td>
-                  </tr>
-                </tbody>
+              <!-- B. ASSIGNMENT NO & DATE TABLE -->
+              <table class="sheet-table sheet-no-date-table">
+                <tr>
+                  <td style="width:50%; font-weight:700;">
+                    Assignment No: 
+                    ${assignment.display_code ? `<span class="mono-val">${assignment.display_code}</span>` : `<span class="mono-val" style="color:var(--warning); font-weight:700;">[DRAFT — Unpublished]</span>`}
+                  </td>
+                  <td style="width:50%; text-align:right; font-weight:700;">Date: <span class="mono-val">${formattedDate}</span></td>
+                </tr>
               </table>
 
-              <div class="sheet-rubric-footnotes" style="font-size:11px; font-style:italic; color:var(--text-secondary, #555); margin-top:4px; line-height:1.45;">
-                <div>* Marks are calculated per parameter based on numerical accuracy and unit correctness.</div>
-                ${attemptDeductionsEnabled ? `
-                  <div>* Attempt penalty: 2nd attempt −10%, 3rd attempt −20% of parameter marks.</div>
-                ` : ''}
-                ${latePenaltyEnabled ? `
-                  <div>* Late submission penalty: ≤24hrs −10%, >24hrs −20%, >48hrs −30% of total assignment marks.</div>
-                ` : ''}
-                ${(!attemptDeductionsEnabled || !latePenaltyEnabled) ? `
-                  <div>* Attempt and late submission deductions are at faculty discretion and may be applied at semester end.</div>
-                ` : ''}
-              </div>
-            </div>
-
-            <!-- G. STUDENT IDENTITY ROW (Page 2 Start) -->
-            <div class="sheet-student-row assignment-sheet-page-break">
-              ${student ? `
-                <strong>UIN & Name:</strong> <span class="mono-val">${student.uin}</span> — <strong>${student.name}</strong>
-              ` : `
-                <strong>UIN & Name:</strong> <span class="mono-val">____________________</span> — <strong>________________________________________</strong>
-              `}
-            </div>
-
-            <!-- H. NOTICE BOXES -->
-            <div class="sheet-notice-container">
-              ${usePerStudentVariables ? `
-                <div class="sheet-notice-box notice-box-unique">
-                  ⚠️ <strong>Notice:</strong> Your data is unique. The values given in your questions are assigned only to you. Do not share or compare with others.
+              <!-- C & D. SIDE-BY-SIDE LAYOUT: VISION & MISSION (55%) | BLOOM'S TAXONOMY (45%) -->
+              <div class="sheet-side-by-side-grid">
+                <!-- Left Column: Vision & Mission -->
+                <div class="sheet-section sheet-vision-mission" style="margin-bottom:0;">
+                  <div class="vision-block">
+                    <strong>Vision:</strong> <em>${department.vision || ''}</em>
+                  </div>
+                  <div class="mission-block" style="margin-top:6px;">
+                    <strong>Mission:</strong>
+                    <ol style="margin-left:20px; margin-top:2px;">
+                      ${(department.mission || []).map(m => `<li><em>${m}</em></li>`).join('')}
+                    </ol>
+                  </div>
                 </div>
-              ` : ''}
-              <div class="sheet-notice-box notice-box-submission">
-                📌 <strong>Important:</strong> Portal submission is not enough. You must also submit your assignment sheets with complete solutions, diagrams, and working to finish your submission.
+
+                <!-- Right Column: Bloom's Taxonomy -->
+                <div class="sheet-section sheet-blooms-section" style="margin-bottom:0;">
+                  <div class="sheet-section-title">Bloom's Taxonomy Levels:</div>
+                  <div class="sheet-blooms-legend">R - Remember, U - Understand, AP - Apply, AN - Analyze, E - Evaluate, C – Create</div>
+                  ${bloomsPyramidUrl ? `<img src="${bloomsPyramidUrl}" alt="Bloom's Taxonomy Pyramid" class="sheet-blooms-img">` : ''}
+                </div>
+              </div>
+
+              <!-- E. ASSIGNMENT META TABLE -->
+              <table class="sheet-table sheet-meta-table">
+                <tr>
+                  <td><strong>Class:</strong> ${className}</td>
+                  <td><strong>Semester:</strong> ${semesterName}</td>
+                </tr>
+                <tr>
+                  <td><strong>Lab Name:</strong> ${labName}</td>
+                  <td><strong>Lab Code:</strong> ${labCode}</td>
+                </tr>
+                <tr>
+                  <td colspan="2"><strong>Type of assessment:</strong> Direct</td>
+                </tr>
+                <tr>
+                  <td colspan="2"><strong>Modules covered:</strong> ${modulesCoveredStr}</td>
+                </tr>
+                <tr>
+                  <td colspan="2"><strong>Lab Outcome/s covered:</strong> ${cosCoveredStr}</td>
+                </tr>
+              </table>
+
+              <!-- F. RUBRIC TABLE -->
+              <div class="sheet-section sheet-rubric-container">
+                <div class="sheet-total-marks-banner" style="background:var(--accent-blue-subtle, #EBF4FF); border:1px solid var(--accent-blue, #1889E6); border-radius:var(--radius-sm, 4px); padding:8px 12px; margin-bottom:8px; font-size:13px; color:#000;">
+                  ${totalMarksText}
+                </div>
+
+                <div class="sheet-table-title">Rubrics for Numerical Problems</div>
+                <table class="sheet-table sheet-rubric-table">
+                  <thead>
+                    <tr>
+                      <th style="width:20%;">Level / Marks</th>
+                      <th style="width:32%;">Criteria 01 (Answers)</th>
+                      <th style="width:28%;">Criteria 02 (Units)</th>
+                      <th style="width:20%;">Marks Awarded</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Unsatisfactory (00)</strong></td>
+                      <td>Beyond ±${tolDeveloping}%</td>
+                      <td>Wrong or missing unit</td>
+                      <td>0 marks</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Developing (01)</strong></td>
+                      <td>Within ±${tolDeveloping}%</td>
+                      <td>Unit partially correct or wrong notation</td>
+                      <td>50% of parameter marks</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Proficient (02)</strong></td>
+                      <td>Within ±${tolProficient}%</td>
+                      <td>Correct unit, minor notation difference</td>
+                      <td>75% of parameter marks</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Exemplary (03)</strong></td>
+                      <td>Within ±${tolExemplary}%</td>
+                      <td>Exact correct unit as specified</td>
+                      <td>100% of parameter marks</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="sheet-rubric-footnotes" style="font-size:11px; font-style:italic; color:var(--text-secondary, #555); margin-top:4px; line-height:1.45;">
+                  <div>* Marks are calculated per parameter based on numerical accuracy and unit correctness.</div>
+                  ${attemptDeductionsEnabled ? `
+                    <div>* Attempt penalty: 2nd attempt −10%, 3rd attempt −20% of parameter marks.</div>
+                  ` : ''}
+                  ${latePenaltyEnabled ? `
+                    <div>* Late submission penalty: ≤24hrs −10%, >24hrs −20%, >48hrs −30% of total assignment marks.</div>
+                  ` : ''}
+                  ${(!attemptDeductionsEnabled || !latePenaltyEnabled) ? `
+                    <div>* Attempt and late submission deductions are at faculty discretion and may be applied at semester end.</div>
+                  ` : ''}
+                </div>
               </div>
             </div>
 
-            <!-- I. QUESTIONS TABLE -->
-            <div class="sheet-section" style="margin-top:12px;">
+            <!-- PAGE 2 CONTENT WRAPPER -->
+            <div class="assignment-sheet-page2 assignment-sheet-page-break">
+              <!-- G. STUDENT IDENTITY ROW -->
+              <div class="sheet-student-row">
+                ${student ? `
+                  <strong>UIN & Name:</strong> <span class="mono-val">${student.uin}</span> — <strong>${student.name}</strong>
+                ` : `
+                  <strong>UIN & Name:</strong> <span class="mono-val">____________________</span> — <strong>________________________________________</strong>
+                `}
+              </div>
+
+              <!-- H. NOTICE BOXES -->
+              <div class="sheet-notice-container">
+                ${usePerStudentVariables ? `
+                  <div class="sheet-notice-box notice-box-unique">
+                    ⚠️ <strong>Notice:</strong> Your data is unique. The values given in your questions are assigned only to you. Do not share or compare with others.
+                  </div>
+                ` : ''}
+                <div class="sheet-notice-box notice-box-submission">
+                  📌 <strong>Important:</strong> Portal submission is not enough. You must also submit your assignment sheets with complete solutions, diagrams, and working to finish your submission.
+                </div>
+              </div>
+
+              <!-- I. QUESTIONS TABLE -->
+              <div class="sheet-section" style="margin-top:12px;">
               <table class="sheet-table sheet-questions-table">
                 <thead>
                   <tr>
@@ -1646,11 +1651,12 @@ class AppEngine {
                 </tbody>
               </table>
             </div>
-
           </div>
+
         </div>
       </div>
-    `;
+    </div>
+  `;
 
     // Remove old modal if exists
     const oldModal = document.getElementById('assignment-sheet-modal-overlay');
