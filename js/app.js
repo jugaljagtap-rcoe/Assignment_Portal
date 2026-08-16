@@ -978,19 +978,24 @@ class AppEngine {
       return `\x00VAR${varTokens.length - 1}\x00`;
     });
 
-    // Step 2 — KaTeX segments ($...$)
-    let out = protectedText.replace(/\$([^\$]+)\$/g, (match, inner) => {
-      if (typeof window !== 'undefined' && window.katex && window.katex.renderToString) {
-        try {
-          return window.katex.renderToString(inner, { throwOnError: false, displayMode: false });
-        } catch (e) {
-          return match;
-        }
-      }
-      return match;
-    });
+    // Step 2 — Extract and protect manual KaTeX blocks ($$...$$ and $...$)
+    const katexTokens = [];
+    let katexProtected = protectedText
+      // Display math $$...$$
+      .replace(/\$\$([^\$]+)\$\$/g, (match, inner) => {
+        katexTokens.push({ display: true, code: inner });
+        return `\x00KATEX${katexTokens.length - 1}\x00`;
+      })
+      // Inline math $...$
+      .replace(/\$([^\$]+)\$/g, (match, inner) => {
+        katexTokens.push({ display: false, code: inner });
+        return `\x00KATEX${katexTokens.length - 1}\x00`;
+      });
 
-    // Step 3 — Greek word replacements
+    // Step 3 — Auto-detection math conversions on non-KaTeX text
+    let out = katexProtected;
+
+    // A. Greek letter names -> symbols
     const greeks = [
       [/\bomega\b/g, 'ω'],
       [/\btheta\b/g, 'θ'],
@@ -998,10 +1003,10 @@ class AppEngine {
       [/\bbeta\b/g, 'β'],
       [/\bdelta\b/g, 'δ'],
       [/\bDelta\b/g, 'Δ'],
+      [/\bphi\b/g, 'φ'],
       [/\bmu\b/g, 'μ'],
       [/\bsigma\b/g, 'σ'],
       [/\bpi\b/g, 'π'],
-      [/\bphi\b/g, 'φ'],
       [/\blambda\b/g, 'λ'],
       [/\brho\b/g, 'ρ']
     ];
@@ -1009,24 +1014,44 @@ class AppEngine {
       out = out.replace(reg, sym);
     });
 
-    // Step 4 — Superscripts
-    out = out.replace(/([A-Za-z0-9]+)\^\{([^}]+)\}/g, '$1<sup>$2</sup>');
-    out = out.replace(/([A-Za-z0-9]+)\^([A-Za-z0-9]+)/g, '$1<sup>$2</sup>');
+    // B. Fractions: word/word or unit/unit or word/unit (e.g. N/m, N/m^2, rad/s, km/h)
+    out = out.replace(/\b([A-Za-z0-9_]+)\/([A-Za-z0-9_\^]+)\b/g, (match, num, den) => {
+      if (typeof window !== 'undefined' && window.katex && window.katex.renderToString) {
+        try {
+          return window.katex.renderToString(`\\frac{${num}}{${den}}`, { throwOnError: false, displayMode: false });
+        } catch (_) {}
+      }
+      return `<span class="math-frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+    });
 
-    // Step 5 — Subscripts
-    out = out.replace(/([A-Za-z])\{([^}]+)\}/g, '$1<sub>$2</sub>');
-    out = out.replace(/([A-Za-z])_([0-9]+)/g, '$1<sub>$2</sub>');
+    // C. Superscripts: word^number or word^{expr}
+    out = out.replace(/([A-Za-z0-9_]+)\^\{([^}]+)\}/g, '$1<sup>$2</sup>');
+    out = out.replace(/([A-Za-z0-9_]+)\^([0-9a-zA-Z]+)/g, '$1<sup>$2</sup>');
 
-    // Step 6 — Fractions
-    out = out.replace(/([A-Za-z0-9\s]+)\/\(([^)]+)\)/g, '<span class="math-frac"><span class="num">$1</span><span class="den">$2</span></span>');
+    // D. Subscripts: word_number or word_word or word_{expr}
+    out = out.replace(/([A-Za-z]+)\{([^}]+)\}/g, '$1<sub>$2</sub>');
+    out = out.replace(/([A-Za-z]+)_([0-9a-zA-Z]+)/g, '$1<sub>$2</sub>');
 
-    // Step 7 — sqrt
+    // E. sqrt
     out = out.replace(/sqrt\(([^)]+)\)/g, '√<span style="text-decoration:overline;">$1</span>');
 
-    // Step 8 — Multiply
+    // F. Multiply symbol
     out = out.replace(/ \* /g, ' × ');
 
-    // Step 9 — Restore variables
+    // Step 4 — Restore and render KaTeX tokens
+    katexTokens.forEach((kt, i) => {
+      let rendered = `$${kt.code}$`;
+      if (typeof window !== 'undefined' && window.katex && window.katex.renderToString) {
+        try {
+          rendered = window.katex.renderToString(kt.code, { throwOnError: false, displayMode: kt.display });
+        } catch (e) {
+          console.warn('KaTeX render error:', e);
+        }
+      }
+      out = out.replace(`\x00KATEX${i}\x00`, rendered);
+    });
+
+    // Step 5 — Restore variables
     varTokens.forEach((vt, i) => {
       const val = variablesMap[vt.key];
       const html = val !== undefined
@@ -1504,15 +1529,8 @@ class AppEngine {
                 </thead>
                 <tbody>
                   ${questions.map((q, idx) => {
-                    // Substitute variables in question text
-                    let qText = q.text || q.question_text || '';
-                    // Find placeholders like {{var_name}}
-                    qText = qText.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, varName) => {
-                      if (studentVars && studentVars[varName] !== undefined && studentVars[varName] !== null) {
-                        return `<strong class="var-val">${studentVars[varName]}</strong>`;
-                      }
-                      return `<strong style="color:red; font-weight:700;">[??]</strong>`;
-                    });
+                    const rawText = q.text || q.question_text || '';
+                    const formattedQText = this.formatQuestionText(rawText, studentVars);
 
                     // Image rendering
                     const qImgUrl = q.imageUrl || q.image_url ? this.getEmbeddableImageUrl(q.imageUrl || q.image_url) : '';
@@ -1534,7 +1552,7 @@ class AppEngine {
                       <tr>
                         <td style="text-align:center; font-weight:700;">Q${idx + 1}</td>
                         <td>
-                          <div class="question-text">${qText}</div>
+                          <div class="question-text">${formattedQText}</div>
                           ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image"></div>` : ''}
                           ${params.length > 0 ? `
                             <div class="question-params-subtable-container" style="margin-top:8px;">
