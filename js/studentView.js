@@ -370,20 +370,31 @@ const studentView = {
         </div>
 
         <div style="display:flex; flex-direction:column; gap:20px;">
-          ${(asg.questions || []).map((q, qIndex) => `
-            <div class="card" style="padding:20px;">
-              <strong style="font-size:15px; color:var(--accent-blue);">${q.sectionLabel || `Question ${qIndex+1}`}</strong>
-              <div style="font-size:14px; margin-top:8px; line-height:1.6;">${app.formatQuestionText(q.text, studentVars)}</div>
-              ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" style="max-width:100%; height:auto; margin-top:12px; border-radius:8px;">` : ''}
+          ${(asg.questions || []).map((q, qIndex) => {
+            const qPrefix = `Q${qIndex + 1}_`;
+            const qStudentVars = {};
+            Object.keys(studentVars).forEach(k => {
+              if (k.startsWith(qPrefix)) {
+                qStudentVars[k.slice(qPrefix.length)] = studentVars[k];
+              } else if (!k.match(/^Q\d+_/)) {
+                qStudentVars[k] = studentVars[k];
+              }
+            });
+            return `
+              <div class="card" style="padding:20px;">
+                <strong style="font-size:15px; color:var(--accent-blue);">${q.sectionLabel || `Question ${qIndex+1}`}</strong>
+                <div style="font-size:14px; margin-top:8px; line-height:1.6;">${app.formatQuestionText(q.text, qStudentVars)}</div>
+                ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" style="max-width:100%; height:auto; margin-top:12px; border-radius:8px;">` : ''}
 
-              <div style="margin-top:16px; border-top:1px solid var(--border-default); padding-top:16px;">
-                <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Evaluation Parameters</label>
-                <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
-                  ${(q.parameters || []).map(p => this.renderParameterInputField(asg.id, student.id, q, p)).join('')}
+                <div style="margin-top:16px; border-top:1px solid var(--border-default); padding-top:16px;">
+                  <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Evaluation Parameters</label>
+                  <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+                    ${(q.parameters || []).map(p => this.renderParameterInputField(asg.id, student.id, q, p)).join('')}
+                  </div>
                 </div>
               </div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
       `;
     } catch(e) {

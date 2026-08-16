@@ -1253,22 +1253,38 @@ const facultyView = {
     app.showToast('Schedule saved successfully.', 'success');
   },
 
-  /* Mode A: Per-Student Variable CSV Pipeline Helpers */
+  getAssignmentLabel(asg) {
+    if (!asg) return '';
+    const status = (asg.lifecycle_status || asg.status || asg.state || 'draft').toLowerCase();
+    const isPublishedOrLocked = status === 'published' || status === 'locked';
+    if (isPublishedOrLocked && (asg.display_code || asg.displayCode)) {
+      return asg.display_code || asg.displayCode;
+    }
+    return asg.working_title || asg.workingTitle || asg.title || asg.code || 'Untitled Assignment';
+  },
+
   getAssignmentVariables(asg) {
     const questions = this.getAsgQuestions(asg);
+    const varsList = [];
     const varsSet = new Set();
-    questions.forEach(q => {
+    questions.forEach((q, qi) => {
       const text = q.text || q.questionText || '';
       const regex = /\{\{(.*?)\}\}/g;
       let match;
       while ((match = regex.exec(text)) !== null) {
         if (match[1]) {
           const v = match[1].trim();
-          if (v) varsSet.add(v);
+          if (v) {
+            const scopedKey = `Q${qi + 1}_${v}`;
+            if (!varsSet.has(scopedKey)) {
+              varsSet.add(scopedKey);
+              varsList.push(scopedKey);
+            }
+          }
         }
       }
     });
-    return Array.from(varsSet);
+    return varsList;
   },
 
   renderCSVModeA(modeACardContainer, sub, selectedAsgId = null) {
@@ -1301,6 +1317,50 @@ const facultyView = {
                     variableAssignments[0];
     this.activeCSVAssignmentId = activeAsg.id;
 
+    const subIdArg = subObj ? `'${subObj.id}'` : (typeof sub === 'string' ? `'${sub}'` : 'null');
+
+    modeACardContainer.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div>
+          <h3 class="card-title">Mode A: Per-Student Variable CSV Pipeline</h3>
+          <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
+            Download template, upload custom variable values per student UIN, and track assignment coverage.
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 1 — Assignment Selector -->
+      <div style="margin-bottom:20px; max-width:520px;">
+        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 1 — Select Assignment with Variables</label>
+        <select id="mode-a-asg-select" class="form-control" onchange="facultyView.activeCSVAssignmentId = this.value; facultyView.renderCSVModeAContent(document.getElementById('mode-a-step-container'), ${subIdArg}, this.value);">
+          ${variableAssignments.map(a => `
+            <option value="${a.id}" ${a.id === activeAsg.id ? 'selected' : ''}>
+              ${this.getAssignmentLabel(a)} (${this.getAssignmentVariables(a).length} variables)
+            </option>
+          `).join('')}
+        </select>
+      </div>
+
+      <!-- Container for Steps 2, 3, and 4 -->
+      <div id="mode-a-step-container"></div>
+    `;
+
+    const stepContainer = document.getElementById('mode-a-step-container');
+    if (stepContainer) {
+      this.renderCSVModeAContent(stepContainer, sub, activeAsg.id);
+    }
+  },
+
+  renderCSVModeAContent(stepContainer, sub, selectedAsgId = null) {
+    const subObj = typeof sub === 'object' && sub !== null
+      ? sub
+      : (app.data.subjects || []).find(s => s.id === sub) || null;
+    const subAsgs = (app.data.assignments || []).filter(a => !subObj || a.subjectId === subObj.id || a.subject_id === subObj.id);
+
+    const activeAsg = subAsgs.find(a => a.id === selectedAsgId) || subAsgs.find(a => a.id === this.activeCSVAssignmentId) || subAsgs[0];
+    if (!activeAsg) return;
+
+    this.activeCSVAssignmentId = activeAsg.id;
     const variableNames = this.getAssignmentVariables(activeAsg);
 
     // Resolve subject & enrolled students via app.getStudentsForDept
@@ -1308,7 +1368,7 @@ const facultyView = {
     const deptId = currentSubject ? (currentSubject.departmentId || currentSubject.department_id || '') : '';
     const enrolledStudents = app.getStudentsForDept(deptId);
 
-    // Compute coverage: students fully assigned (has value for ALL variables)
+    // Compute coverage: students fully assigned (has value for ALL scoped variables)
     let fullyAssignedCount = 0;
     enrolledStudents.forEach(s => {
       const isFullyAssigned = variableNames.length > 0 && variableNames.every(vName => {
@@ -1324,28 +1384,7 @@ const facultyView = {
 
     const subIdArg = subObj ? `'${subObj.id}'` : (typeof sub === 'string' ? `'${sub}'` : 'null');
 
-    modeACardContainer.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-        <div>
-          <h3 class="card-title">Mode A: Per-Student Variable CSV Pipeline</h3>
-          <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
-            Download template, upload custom variable values per student UIN, and track assignment coverage.
-          </p>
-        </div>
-      </div>
-
-      <!-- Step 1 — Assignment Selector -->
-      <div style="margin-bottom:20px; max-width:480px;">
-        <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 1 — Select Assignment with Variables</label>
-        <select id="mode-a-asg-select" class="form-control" onchange="facultyView.activeCSVAssignmentId = this.value; facultyView.renderCSVModeA(document.getElementById('mode-a-container'), ${subIdArg}, this.value);">
-          ${variableAssignments.map(a => `
-            <option value="${a.id}" ${a.id === activeAsg.id ? 'selected' : ''}>
-              ${a.display_code || a.code || a.working_title || a.title || a.id} (${this.getAssignmentVariables(a).length} variables)
-            </option>
-          `).join('')}
-        </select>
-      </div>
-
+    stepContainer.innerHTML = `
       <!-- Step 2 & Step 3 — Template Download & CSV Upload -->
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px; padding:16px; background:var(--surface-hover); border-radius:8px; border:1px solid var(--border-color);">
         <div>
@@ -1409,7 +1448,7 @@ const facultyView = {
                         const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
                         return `
                           <td>
-                            ${hasVal ? `<span class="mono-val">${val}</span>` : `<span class="tag tag-danger">Missing</span>`}
+                            ${hasVal ? `<span class="mono-val">${val}</span>` : `<span class="tag tag-danger" style="font-weight:700;">Missing</span>`}
                           </td>
                         `;
                       }).join('')}
@@ -1434,11 +1473,14 @@ const facultyView = {
     const rows = enrolledStudents.map(s => [s.uin || s.id, ...variableNames.map(() => '')].join(','));
     const csvContent = [header, ...rows].join('\n');
 
+    const label = this.getAssignmentLabel(asg);
+    const safeFilename = `${label.replace(/[^a-zA-Z0-9_\-]/g, '_')}_variables_template.csv`;
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `variable_template_${asg.code || asg.display_code || asg.id}.csv`);
+    link.setAttribute('download', safeFilename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1538,7 +1580,7 @@ const facultyView = {
     }
 
     app.saveState();
-    writeAudit('bulk_upsert', 'student_variables', asgId, { count: recordCount, students_processed: uniqueStudentIds.size, variables_count: variableNames.length });
+    writeAudit('bulk_upsert', 'student_variables', asgId, { count: recordCount, students_processed: uniqueStudentIds.size, skipped_uins_count: missingUins.length });
 
     if (missingUins.length > 0) {
       app.showToast(`Warning: Skipped ${missingUins.length} UIN(s) not found: ${missingUins.join(', ')}`, 'warning');
@@ -1546,10 +1588,10 @@ const facultyView = {
 
     app.showToast(`Saved variables for ${uniqueStudentIds.size} students across ${variableNames.length} parameters.`, 'success');
 
-    // Re-render Mode A in place
-    const containerEl = document.getElementById('mode-a-container');
-    if (containerEl) {
-      this.renderCSVModeA(containerEl, sub, asgId);
+    // Re-render Mode A steps and coverage table in place
+    const stepContainerEl = document.getElementById('mode-a-step-container');
+    if (stepContainerEl) {
+      this.renderCSVModeAContent(stepContainerEl, sub, asgId);
     }
   },
 

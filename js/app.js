@@ -1585,7 +1585,16 @@ class AppEngine {
                 <tbody>
                   ${questions.map((q, idx) => {
                     const rawText = q.text || q.question_text || '';
-                    const formattedQText = this.formatQuestionText(rawText, studentVars);
+                    const qPrefix = `Q${idx + 1}_`;
+                    const qStudentVars = {};
+                    Object.keys(studentVars).forEach(k => {
+                      if (k.startsWith(qPrefix)) {
+                        qStudentVars[k.slice(qPrefix.length)] = studentVars[k];
+                      } else if (!k.match(/^Q\d+_/)) {
+                        qStudentVars[k] = studentVars[k];
+                      }
+                    });
+                    const formattedQText = this.formatQuestionText(rawText, qStudentVars);
 
                     // Image rendering
                     const qImgUrl = q.imageUrl || q.image_url ? this.getEmbeddableImageUrl(q.imageUrl || q.image_url) : '';
