@@ -1601,7 +1601,7 @@ class AppEngine {
                         <td style="text-align:center; font-weight:700; vertical-align:top;">Q${idx + 1}</td>
                         <td style="vertical-align:top;">
                           <div class="question-text">${formattedQText}</div>
-                          ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image"></div>` : ''}
+                          ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image" style="border:none; background:transparent; display:block; margin:8px auto;"></div>` : ''}
                           ${params.length > 0 ? `
                             <div class="question-params-subtable-container" style="margin-top:8px;">
                               <table class="question-params-subtable">
