@@ -1604,6 +1604,7 @@ class AppEngine {
                         </td>
                         <td style="vertical-align:top;">
                           <div class="question-text">${formattedQText}</div>
+                          <div style="text-align:right; font-size:11px; font-weight:700; color:#000; margin-top:6px;">[Max Marks: ${parseFloat(q.max_marks || q.maxMarks || 0)}]</div>
                           ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image" style="border:none; background:transparent; display:block; margin:8px auto;"></div>` : ''}
                           ${params.length > 0 ? `
                             <div class="question-params-subtable-container" style="margin-top:8px;">
