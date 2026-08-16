@@ -1357,10 +1357,14 @@ class AppEngine {
     };
     const tolExemplary = rubric.tolerance_exemplary !== undefined ? rubric.tolerance_exemplary : 2;
     const tolProficient = rubric.tolerance_proficient !== undefined ? rubric.tolerance_proficient : 5;
-    const tolDeveloping = rubric.tolerance_developing !== undefined ? rubric.tolerance_developing : 10;
-
-    // BT Level labels
+       // BT Level labels
     const btLabelsMap = {
+      'BT1': 'R - Remember',
+      'BT2': 'U - Understand',
+      'BT3': 'AP - Apply',
+      'BT4': 'AN - Analyze',
+      'BT5': 'E - Evaluate',
+      'BT6': 'C - Create',
       'R': 'R - Remember',
       'U': 'U - Understand',
       'AP': 'AP - Apply',
@@ -1414,7 +1418,7 @@ class AppEngine {
               </tr>
             </table>
 
-            <!-- C & D. SIDE-BY-SIDE LAYOUT: VISION & MISSION (60%) | BLOOM'S TAXONOMY (40%) -->
+            <!-- C & D. SIDE-BY-SIDE LAYOUT: VISION & MISSION (55%) | BLOOM'S TAXONOMY (45%) -->
             <div class="sheet-side-by-side-grid">
               <!-- Left Column: Vision & Mission -->
               <div class="sheet-section sheet-vision-mission" style="margin-bottom:0;">
@@ -1520,11 +1524,9 @@ class AppEngine {
               <table class="sheet-table sheet-questions-table">
                 <thead>
                   <tr>
-                    <th style="width:6%;">Q.No</th>
-                    <th style="width:54%;">Question</th>
-                    <th style="width:12%;">CO</th>
-                    <th style="width:14%;">BT Level</th>
-                    <th style="width:14%;">Module</th>
+                    <th style="width:5%;">Q.No</th>
+                    <th style="width:80%;">Question</th>
+                    <th style="width:15%;">Mapping</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1550,8 +1552,8 @@ class AppEngine {
 
                     return `
                       <tr>
-                        <td style="text-align:center; font-weight:700;">Q${idx + 1}</td>
-                        <td>
+                        <td style="text-align:center; font-weight:700; vertical-align:top;">Q${idx + 1}</td>
+                        <td style="vertical-align:top;">
                           <div class="question-text">${formattedQText}</div>
                           ${qImgUrl ? `<div style="margin-top:8px;"><img src="${qImgUrl}" alt="Question Diagram" class="question-image"></div>` : ''}
                           ${params.length > 0 ? `
@@ -1581,9 +1583,22 @@ class AppEngine {
                             </div>
                           ` : ''}
                         </td>
-                        <td style="text-align:center;">${coCode}</td>
-                        <td style="text-align:center;">${btFull}</td>
-                        <td style="text-align:center;">${modCode}</td>
+                        <td style="vertical-align:top; font-size:11px; text-align:center;">
+                          <div class="sheet-mapping-stack" style="display:flex; flex-direction:column; gap:6px; align-items:center;">
+                            <div class="sheet-mapping-item">
+                              <span style="font-size:9px; text-transform:uppercase; color:#666; display:block; font-weight:700; line-height:1;">CO</span>
+                              <span class="tag tag-co" style="font-weight:700; font-size:10px; padding:1px 6px; margin-top:2px; display:inline-block;">${coCode}</span>
+                            </div>
+                            <div class="sheet-mapping-item">
+                              <span style="font-size:9px; text-transform:uppercase; color:#666; display:block; font-weight:700; line-height:1;">BT Level</span>
+                              <strong style="color:#000; font-size:10px; display:block; margin-top:1px;">${btFull}</strong>
+                            </div>
+                            <div class="sheet-mapping-item">
+                              <span style="font-size:9px; text-transform:uppercase; color:#666; display:block; font-weight:700; line-height:1;">Module</span>
+                              <strong style="color:#000; font-size:10px; display:block; margin-top:1px;">${modCode}</strong>
+                            </div>
+                          </div>
+                        </td>
                       </tr>
                     `;
                   }).join('')}
