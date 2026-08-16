@@ -1382,6 +1382,16 @@ class AppEngine {
       'C': 'C - Create'
     };
 
+    // Total assignment marks calculation
+    const totalMaxMarks = questions.reduce((sum, q) => sum + (parseFloat(q.max_marks || q.maxMarks || 0) || 0), 0);
+    const totalMarksText = totalMaxMarks > 0 
+      ? `Total Assignment Marks: <strong>${totalMaxMarks}</strong> marks` 
+      : `Total Marks: <em>Not yet defined</em>`;
+
+    // Rubric deduction flags
+    const attemptDeductionsEnabled = !!(rubric.attempt_deductions_enabled || rubric.attemptDeductionsEnabled);
+    const latePenaltyEnabled = !!(rubric.late_penalty_enabled || rubric.latePenaltyEnabled);
+
     // Construct Sheet HTML
     const html = `
       <div id="assignment-sheet-modal-overlay" class="assignment-sheet-modal-overlay">
@@ -1473,38 +1483,60 @@ class AppEngine {
 
             <!-- F. RUBRIC TABLE -->
             <div class="sheet-section sheet-rubric-container">
+              <div class="sheet-total-marks-banner" style="background:var(--accent-blue-subtle, #EBF4FF); border:1px solid var(--accent-blue, #1889E6); border-radius:var(--radius-sm, 4px); padding:8px 12px; margin-bottom:8px; font-size:13px; color:#000;">
+                ${totalMarksText}
+              </div>
+
               <div class="sheet-table-title">Rubrics for Numerical Problems</div>
               <table class="sheet-table sheet-rubric-table">
                 <thead>
                   <tr>
-                    <th style="width:25%;">Level / Marks</th>
-                    <th style="width:40%;">Criteria 01 (Answers)</th>
-                    <th style="width:35%;">Criteria 02 (Units)</th>
+                    <th style="width:20%;">Level / Marks</th>
+                    <th style="width:32%;">Criteria 01 (Answers)</th>
+                    <th style="width:28%;">Criteria 02 (Units)</th>
+                    <th style="width:20%;">Marks Awarded</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td><strong>Unsatisfactory (00)</strong></td>
                     <td>Beyond ±${tolDeveloping}%</td>
-                    <td>Wrong/missing units</td>
+                    <td>Wrong or missing unit</td>
+                    <td>0 marks</td>
                   </tr>
                   <tr>
                     <td><strong>Developing (01)</strong></td>
                     <td>Within ±${tolDeveloping}%</td>
-                    <td>50%-90% units correct</td>
+                    <td>Unit partially correct or wrong notation</td>
+                    <td>50% of parameter marks</td>
                   </tr>
                   <tr>
                     <td><strong>Proficient (02)</strong></td>
                     <td>Within ±${tolProficient}%</td>
-                    <td>More than 90% units correct</td>
+                    <td>Correct unit, minor notation difference</td>
+                    <td>75% of parameter marks</td>
                   </tr>
                   <tr>
                     <td><strong>Exemplary (03)</strong></td>
                     <td>Within ±${tolExemplary}%</td>
-                    <td>All units correct</td>
+                    <td>Exact correct unit as specified</td>
+                    <td>100% of parameter marks</td>
                   </tr>
                 </tbody>
               </table>
+
+              <div class="sheet-rubric-footnotes" style="font-size:11px; font-style:italic; color:var(--text-secondary, #555); margin-top:4px; line-height:1.45;">
+                <div>* Marks are calculated per parameter based on numerical accuracy and unit correctness.</div>
+                ${attemptDeductionsEnabled ? `
+                  <div>* Attempt penalty: 2nd attempt −10%, 3rd attempt −20% of parameter marks.</div>
+                ` : ''}
+                ${latePenaltyEnabled ? `
+                  <div>* Late submission penalty: ≤24hrs −10%, >24hrs −20%, >48hrs −30% of total assignment marks.</div>
+                ` : ''}
+                ${(!attemptDeductionsEnabled || !latePenaltyEnabled) ? `
+                  <div>* Attempt and late submission deductions are at faculty discretion and may be applied at semester end.</div>
+                ` : ''}
+              </div>
             </div>
 
             <!-- G. STUDENT IDENTITY ROW (Page 2 Start) -->
