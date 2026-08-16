@@ -1266,6 +1266,22 @@ class AppEngine {
     const deptId = subject ? (subject.departmentId || subject.department_id) : 'dept-fe';
     const department = (this.data.departments || HARDCODED_DEPARTMENTS).find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
 
+    // Class | Semester lookup via subject & academicClasses
+    let className = '—';
+    if (subject) {
+      if (subject.className || subject.class_name) {
+        className = subject.className || subject.class_name;
+      } else {
+        const clsObj = (this.data.academicClasses || []).find(c => c.departmentId === deptId || c.id === subject.classId || c.id === subject.class_id);
+        if (clsObj) className = clsObj.name || clsObj.code || '—';
+      }
+    }
+    const semesterName = (subject && (subject.semester || subject.semester_name)) || '—';
+
+    // Lab Name & Lab Code with safe fallbacks
+    const labName = (subject && (subject.fullName || subject.full_name || subject.name)) || '—';
+    const labCode = (subject && subject.code) || '—';
+
     // 3. Determine student profile & variables
     let student = null;
     if (studentId) {
@@ -1315,7 +1331,7 @@ class AppEngine {
 
     // 6. Assignment Metadata
     // Format published date as DD/MM/YYYY
-    let formattedDate = 'N/A';
+    let formattedDate = '—';
     if (assignment.created_at || assignment.createdAt || assignment.published_at || assignment.publishedAt) {
       const rawDate = new Date(assignment.created_at || assignment.createdAt || assignment.published_at || assignment.publishedAt);
       if (!isNaN(rawDate.getTime())) {
@@ -1324,14 +1340,6 @@ class AppEngine {
         const year = rawDate.getFullYear();
         formattedDate = `${day}/${month}/${year}`;
       }
-    }
-
-    // Class | Semester lookup
-    let className = 'First Year Engineering (FE)';
-    let semesterName = 'Semester I';
-    if (subject) {
-      if (subject.className || subject.class_name) className = subject.className || subject.class_name;
-      if (subject.semester) semesterName = subject.semester;
     }
 
     // Modules covered
@@ -1449,8 +1457,8 @@ class AppEngine {
                 <td><strong>Semester:</strong> ${semesterName}</td>
               </tr>
               <tr>
-                <td><strong>Lab Name:</strong> ${subject ? subject.name : 'Engineering Lab'}</td>
-                <td><strong>Lab Code:</strong> ${subject ? subject.code : 'ESL101'}</td>
+                <td><strong>Lab Name:</strong> ${labName}</td>
+                <td><strong>Lab Code:</strong> ${labCode}</td>
               </tr>
               <tr>
                 <td colspan="2"><strong>Type of assessment:</strong> Direct</td>
