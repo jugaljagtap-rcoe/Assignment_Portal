@@ -1149,18 +1149,16 @@ sub {
 
   /* Print Layout & Page Breakdown Rules */
   .assignment-sheet-page1 {
-    page-break-inside: avoid-if-possible !important;
-    break-inside: avoid-page !important;
-  }
-
-  .assignment-sheet-page1 > * {
-    page-break-before: avoid !important;
-    break-before: avoid !important;
+    max-height: 257mm !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
   }
 
   .assignment-sheet-page2 {
-    page-break-before: always !important;
-    break-before: page !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    display: block !important;
   }
 
   .sheet-table, .sheet-questions-table, .sheet-rubric-table, .sheet-meta-table, .sheet-no-date-table {
@@ -1222,11 +1220,6 @@ sub {
     break-inside: avoid !important;
   }
 
-  .sheet-questions-table tr {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
   body, html {
     background: #FFF !important;
     font-size: 11pt !important;
@@ -1282,33 +1275,53 @@ sub {
     padding: 0 !important;
   }
 
-  img {
-    max-width: 100% !important;
-    page-break-inside: avoid;
-  }
-
   /* Page Break Boundary Rules for Assignment Sheet Printing */
-  .blooms-pyramid-img {
-    height: 140px !important;
-    max-height: 140px !important;
-    margin: 4px auto !important;
+  .blooms-pyramid-img,
+  .sheet-blooms-img {
+    max-height: 120px !important;
+    height: 120px !important;
+    margin: 2px auto !important;
   }
 
   .printable-assignment-sheet > div {
     margin-bottom: 8px !important;
   }
 
-  .student-notice-box {
-    display: block !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    margin-bottom: 0 !important;
-    padding: 6px 10px !important;
-  }
-
   .questions-section-printable {
     margin-top: 0 !important;
     padding-top: 10px !important;
+  }
+
+  .sheet-student-row {
+    margin-bottom: 4px !important;
+    padding: 6px 10px !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .sheet-notice-container {
+    margin-bottom: 4px !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .sheet-notice-box {
+    margin-bottom: 3px !important;
+    padding: 4px 8px !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  .sheet-questions-table {
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    margin-top: 6px !important;
   }
 
   .sheet-questions-table thead {
@@ -1318,47 +1331,6 @@ sub {
   .sheet-questions-table tbody tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-
-  .sheet-student-row {
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    margin-bottom: 4px !important;
-  }
-
-  .sheet-notice-container {
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    margin-bottom: 4px !important;
-  }
-
-  .sheet-notice-box {
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    margin-bottom: 4px !important;
-    padding: 4px 8px !important;
-  }
-
-  .assignment-sheet-page2 {
-    page-break-before: always !important;
-    break-before: page !important;
-  }
-
-  .assignment-sheet-page2 > * {
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-  }
-
-  .sheet-questions-table {
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-    margin-top: 4px !important;
   }
 
   table, tr, .question-block {
