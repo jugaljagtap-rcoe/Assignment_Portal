@@ -1357,6 +1357,7 @@ class AppEngine {
     };
     const tolExemplary = rubric.tolerance_exemplary !== undefined ? rubric.tolerance_exemplary : 2;
     const tolProficient = rubric.tolerance_proficient !== undefined ? rubric.tolerance_proficient : 5;
+    const tolDeveloping = rubric.tolerance_developing !== undefined ? rubric.tolerance_developing : 10;
        // BT Level labels
     const btLabelsMap = {
       'BT1': 'R - Remember',
