@@ -1301,21 +1301,27 @@ sub {
     break-before: avoid !important;
   }
 
-  .sheet-notice-container {
-    margin-bottom: 4px !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
+  .sheet-notice-box {
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
-  }
-
-  .sheet-notice-box {
     margin-bottom: 3px !important;
     padding: 4px 8px !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
+    font-size: 9.5pt !important;
+    line-height: 1.3 !important;
+  }
+
+  .sheet-notice-container {
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
     page-break-before: avoid !important;
     break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    margin-bottom: 4px !important;
   }
 
   .sheet-questions-table {
