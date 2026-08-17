@@ -677,7 +677,10 @@ const studentView = {
     const student = this.getResolvedStudent();
     const studentAssignments = this.getAssignmentsForStudent(student);
     const activeAsg = studentAssignments.length > 0 ? (studentAssignments.find(a => a.id === app.activeAssignmentId) || studentAssignments[0]) : null;
-    const mySubmissions = student && activeAsg ? app.data.submissions.filter(s => (s.studentId === student.id || s.studentId === student.uin) && s.assignmentId === activeAsg.id) : [];
+    const mySubmissions = student && activeAsg ? app.data.submissions.filter(s =>
+      (s.studentId === student.id || s.studentId === student.uin || s.student_id === student.id || s.student_id === student.uin) &&
+      (s.assignmentId === activeAsg.id || s.assignment_id === activeAsg.id)
+    ) : [];
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -688,7 +691,7 @@ const studentView = {
       </div>
 
       <div class="card" style="margin-bottom:24px;">
-        <h3 class="card-title" style="margin-bottom:12px;">Attempt History — ${activeAsg ? activeAsg.code : 'All'}</h3>
+        <h3 class="card-title" style="margin-bottom:12px;">Attempt History — ${activeAsg ? (activeAsg.display_code || activeAsg.working_title || activeAsg.title || activeAsg.id) : 'All'}</h3>
         <div class="table-container">
           <table class="custom-table">
             <thead>
