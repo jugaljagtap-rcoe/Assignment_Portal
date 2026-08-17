@@ -399,7 +399,7 @@ const studentView = {
               <div class="card" style="padding:20px;">
                 <strong style="font-size:15px; color:var(--accent-blue);">${q.sectionLabel || `Question ${qIndex+1}`}</strong>
                 <div style="font-size:14px; margin-top:8px; line-height:1.6;">${app.formatQuestionText(q.text, qStudentVars)}</div>
-                ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" style="max-width:100%; height:auto; margin-top:12px; border-radius:8px;">` : ''}
+                ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" class="question-diagram" alt="Question Diagram">` : ''}
 
                 <div style="margin-top:16px; border-top:1px solid var(--border-default); padding-top:16px;">
                   <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Evaluation Parameters</label>
