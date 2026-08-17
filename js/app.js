@@ -1041,7 +1041,7 @@ class AppEngine {
 
     // C. Superscripts: word^number or word^{expr}
     out = out.replace(/([A-Za-z0-9_]+)\^\{([^}]+)\}/g, '$1<sup>$2</sup>');
-    out = out.replace(/([A-Za-z0-9_]+)\^([0-9a-zA-Z]+)/g, '$1<sup>$2</sup>');
+    out = out.replace(/([A-Za-z0-9_]+)\^(-?[0-9a-zA-Z]+)/g, '$1<sup>$2</sup>');
 
     // D. Subscripts: word_number or word_word or word_{expr}
     out = out.replace(/([A-Za-z]+)\{([^}]+)\}/g, '$1<sub>$2</sub>');
