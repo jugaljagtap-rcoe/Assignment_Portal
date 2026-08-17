@@ -616,6 +616,26 @@ const adminView = {
 
   openBulkStudentCSVModal(deptId) {
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+
+    app.showModal(`📥 Bulk CSV Student Onboarding — ${dept.shortName}`, `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <p style="font-size:12px; color:var(--text-secondary); margin:0;">
+            Upload a CSV file with columns: <code>uin, full_name, email, branch, division, batch</code>
+          </p>
+          <button class="btn btn-secondary btn-sm" onclick="adminView.downloadBulkStudentCSVTemplate('${deptId}')">📄 Download CSV Template</button>
+        </div>
+        <input type="file" id="bulk-csv-file-input" accept=".csv" class="form-input" style="padding: 8px;">
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="adminView.processBulkStudentCSV('${deptId}')">📥 Upload & Import</button>
+        </div>
+      </div>
+    `);
+  },
+
+  downloadBulkStudentCSVTemplate(deptId) {
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
     let defaultBranch = HARDCODED_BRANCHES[0];
     if (deptId === 'dept-aids') defaultBranch = 'Artificial Intelligence & Data Science';
     else if (deptId === 'dept-civil') defaultBranch = 'Civil Engineering';
@@ -623,30 +643,82 @@ const adminView = {
     else if (deptId === 'dept-ecs') defaultBranch = 'Electronics & Computer Science';
     else if (deptId === 'dept-mech') defaultBranch = 'Mechanical Engineering';
 
-    app.showModal(`📥 Bulk CSV Student Onboarding — ${dept.shortName}`, `
-      <div style="display:flex; flex-direction:column; gap:14px;">
-        <p style="font-size:12px; color:var(--text-secondary);">
-          Paste raw CSV lines below. Format: <code>uin, full_name, email, branch, division, batch</code>
-        </p>
-        <textarea id="bulk-csv-textarea" class="form-input code-font" rows="8" placeholder="24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,A1\n24051002,Ananya Patel,24051002@eng.rizvi.edu.in,${defaultBranch},A,A1"></textarea>
-        <div style="display:flex; justify-content:flex-end; gap:10px;">
-          <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="adminView.processBulkStudentCSV('${deptId}')">📥 Process & Import CSV</button>
-        </div>
-      </div>
-    `);
+    const headerRow = 'uin,full_name,email,branch,division,batch';
+    const sampleRow = `24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,A1`;
+    const csvContent = `${headerRow}\n${sampleRow}`;
+
+    const safeDeptShort = (dept.shortName || dept.id || 'Dept').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const filename = `Student_Import_Template_${safeDeptShort}.csv`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   },
 
   async processBulkStudentCSV(deptId) {
-    const raw = document.getElementById('bulk-csv-textarea')?.value || '';
-    if (!raw.trim()) { app.showToast('Please paste valid CSV data', 'warning'); return; }
+    const fileInput = document.getElementById('bulk-csv-file-input');
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      app.showToast('Please select a CSV file to upload.', 'warning');
+      return;
+    }
 
-    const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-    let imported = 0;
+    let raw = await file.text();
+    // Strip BOM if present
+    if (raw.charCodeAt(0) === 0xFEFF) {
+      raw = raw.slice(1);
+    }
+
+    const lines = raw.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length === 0) {
+      app.showToast('CSV file is empty.', 'warning');
+      return;
+    }
+
+    // Auto-detect delimiter from header line
+    const headerLine = lines[0];
+    const commaCount = (headerLine.match(/,/g) || []).length;
+    const semicolonCount = (headerLine.match(/;/g) || []).length;
+    const delimiter = semicolonCount > commaCount ? ';' : ',';
+
+    const parseLine = (line, del) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === del && !inQuotes) {
+          result.push(current.trim().replace(/^["']|["']$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim().replace(/^["']|["']$/g, ''));
+      return result;
+    };
+
+    let newCount = 0;
+    let updatedCount = 0;
     const newStudents = [];
+
     lines.forEach((line, idx) => {
-      if (idx === 0 && line.toLowerCase().includes('uin')) return;
-      const parts = line.split(',').map(p => p.trim());
+      const parts = parseLine(line, delimiter);
+      if (idx === 0 && parts[0] && parts[0].toLowerCase().trim() === 'uin') return;
+
       if (parts.length >= 2) {
         const uin = parts[0];
         const name = parts[1];
@@ -657,11 +729,17 @@ const adminView = {
 
         const existingIdx = app.data.students.findIndex(s => s.uin === uin);
         const deterministicId = `st-${uin.toLowerCase()}`;
-        const stObj = { id: existingIdx >= 0 ? app.data.students[existingIdx].id : deterministicId, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
-        if (existingIdx >= 0) app.data.students[existingIdx] = stObj;
-        else app.data.students.push(stObj);
+        const isExisting = existingIdx >= 0;
+        const stObj = { id: isExisting ? app.data.students[existingIdx].id : deterministicId, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
+
+        if (isExisting) {
+          app.data.students[existingIdx] = stObj;
+          updatedCount++;
+        } else {
+          app.data.students.push(stObj);
+          newCount++;
+        }
         newStudents.push(stObj);
-        imported++;
       }
     });
 
@@ -675,7 +753,7 @@ const adminView = {
       }, `Student ${stObj.name}`);
     }
     app.closeModal();
-    app.showToast(`Successfully enrolled ${imported} students!`, 'success');
+    app.showToast(`Imported ${newCount} new, updated ${updatedCount} existing students`, 'success');
     app.renderCurrentView();
   },
 
