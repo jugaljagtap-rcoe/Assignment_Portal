@@ -1219,6 +1219,8 @@ const adminView = {
     else if (deptId === 'dept-ecs') preselectedBranch = 'Electronics & Computer Science';
     else if (deptId === 'dept-mech') preselectedBranch = 'Mechanical Engineering';
 
+    const batchHints = [...new Set(app.data.students.filter(s => deptId ? app.getStudentsForDept(deptId).some(d => d.id === s.id) : true).map(s => s.batch).filter(Boolean))].sort();
+
     app.showModal('Add New Student to Master Roster', `
       <form onsubmit="adminView.saveNewStudent(event)">
         <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-name" class="form-input" required></div>
@@ -1240,8 +1242,8 @@ const adminView = {
           </select>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <div class="form-group"><label class="form-label">Division</label><input type="text" id="st-div" class="form-input" value="A" required></div>
-          <div class="form-group"><label class="form-label">Batch</label><input type="text" id="st-batch" class="form-input" value="A1" required></div>
+          <div class="form-group"><label class="form-label">Division</label><input type="text" id="st-div" class="form-input" placeholder="e.g. A (optional for SE/TE/BE)"></div>
+          <div class="form-group"><label class="form-label">Batch</label><input type="text" id="st-batch" class="form-input" list="batch-hints-add" value="A1" required><datalist id="batch-hints-add">${batchHints.map(b => `<option value="${b}">`).join('')}</datalist></div>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
@@ -1290,6 +1292,8 @@ const adminView = {
     const curYear = (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase();
     const curBranch = s.branch || HARDCODED_BRANCHES[0];
 
+    const batchHints = [...new Set(app.data.students.filter(st => st.branch === s.branch).map(st => st.batch).filter(Boolean))].sort();
+
     app.showModal(`Edit Student: ${s.name}`, `
       <form onsubmit="adminView.saveEditedStudent(event, '${s.id}')">
         <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="st-edit-name" class="form-input" value="${s.name || ''}" required></div>
@@ -1311,8 +1315,8 @@ const adminView = {
           </select>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <div class="form-group"><label class="form-label">Division</label><input type="text" id="st-edit-div" class="form-input" value="${s.division || 'A'}" required></div>
-          <div class="form-group"><label class="form-label">Batch</label><input type="text" id="st-edit-batch" class="form-input" value="${s.batch || 'A1'}" required></div>
+          <div class="form-group"><label class="form-label">Division</label><input type="text" id="st-edit-div" class="form-input" value="${s.division || ''}" placeholder="e.g. A (optional for SE/TE/BE)"></div>
+          <div class="form-group"><label class="form-label">Batch</label><input type="text" id="st-edit-batch" class="form-input" list="batch-hints-edit" value="${s.batch || ''}" required><datalist id="batch-hints-edit">${batchHints.map(b => `<option value="${b}">`).join('')}</datalist></div>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
           <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
