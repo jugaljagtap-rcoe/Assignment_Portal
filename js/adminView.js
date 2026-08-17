@@ -275,7 +275,13 @@ const adminView = {
             </thead>
             <tbody>
               ${classes.map(c => {
-                const count = app.data.students.filter(s => s.yearOfStudy === c.code || (c.code === 'FE' && (!s.yearOfStudy || s.yearOfStudy === 'FE'))).length;
+                const yearPrefix = (c.code || '').split(' ')[0].toUpperCase();
+                const deptStudents = app.getStudentsForDept(dept.id);
+                const count = deptStudents.filter(s => {
+                  const sYear = (s.yearOfStudy || '').toUpperCase();
+                  if (sYear) return sYear === yearPrefix;
+                  return yearPrefix === 'FE';
+                }).length;
                 return `
                   <tr>
                     <td class="mono-val" style="font-weight:700; color:var(--accent-blue);">${c.code}</td>
