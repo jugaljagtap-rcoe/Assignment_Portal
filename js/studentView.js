@@ -33,8 +33,10 @@ const studentView = {
     let allAssignments = app.data.assignments || [];
     if (allAssignments.length === 0) return [];
 
-    // Part 11 Fix: Students should ONLY see published or locked assignments (no drafts)
-    if (app.currentRole === 'student') {
+    // Only hide drafts from real authenticated students.
+    // Admin/faculty using student perspective dropdown should see drafts as preview.
+    const isRealStudent = app.currentRole === 'student' && !app.currentUser?.isDualRole;
+    if (isRealStudent) {
       allAssignments = allAssignments.filter(a =>
         (a.lifecycle_status || a.state || '').toLowerCase() !== 'draft'
       );
