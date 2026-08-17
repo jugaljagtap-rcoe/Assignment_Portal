@@ -5,6 +5,12 @@
 const studentView = {
   _submitting: false,
 
+  getAsgTypeLabel(asg) {
+    if (!asg) return 'Assignment';
+    const t = (asg.series_type || asg.seriesType || 'A').toUpperCase();
+    return { 'L': 'Lab Practical', 'A': 'Assignment', 'T': 'Test/Quiz', 'P': 'Project' }[t] || 'Assignment';
+  },
+
   getAsgQuestions(asg) {
     if (!asg) return [];
     if (Array.isArray(asg.questions)) return asg.questions;
@@ -153,7 +159,7 @@ const studentView = {
           ` : ''}
           ${activeAsg ? `
             <button class="btn btn-primary" onclick="app.switchNav('solver')">
-              ✏️ Continue Lab: ${activeAsg.display_code || activeAsg.working_title || activeAsg.title || activeAsg.code}
+              ✏️ Continue ${this.getAsgTypeLabel(activeAsg)}: ${activeAsg.display_code || activeAsg.working_title || activeAsg.title || activeAsg.code}
             </button>
           ` : ''}
         </div>
@@ -189,14 +195,14 @@ const studentView = {
           <span class="kpi-trend positive">${student ? student.branch : 'No Branch'}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Assigned Experiments</span>
+          <span class="kpi-label">My Assignments</span>
           <span class="kpi-value">${assignments.length}</span>
           <span class="kpi-trend ${assignments.length > 0 ? 'positive' : 'neutral'}">
-            ${assignments.filter(a => app.getAssignmentSchedule(a.id, student ? student.batch : 'A1')?.submissionsOpen).length} Open Submissions
+            Across All Types
           </span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">Active Experiment</span>
+          <span class="kpi-label">Active Assignment</span>
           <span class="kpi-value" style="font-size:20px; font-family:var(--font-mono); color:var(--accent-blue);" title="${activeAsg ? activeAsg.title : ''}">
             ${activeAsg ? (activeAsg.display_code || activeAsg.working_title || activeAsg.title || activeAsg.code) : 'None'}
           </span>
@@ -214,7 +220,7 @@ const studentView = {
       </div>
 
       <div class="card" style="margin-top: 16px;">
-        <h2 class="card-title" style="margin-bottom:12px;">Assigned Experiments</h2>
+        <h2 class="card-title" style="margin-bottom:12px;">My Assignments</h2>
         <div class="table-container">
           <table class="custom-table">
             <thead>
@@ -231,7 +237,7 @@ const studentView = {
               ${assignments.length === 0 ? `
                 <tr>
                   <td colspan="6" style="text-align:center; padding:24px; color:var(--text-secondary);">
-                    ${!student ? '⚠️ No active student profile selected. Please enroll or select a student profile.' : 'ℹ️ No lab experiments currently assigned for this class/branch.'}
+                    ${!student ? '⚠️ No active student profile selected. Please enroll or select a student profile.' : 'ℹ️ No assignments currently assigned for this class/branch.'}
                   </td>
                 </tr>
               ` : assignments.map(asg => {
@@ -254,7 +260,7 @@ const studentView = {
                     </td>
                     <td>
                       <button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="app.startAssignment('${asg.id}');">
-                        ✏️ ${isActive ? 'Continue Experiment' : 'Start Experiment'}
+                        ✏️ ${isActive ? `Continue ${this.getAsgTypeLabel(asg)}` : `Start ${this.getAsgTypeLabel(asg)}`}
                       </button>
                     </td>
                   </tr>
