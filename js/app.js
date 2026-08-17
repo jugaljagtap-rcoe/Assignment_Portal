@@ -219,7 +219,13 @@ class AppEngine {
         });
         this.data.subjects = merged;
       }
-      if (assignmentsRes.data) this.data.assignments = assignmentsRes.data;
+      if (assignmentsRes.data) {
+        this.data.assignments = assignmentsRes.data.map(a => ({
+          ...a,
+          subjectId: a.subject_id || a.subjectId || '',
+          subject_id: a.subject_id || a.subjectId || ''
+        }));
+      }
       if (submissionsRes.data) this.data.submissions = submissionsRes.data;
       if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;
       if (studentVarsRes.data) {
@@ -313,6 +319,9 @@ class AppEngine {
       this.lastSyncedAt = new Date();
       this.saveState();
       this.reconcileUserSession();
+      if (this.currentUser && document.getElementById('main-content')) {
+        this.renderCurrentView();
+      }
     } catch (e) {
       console.warn('loadAllFromSupabase fetch notice:', e);
     }
