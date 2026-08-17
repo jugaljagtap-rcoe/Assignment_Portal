@@ -110,9 +110,15 @@ const studentView = {
     const totalEarnedMarks = student ? this.calculateStudentTotalMarks(student.id) : 0;
     let totalPossibleMarks = 0;
     assignments.forEach(a => {
-      const qList = (a.questions || []).map(q => typeof q === 'string' ? JSON.parse(q) : q);
+      let qList = [];
+      if (Array.isArray(a.questions)) {
+        qList = a.questions;
+      } else if (typeof a.questions === 'string') {
+        try { qList = JSON.parse(a.questions); } catch(_) { qList = []; }
+      }
       qList.forEach(q => {
-        totalPossibleMarks += (parseFloat(q.max_marks || q.maxMarks) || 10);
+        const questionObj = typeof q === 'string' ? JSON.parse(q) : q;
+        totalPossibleMarks += (parseFloat(questionObj?.max_marks || questionObj?.maxMarks) || 10);
       });
     });
 
