@@ -361,6 +361,7 @@ const adminView = {
           <div style="display:flex; gap:8px;">
             <button class="btn btn-primary btn-sm" onclick="adminView.openAddStudentModal('${dept.id}')">+ Enroll Student</button>
             <button class="btn btn-secondary btn-sm" onclick="adminView.openBulkStudentCSVModal('${dept.id}')">📥 Bulk CSV Import</button>
+            <button class="btn btn-secondary btn-sm" onclick="adminView.openBulkYearUpdateModal('${dept.id}')">📋 Bulk Year Update</button>
             <button class="btn btn-secondary btn-sm" onclick="adminView.openTransferStudentModal('${dept.id}')">🔄 Transfer Class / Branch</button>
           </div>
         </div>
@@ -620,6 +621,102 @@ const adminView = {
     app.renderCurrentView();
   },
 
+  openBulkYearUpdateModal(deptId) {
+    const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    const deptStudents = app.getStudentsForDept(deptId);
+    const existingDivisions = [...new Set(deptStudents.map(s => s.division).filter(Boolean))].sort();
+    const existingBatches = [...new Set(deptStudents.map(s => s.batch).filter(Boolean))].sort();
+
+    app.showModal(`📋 Bulk Year of Study Update — ${dept.shortName}`, `
+      <div style="display:flex; flex-direction:column; gap:14px; min-width:420px;">
+        <p style="font-size:12px; color:var(--text-secondary); margin:0;">
+          Select target Division and/or Batch to filter students, then select the new Year of Study to apply.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:12px;">Filter Division</label>
+          <select id="bulk-year-division" class="form-select" style="font-size:12px;">
+            <option value="ALL">All Divisions</option>
+            ${existingDivisions.map(d => `<option value="${d}">Division ${d}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:12px;">Filter Batch</label>
+          <select id="bulk-year-batch" class="form-select" style="font-size:12px;">
+            <option value="ALL">All Batches</option>
+            ${existingBatches.map(b => `<option value="${b}">Batch ${b}</option>`).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:12px;">New Year of Study</label>
+          <select id="bulk-year-study" class="form-select" style="font-size:12px;">
+            <option value="FE">FE (First Year)</option>
+            <option value="SE">SE (Second Year)</option>
+            <option value="TE">TE (Third Year)</option>
+            <option value="BE">BE (Fourth Year)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+          <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="
+            const divVal = document.getElementById('bulk-year-division').value;
+            const batchVal = document.getElementById('bulk-year-batch').value;
+            const yearVal = document.getElementById('bulk-year-study').value;
+            adminView.saveBulkYearUpdate('${deptId}', batchVal, divVal, yearVal);
+          ">Confirm & Update</button>
+        </div>
+      </div>
+    `);
+  },
+
+  async saveBulkYearUpdate(deptId, batch, division, year) {
+    let deptStudents = app.getStudentsForDept(deptId);
+
+    if (division && division !== 'ALL') {
+      deptStudents = deptStudents.filter(s => (s.division || '').toUpperCase() === division.toUpperCase());
+    }
+    if (batch && batch !== 'ALL') {
+      deptStudents = deptStudents.filter(s => (s.batch || '').toUpperCase() === batch.toUpperCase());
+    }
+
+    if (deptStudents.length === 0) {
+      app.showToast('No students matched the selected filters.', 'warning');
+      return;
+    }
+
+    let updatedCount = 0;
+    for (const st of deptStudents) {
+      const idx = app.data.students.findIndex(s => s.id === st.id);
+      if (idx >= 0) {
+        app.data.students[idx].yearOfStudy = year;
+        updatedCount++;
+      }
+    }
+
+    app.saveState();
+
+    for (const st of deptStudents) {
+      await app.supabaseUpsert('students', {
+        id: st.id,
+        uin: st.uin,
+        name: st.name,
+        email: st.email,
+        branch: st.branch,
+        division: st.division,
+        batch: st.batch,
+        year_of_study: year,
+        academic_year: '2026-27'
+      }, `Student ${st.name}`);
+    }
+
+    app.closeModal();
+    app.showToast(`Updated Year of Study to ${year} for ${updatedCount} student(s)`, 'success');
+    app.renderCurrentView();
+  },
+
   openBulkStudentCSVModal(deptId) {
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
     const deptStudents = app.getStudentsForDept(deptId);
@@ -634,13 +731,13 @@ const adminView = {
     else if (deptId === 'dept-mech') defaultBranch = 'Mechanical Engineering';
 
     const sampleBatch = existingBatches[0] || 'A1';
-    const csvPlaceholder = `uin,full_name,email,branch,division,batch\n24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,${sampleBatch}`;
+    const csvPlaceholder = `uin,full_name,email,branch,division,batch,year_of_study\n24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,${sampleBatch},TE`;
 
     app.showModal(`📥 Bulk CSV Student Onboarding — ${dept.shortName}`, `
       <div style="display:flex; flex-direction:column; gap:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <p style="font-size:12px; color:var(--text-secondary); margin:0;">
-            Upload CSV file or paste CSV data with columns: <code>uin, full_name, email, branch, division, batch</code>
+            Upload CSV file or paste CSV data with columns: <code>uin, full_name, email, branch, division, batch, year_of_study</code>
           </p>
           <button class="btn btn-secondary btn-sm" onclick="adminView.downloadBulkStudentCSVTemplate('${deptId}')">📄 Download CSV Template</button>
         </div>
@@ -673,8 +770,8 @@ const adminView = {
     else if (deptId === 'dept-ecs') defaultBranch = 'Electronics & Computer Science';
     else if (deptId === 'dept-mech') defaultBranch = 'Mechanical Engineering';
 
-    const headerRow = 'uin,full_name,email,branch,division,batch';
-    const sampleRow = `24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,${sampleBatch}`;
+    const headerRow = 'uin,full_name,email,branch,division,batch,year_of_study';
+    const sampleRow = `24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,${sampleBatch},TE`;
     const csvContent = `${headerRow}\n${sampleRow}`;
 
     const safeDeptShort = (dept.shortName || dept.id || 'Dept').replace(/[^a-zA-Z0-9_\-]/g, '_');
@@ -761,11 +858,12 @@ const adminView = {
         const branch = parts[3] || HARDCODED_BRANCHES[0];
         const division = parts[4] || 'A';
         const batch = parts[5] || 'A1';
+        const yearOfStudy = (parts[6] || '').trim() || 'FE';
 
         const existingIdx = app.data.students.findIndex(s => s.uin === uin);
         const deterministicId = `st-${uin.toLowerCase()}`;
         const isExisting = existingIdx >= 0;
-        const stObj = { id: isExisting ? app.data.students[existingIdx].id : deterministicId, uin, name, email, branch, division, batch, yearOfStudy: 'FE' };
+        const stObj = { id: isExisting ? app.data.students[existingIdx].id : deterministicId, uin, name, email, branch, division, batch, yearOfStudy };
 
         if (isExisting) {
           app.data.students[existingIdx] = stObj;
