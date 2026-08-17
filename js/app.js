@@ -1326,13 +1326,8 @@ class AppEngine {
     // Check if any question uses per-student variables
     let usePerStudentVariables = false;
     questions.forEach(q => {
-      if (Array.isArray(q.parameters)) {
-        q.parameters.forEach(p => {
-          const mode = p.variation_mode || p.variationMode || 'individual';
-          if (mode === 'individual' || mode === 'per_student') {
-            usePerStudentVariables = true;
-          }
-        });
+      if (q.usePerStudentVariables === true || (q.text && /\{\{.*?\}\}/.test(q.text))) {
+        usePerStudentVariables = true;
       }
     });
 
