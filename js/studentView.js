@@ -5,6 +5,15 @@
 const studentView = {
   _submitting: false,
 
+  getAsgQuestions(asg) {
+    if (!asg) return [];
+    if (Array.isArray(asg.questions)) return asg.questions;
+    if (typeof asg.questions === 'string') {
+      try { return JSON.parse(asg.questions); } catch(_) { return []; }
+    }
+    return [];
+  },
+
   render(container, activeNav) {
     switch(activeNav) {
       case 'solver':
@@ -144,7 +153,7 @@ const studentView = {
           ` : ''}
           ${activeAsg ? `
             <button class="btn btn-primary" onclick="app.switchNav('solver')">
-              ✏️ Continue Lab: ${activeAsg.code}
+              ✏️ Continue Lab: ${activeAsg.display_code || activeAsg.working_title || activeAsg.title || activeAsg.code}
             </button>
           ` : ''}
         </div>
@@ -166,7 +175,7 @@ const studentView = {
 
             return `
               <div class="timeline-pill ${isActive ? 'active' : pillClass}" onclick="app.startAssignment('${a.id}');">
-                ${a.code}: ${label}
+                ${a.display_code || a.working_title || a.title || a.code}: ${label}
               </div>
             `;
           }).join('')}
@@ -189,7 +198,7 @@ const studentView = {
         <div class="kpi-card">
           <span class="kpi-label">Active Experiment</span>
           <span class="kpi-value" style="font-size:20px; font-family:var(--font-mono); color:var(--accent-blue);" title="${activeAsg ? activeAsg.title : ''}">
-            ${activeAsg ? activeAsg.code : 'None'}
+            ${activeAsg ? (activeAsg.display_code || activeAsg.working_title || activeAsg.title || activeAsg.code) : 'None'}
           </span>
           <span class="kpi-trend ${schedule && schedule.submissionsOpen ? 'positive' : 'negative'}">
             ${schedule ? (schedule.submissionsOpen ? '● Submissions Open' : '● Submissions Closed') : 'No Schedule'}
@@ -234,7 +243,7 @@ const studentView = {
 
                 return `
                   <tr style="${isActive ? 'background:var(--accent-blue-subtle);' : ''}">
-                    <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${asg.code}</td>
+                    <td style="font-weight:700; color:var(--accent-blue); font-family:var(--font-mono);">${asg.display_code || asg.working_title || asg.title || asg.code}</td>
                     <td style="font-weight:600;">${asg.title}</td>
                     <td><span class="tag tag-co">${sub ? sub.code : ''}</span></td>
                     <td style="font-size:12px; font-weight:600;">${sch ? new Date(sch.deadline).toLocaleString() : '—'}</td>
@@ -289,12 +298,12 @@ const studentView = {
         return;
       }
 
-      if (!asg.questions || asg.questions.length === 0) {
+      if (this.getAsgQuestions(asg).length === 0) {
         container.innerHTML = `
           <div class="page-header-container">
             <div>
               <h1 class="page-title">Solve Assignment</h1>
-              <p class="page-subtitle">${asg.code} — ${asg.title}</p>
+              <p class="page-subtitle">${asg.display_code || asg.working_title || asg.title || asg.code} — ${asg.working_title || asg.title}</p>
             </div>
             <button class="btn btn-secondary" onclick="app.switchNav('dashboard')">← Back to Dashboard</button>
           </div>
@@ -302,7 +311,7 @@ const studentView = {
             <div style="font-size:48px; margin-bottom:12px;">📋</div>
             <h2 style="font-size:18px; font-weight:700; margin-bottom:8px;">Questions Not Yet Published</h2>
             <p style="color:var(--text-secondary); max-width:480px; margin:0 auto; font-size:13px;">
-              Your faculty is still building the questions for <strong>${asg.code}</strong>. Please check back later.
+              Your faculty is still building the questions for <strong>${asg.display_code || asg.working_title || asg.title || asg.code}</strong>. Please check back later.
             </p>
           </div>
         `;
@@ -331,7 +340,7 @@ const studentView = {
         <div class="page-header-container print-hide">
           <div>
             <h1 class="page-title">Solve Assignment</h1>
-            <p class="page-subtitle">${asg.code} — ${asg.title}</p>
+            <p class="page-subtitle">${asg.display_code || asg.working_title || asg.title || asg.code} — ${asg.working_title || asg.title}</p>
           </div>
           <div style="display:flex; gap:8px;">
             <button class="btn btn-secondary" onclick="app.renderAssignmentSheet('${asg.id}', '${student ? student.id : ''}')">📄 View Assignment Sheet</button>
@@ -355,7 +364,7 @@ const studentView = {
 
               return `
                 <div class="timeline-pill ${isActive ? 'active' : pillClass}" onclick="app.startAssignment('${a.id}');">
-                  ${a.code}: ${label}
+                  ${a.display_code || a.working_title || a.title || a.code}: ${label}
                 </div>
               `;
             }).join('')}
@@ -378,7 +387,7 @@ const studentView = {
         </div>
 
         <div style="display:flex; flex-direction:column; gap:20px;">
-          ${(asg.questions || []).map((q, qIndex) => {
+          ${this.getAsgQuestions(asg).map((q, qIndex) => {
             const qPrefix = `Q${qIndex + 1}_`;
             const qStudentVars = {};
             Object.keys(studentVars).forEach(k => {
