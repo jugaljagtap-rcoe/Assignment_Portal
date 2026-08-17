@@ -730,7 +730,12 @@ const studentView = {
 
     const paramMap = {};
     (app.data.assignments || []).forEach(asg => {
-      (asg.questions || []).forEach(q => {
+      let asgQuestions = asg.questions;
+      if (typeof asgQuestions === 'string') {
+        try { asgQuestions = JSON.parse(asgQuestions); } catch(_) { asgQuestions = []; }
+      }
+      if (!Array.isArray(asgQuestions)) asgQuestions = [];
+      asgQuestions.forEach(q => {
         (q.parameters || []).forEach(p => {
           paramMap[p.id] = { coId: q.coId || 'CO1', valueMarks: p.valueMarks || 4 };
         });

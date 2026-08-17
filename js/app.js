@@ -1085,7 +1085,7 @@ class AppEngine {
 
   getAssignmentSchedule(asgId, batchName = 'A1') {
     const asg = this.data.assignments.find(a => a.id === asgId);
-    if (!asg || !asg.schedules || asg.schedules.length === 0) {
+    if (!asg) {
       return {
         deadline: '2026-12-31T23:59',
         submissionsOpen: true,
@@ -1094,8 +1094,22 @@ class AppEngine {
         lateMaxCap: 30
       };
     }
-    const batchSch = asg.schedules.find(s => s.scopeValue === batchName);
-    return batchSch || asg.schedules[0];
+    let schedules = asg.schedules;
+    if (typeof schedules === 'string') {
+      try { schedules = JSON.parse(schedules); } catch(_) { schedules = []; }
+    }
+    if (!Array.isArray(schedules)) schedules = [];
+    if (schedules.length === 0) {
+      return {
+        deadline: '2026-12-31T23:59',
+        submissionsOpen: true,
+        gradesReleased: true,
+        latePenaltyValue: 10,
+        lateMaxCap: 30
+      };
+    }
+    const batchSch = schedules.find(s => s.scopeValue === batchName);
+    return batchSch || schedules[0];
   }
   /* ==========================================================================
      SUPABASE WRITE WRAPPERS — Always use these instead of direct .from().upsert()
