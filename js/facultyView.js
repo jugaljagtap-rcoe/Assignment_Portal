@@ -1363,12 +1363,19 @@ const facultyView = {
     this.activeCSVAssignmentId = activeAsg.id;
     const variableNames = this.getAssignmentVariables(activeAsg);
 
+    // Orphaned keys detection
+    const currentVarSet = new Set(variableNames);
+    const existingAsgVars = (app.data.studentVariables || []).filter(v =>
+      v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId
+    );
+    const orphanedKeys = Array.from(new Set(existingAsgVars.map(v => v.key).filter(k => k && !currentVarSet.has(k))));
+
     // Resolve subject & enrolled students via app.getStudentsForDept
     const currentSubject = subObj || (app.data.subjects || []).find(s => s.id === (activeAsg.subjectId || activeAsg.subject_id)) || (app.data.subjects || [])[0];
     const deptId = currentSubject ? (currentSubject.departmentId || currentSubject.department_id || '') : '';
     const enrolledStudents = app.getStudentsForDept(deptId);
 
-    // Compute coverage: students fully assigned (has value for ALL scoped variables)
+    // Compute coverage: students fully assigned (has non-empty value for ALL scoped variables)
     let fullyAssignedCount = 0;
     enrolledStudents.forEach(s => {
       const isFullyAssigned = variableNames.length > 0 && variableNames.every(vName => {
@@ -1385,12 +1392,21 @@ const facultyView = {
     const subIdArg = subObj ? `'${subObj.id}'` : (typeof sub === 'string' ? `'${sub}'` : 'null');
 
     stepContainer.innerHTML = `
+      ${orphanedKeys.length > 0 ? `
+        <div id="mode-a-orphaned-banner" style="margin-bottom:16px; background:var(--warning-subtle, #fffbe6); border:1px solid var(--warning, #ffe58f); border-radius:var(--radius-md, 6px); padding:12px 16px; font-size:13px; color:var(--warning-text, #873800); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            ⚠️ <strong>Orphaned Variable Keys Detected:</strong> The following stored keys no longer match any current question variable: <code>${orphanedKeys.join(', ')}</code>. Please review recent question changes and re-upload variables if necessary.
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('mode-a-orphaned-banner').remove()">Dismiss</button>
+        </div>
+      ` : ''}
+
       <!-- Step 2 & Step 3 — Template Download & CSV Upload -->
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px; padding:16px; background:var(--surface-hover); border-radius:8px; border:1px solid var(--border-color);">
         <div>
           <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 2 — Download CSV Template</label>
           <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
-            Generates a pre-formatted CSV with headers (<code>uin, ${variableNames.join(', ')}</code>) and enrolled student UINs.
+            Generates a pre-formatted CSV with headers (<code>uin, ${variableNames.join(', ')}</code>), a DEFAULT fallback row, and enrolled student rows pre-filled with saved values.
           </p>
           <button class="btn btn-secondary" onclick="facultyView.downloadVariableCSVTemplate('${activeAsg.id}', '${deptId}')">
             📥 Download CSV Template
@@ -1412,54 +1428,60 @@ const facultyView = {
       </div>
 
       <!-- Step 4 — Coverage Display -->
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-          <h4 style="margin:0; font-size:14px; font-weight:700;">Step 4 — Variable Assignment Coverage</h4>
-          <div style="font-size:13px; font-weight:600; color:var(--text-primary);">
-            📊 <strong>${fullyAssignedCount} of ${enrolledStudents.length} students fully assigned.</strong>
-          </div>
-        </div>
-
-        ${enrolledStudents.length === 0 ? `
-          <div style="padding:20px; text-align:center; color:var(--text-tertiary);">No students enrolled in this department.</div>
-        ` : `
-          <div class="table-container" style="max-height:400px; overflow-y:auto;">
-            <table class="custom-table">
-              <thead>
-                <tr>
-                  <th>UIN</th>
-                  <th>Student Name</th>
-                  ${variableNames.map(v => `<th>${v}</th>`).join('')}
-                </tr>
-              </thead>
-              <tbody>
-                ${enrolledStudents.map(st => {
-                  return `
-                    <tr>
-                      <td class="mono-val" style="font-weight:700;">${st.uin || st.id}</td>
-                      <td>${st.name || st.fullName || 'Student'}</td>
-                      ${variableNames.map(vName => {
-                        const rec = (app.data.studentVariables || []).find(v =>
-                          v.studentId === st.id &&
-                          (v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId) &&
-                          v.key === vName
-                        );
-                        const val = rec ? rec.value : null;
-                        const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
-                        return `
-                          <td>
-                            ${hasVal ? `<span class="mono-val">${val}</span>` : `<span class="tag tag-danger" style="font-weight:700;">Missing</span>`}
-                          </td>
-                        `;
-                      }).join('')}
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        `}
+      <div id="mode-a-coverage-container">
+        ${this.renderCoverageTableHTML(activeAsg, variableNames, enrolledStudents, fullyAssignedCount)}
       </div>
+    `;
+  },
+
+  renderCoverageTableHTML(activeAsg, variableNames, enrolledStudents, fullyAssignedCount) {
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+        <h4 style="margin:0; font-size:14px; font-weight:700;">Step 4 — Variable Assignment Coverage</h4>
+        <div style="font-size:13px; font-weight:600; color:var(--text-primary);">
+          📊 <strong>${fullyAssignedCount} of ${enrolledStudents.length} students fully assigned.</strong>
+        </div>
+      </div>
+
+      ${enrolledStudents.length === 0 ? `
+        <div style="padding:20px; text-align:center; color:var(--text-tertiary);">No students enrolled in this department.</div>
+      ` : `
+        <div class="table-container" style="max-height:400px; overflow-y:auto;">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>UIN</th>
+                <th>Student Name</th>
+                ${variableNames.map(v => `<th>${v}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${enrolledStudents.map(st => {
+                return `
+                  <tr>
+                    <td class="mono-val" style="font-weight:700;">${st.uin || st.id}</td>
+                    <td>${st.name || st.fullName || 'Student'}</td>
+                    ${variableNames.map(vName => {
+                      const rec = (app.data.studentVariables || []).find(v =>
+                        v.studentId === st.id &&
+                        (v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId) &&
+                        v.key === vName
+                      );
+                      const val = rec ? rec.value : null;
+                      const hasVal = val !== undefined && val !== null && String(val).trim() !== '';
+                      return `
+                        <td>
+                          ${hasVal ? `<span class="mono-val" style="color:var(--success, #16a34a); font-weight:700;">${val}</span>` : `<span style="color:var(--danger, #dc2626); font-weight:700;">Missing</span>`}
+                        </td>
+                      `;
+                    }).join('')}
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
     `;
   },
 
@@ -1469,9 +1491,31 @@ const facultyView = {
     const variableNames = this.getAssignmentVariables(asg);
     const enrolledStudents = app.getStudentsForDept(deptId);
 
-    const header = ['uin', ...variableNames].join(',');
-    const rows = enrolledStudents.map(s => [s.uin || s.id, ...variableNames.map(() => '')].join(','));
-    const csvContent = [header, ...rows].join('\n');
+    const escapeCSV = (val) => {
+      if (val === undefined || val === null) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes(';')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const headerRow = ['uin', ...variableNames].map(escapeCSV).join(',');
+    const defaultRow = ['DEFAULT', ...variableNames.map(() => '')].map(escapeCSV).join(',');
+    const studentRows = enrolledStudents.map(s => {
+      const uinCell = s.uin || s.id || '';
+      const varCells = variableNames.map(vName => {
+        const rec = (app.data.studentVariables || []).find(v =>
+          v.studentId === s.id &&
+          (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId) &&
+          v.key === vName
+        );
+        return rec && rec.value !== undefined && rec.value !== null ? rec.value : '';
+      });
+      return [uinCell, ...varCells].map(escapeCSV).join(',');
+    });
+
+    const csvContent = [headerRow, defaultRow, ...studentRows].join('\n');
 
     const label = this.getAssignmentLabel(asg);
     const safeFilename = `${label.replace(/[^a-zA-Z0-9_\-]/g, '_')}_variables_template.csv`;
@@ -1495,12 +1539,23 @@ const facultyView = {
       return;
     }
 
-    const text = await file.text();
+    let text = await file.text();
+    // Strip BOM
+    if (text.charCodeAt(0) === 0xFEFF) {
+      text = text.slice(1);
+    }
+
     const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
     if (lines.length < 2) {
-      app.showToast('CSV file is empty or missing data rows.', 'warning');
+      app.showToast('CSV file is empty or missing header/data rows.', 'warning');
       return;
     }
+
+    // Auto-detect delimiter from header line
+    const headerLine = lines[0];
+    const commaCount = (headerLine.match(/,/g) || []).length;
+    const semicolonCount = (headerLine.match(/;/g) || []).length;
+    const delimiter = semicolonCount > commaCount ? ';' : ',';
 
     const parseLine = (line) => {
       const result = [];
@@ -1509,8 +1564,13 @@ const facultyView = {
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
         if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiter && !inQuotes) {
           result.push(current.trim().replace(/^["']|["']$/g, ''));
           current = '';
         } else {
@@ -1527,31 +1587,80 @@ const facultyView = {
       return;
     }
 
-    const variableNames = headerCols.slice(1);
-    let recordCount = 0;
-    const uniqueStudentIds = new Set();
-    const missingUins = [];
+    const scopedVarNames = headerCols.slice(1).map(c => c.trim()).filter(Boolean);
 
-    for (let i = 1; i < lines.length; i++) {
+    // Second row: check if DEFAULT row
+    let defaultValues = {};
+    let dataStartIdx = 1;
+
+    if (lines.length > 1) {
+      const secondRowCols = parseLine(lines[1]);
+      if (secondRowCols.length > 0 && String(secondRowCols[0]).trim().toUpperCase() === 'DEFAULT') {
+        dataStartIdx = 2;
+        scopedVarNames.forEach((varName, idx) => {
+          const rawVal = secondRowCols[idx + 1] !== undefined ? String(secondRowCols[idx + 1]).trim() : '';
+          if (rawVal !== '') {
+            defaultValues[varName] = rawVal;
+          }
+        });
+      }
+    }
+
+    let recordCount = 0;
+    const processedStudentIds = new Set();
+    const skippedUins = [];
+    const nonNumericWarnings = [];
+
+    for (let i = dataStartIdx; i < lines.length; i++) {
       const rowCols = parseLine(lines[i]);
       if (rowCols.length === 0 || !rowCols[0]) continue;
-      const uinVal = rowCols[0].trim();
-      if (!uinVal) continue;
+      const rawUin = String(rowCols[0]).trim();
+      if (!rawUin) continue;
 
-      const student = (app.data.students || []).find(st => String(st.uin || '').trim() === uinVal);
+      if (rawUin.toUpperCase() === 'DEFAULT') continue;
+
+      const student = (app.data.students || []).find(st => String(st.uin || '').trim() === rawUin);
       if (!student) {
-        missingUins.push(uinVal);
+        skippedUins.push(rawUin);
         continue;
       }
 
-      uniqueStudentIds.add(student.id);
+      // Check if all variable cells for this student row are empty and DEFAULT row has no values for them
+      let hasAnyValue = false;
+      scopedVarNames.forEach((varName, idx) => {
+        const cellVal = rowCols[idx + 1] !== undefined ? String(rowCols[idx + 1]).trim() : '';
+        const defVal = defaultValues[varName] !== undefined ? defaultValues[varName] : '';
+        if (cellVal !== '' || defVal !== '') {
+          hasAnyValue = true;
+        }
+      });
 
-      for (let j = 1; j < headerCols.length; j++) {
-        const varName = headerCols[j].trim();
-        if (!varName) continue;
-        const val = rowCols[j] !== undefined ? String(rowCols[j]).trim() : '';
+      if (!hasAnyValue) {
+        continue;
+      }
 
-        const rawId = `sv-${student.id}-${asgId}-${varName}`;
+      let studentVarSavedCount = 0;
+
+      for (let j = 0; j < scopedVarNames.length; j++) {
+        const scopedKey = scopedVarNames[j];
+        const cellVal = rowCols[j + 1] !== undefined ? String(rowCols[j + 1]).trim() : '';
+
+        let finalVal = cellVal;
+        if (finalVal === '') {
+          if (defaultValues[scopedKey] !== undefined) {
+            finalVal = defaultValues[scopedKey];
+          } else {
+            // Missing, skip this variable for this student
+            continue;
+          }
+        }
+
+        // Validate if numeric
+        if (isNaN(parseFloat(finalVal))) {
+          nonNumericWarnings.push(`UIN ${rawUin}: ${scopedKey} = "${finalVal}" is non-numeric`);
+        }
+
+        const rawId = `sv-${student.id}-${asgId}-${scopedKey}`;
         const deterministicId = rawId.toLowerCase().replace(/[^a-z0-9\-]/g, '-');
 
         const record = {
@@ -1560,8 +1669,8 @@ const facultyView = {
           studentId: student.id,
           assignment_id: asgId,
           assignmentId: asgId,
-          key: varName,
-          value: val
+          key: scopedKey,
+          value: String(finalVal)
         };
 
         // Memory upsert
@@ -1574,24 +1683,62 @@ const facultyView = {
         }
 
         // Supabase upsert
-        await app.supabaseUpsert('student_variables', record, `Variable ${varName} for ${uinVal}`);
+        await app.supabaseUpsert('student_variables', record, `Variable ${scopedKey} for ${rawUin}`);
         recordCount++;
+        studentVarSavedCount++;
+      }
+
+      if (studentVarSavedCount > 0) {
+        processedStudentIds.add(student.id);
       }
     }
 
     app.saveState();
-    writeAudit('bulk_upsert', 'student_variables', asgId, { count: recordCount, students_processed: uniqueStudentIds.size, skipped_uins_count: missingUins.length });
+    writeAudit('bulk_upsert', 'student_variables', asgId, {
+      count: recordCount,
+      students_processed: processedStudentIds.size,
+      skipped_uins_count: skippedUins.length,
+      non_numeric_warnings_count: nonNumericWarnings.length
+    });
 
-    if (missingUins.length > 0) {
-      app.showToast(`Warning: Skipped ${missingUins.length} UIN(s) not found: ${missingUins.join(', ')}`, 'warning');
+    if (skippedUins.length > 0) {
+      app.showToast(`Warning: Skipped ${skippedUins.length} UIN(s) not found: ${skippedUins.join(', ')}`, 'warning');
     }
 
-    app.showToast(`Saved variables for ${uniqueStudentIds.size} students across ${variableNames.length} parameters.`, 'success');
+    if (nonNumericWarnings.length > 0) {
+      app.showToast(`Warning: ${nonNumericWarnings.length} non-numeric value(s) found:\n${nonNumericWarnings.slice(0, 5).join('\n')}${nonNumericWarnings.length > 5 ? '\n...' : ''}`, 'warning');
+    }
 
-    // Re-render Mode A steps and coverage table in place
-    const stepContainerEl = document.getElementById('mode-a-step-container');
-    if (stepContainerEl) {
-      this.renderCSVModeAContent(stepContainerEl, sub, asgId);
+    app.showToast(`Saved variables for ${processedStudentIds.size} students across ${scopedVarNames.length} parameters.`, 'success');
+
+    // Re-render only coverage table in place
+    const coverageContainer = document.getElementById('mode-a-coverage-container');
+    if (coverageContainer) {
+      const asg = (app.data.assignments || []).find(a => a.id === asgId);
+      if (asg) {
+        const variableNames = this.getAssignmentVariables(asg);
+        const subObj = typeof sub === 'object' && sub !== null
+          ? sub
+          : (app.data.subjects || []).find(s => s.id === sub) || null;
+        const currentSubject = subObj || (app.data.subjects || []).find(s => s.id === (asg.subjectId || asg.subject_id)) || (app.data.subjects || [])[0];
+        const deptId = currentSubject ? (currentSubject.departmentId || currentSubject.department_id || '') : '';
+        const enrolledStudents = app.getStudentsForDept(deptId);
+
+        let fullyAssignedCount = 0;
+        enrolledStudents.forEach(s => {
+          const isFullyAssigned = variableNames.length > 0 && variableNames.every(vName => {
+            const rec = (app.data.studentVariables || []).find(v =>
+              v.studentId === s.id &&
+              (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId) &&
+              v.key === vName
+            );
+            return rec && rec.value !== undefined && rec.value !== null && String(rec.value).trim() !== '';
+          });
+          if (isFullyAssigned) fullyAssignedCount++;
+        });
+
+        coverageContainer.innerHTML = this.renderCoverageTableHTML(asg, variableNames, enrolledStudents, fullyAssignedCount);
+      }
     }
   },
 

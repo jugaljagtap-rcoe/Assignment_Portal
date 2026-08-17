@@ -1590,8 +1590,6 @@ class AppEngine {
                     Object.keys(studentVars).forEach(k => {
                       if (k.startsWith(qPrefix)) {
                         qStudentVars[k.slice(qPrefix.length)] = studentVars[k];
-                      } else if (!k.match(/^Q\d+_/)) {
-                        qStudentVars[k] = studentVars[k];
                       }
                     });
                     const formattedQText = this.formatQuestionText(rawText, qStudentVars);
