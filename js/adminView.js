@@ -622,16 +622,36 @@ const adminView = {
 
   openBulkStudentCSVModal(deptId) {
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    const deptStudents = app.getStudentsForDept(deptId);
+    const existingBatches = [...new Set(deptStudents.map(s => s.batch).filter(Boolean))].sort();
+    const batchHintStr = existingBatches.length > 0 ? existingBatches.join(', ') : 'A1, A2, B1, B2';
+
+    let defaultBranch = HARDCODED_BRANCHES[0];
+    if (deptId === 'dept-aids') defaultBranch = 'Artificial Intelligence & Data Science';
+    else if (deptId === 'dept-civil') defaultBranch = 'Civil Engineering';
+    else if (deptId === 'dept-comp') defaultBranch = 'Computer Engineering';
+    else if (deptId === 'dept-ecs') defaultBranch = 'Electronics & Computer Science';
+    else if (deptId === 'dept-mech') defaultBranch = 'Mechanical Engineering';
+
+    const sampleBatch = existingBatches[0] || 'A1';
+    const csvPlaceholder = `uin,full_name,email,branch,division,batch\n24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,${sampleBatch}`;
 
     app.showModal(`📥 Bulk CSV Student Onboarding — ${dept.shortName}`, `
       <div style="display:flex; flex-direction:column; gap:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <p style="font-size:12px; color:var(--text-secondary); margin:0;">
-            Upload a CSV file with columns: <code>uin, full_name, email, branch, division, batch</code>
+            Upload CSV file or paste CSV data with columns: <code>uin, full_name, email, branch, division, batch</code>
           </p>
           <button class="btn btn-secondary btn-sm" onclick="adminView.downloadBulkStudentCSVTemplate('${deptId}')">📄 Download CSV Template</button>
         </div>
-        <input type="file" id="bulk-csv-file-input" accept=".csv" class="form-input" style="padding: 8px;">
+        <div class="form-group">
+          <label class="form-label" style="font-size:12px;">Option 1: Upload CSV File</label>
+          <input type="file" id="bulk-csv-file-input" accept=".csv" class="form-input" style="padding: 8px;">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-size:12px;">Option 2: Paste CSV Data (Existing Batches in ${dept.shortName}: ${batchHintStr})</label>
+          <textarea id="bulk-csv-textarea" class="form-input code-font" rows="5" placeholder="${csvPlaceholder}" style="font-size:12px; font-family:var(--font-mono);"></textarea>
+        </div>
         <div style="display:flex; justify-content:flex-end; gap:10px;">
           <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
           <button class="btn btn-primary" onclick="adminView.processBulkStudentCSV('${deptId}')">📥 Upload & Import</button>
@@ -642,6 +662,10 @@ const adminView = {
 
   downloadBulkStudentCSVTemplate(deptId) {
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || HARDCODED_DEPARTMENTS[0];
+    const deptStudents = app.getStudentsForDept(deptId);
+    const existingBatches = [...new Set(deptStudents.map(s => s.batch).filter(Boolean))].sort();
+    const sampleBatch = existingBatches[0] || 'A1';
+
     let defaultBranch = HARDCODED_BRANCHES[0];
     if (deptId === 'dept-aids') defaultBranch = 'Artificial Intelligence & Data Science';
     else if (deptId === 'dept-civil') defaultBranch = 'Civil Engineering';
@@ -650,7 +674,7 @@ const adminView = {
     else if (deptId === 'dept-mech') defaultBranch = 'Mechanical Engineering';
 
     const headerRow = 'uin,full_name,email,branch,division,batch';
-    const sampleRow = `24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,A1`;
+    const sampleRow = `24051001,Aarav Sharma,24051001@eng.rizvi.edu.in,${defaultBranch},A,${sampleBatch}`;
     const csvContent = `${headerRow}\n${sampleRow}`;
 
     const safeDeptShort = (dept.shortName || dept.id || 'Dept').replace(/[^a-zA-Z0-9_\-]/g, '_');
@@ -669,13 +693,18 @@ const adminView = {
 
   async processBulkStudentCSV(deptId) {
     const fileInput = document.getElementById('bulk-csv-file-input');
+    const textArea = document.getElementById('bulk-csv-textarea');
     const file = fileInput?.files?.[0];
-    if (!file) {
-      app.showToast('Please select a CSV file to upload.', 'warning');
+    let raw = '';
+    if (file) {
+      raw = await file.text();
+    } else if (textArea && textArea.value.trim()) {
+      raw = textArea.value.trim();
+    }
+    if (!raw) {
+      app.showToast('Please select a CSV file or paste CSV data to import.', 'warning');
       return;
     }
-
-    let raw = await file.text();
     // Strip BOM if present
     if (raw.charCodeAt(0) === 0xFEFF) {
       raw = raw.slice(1);

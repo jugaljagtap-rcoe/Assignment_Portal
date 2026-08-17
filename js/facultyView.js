@@ -1143,7 +1143,10 @@ const facultyView = {
   /* 3. Schedule & Access Manager */
   renderScheduleManager(container, sub) {
     const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
-    const batches = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4'];
+    const targetSub = sub || (subAsgs[0] ? (app.data.subjects || []).find(s => s.id === (subAsgs[0].subjectId || subAsgs[0].subject_id)) : null) || (app.data.subjects || [])[0];
+    const deptId = targetSub ? (targetSub.departmentId || targetSub.department_id) : '';
+    const students = deptId ? app.getStudentsForDept(deptId) : [];
+    const batches = [...new Set(students.map(s => s.batch).filter(Boolean))].sort();
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -1179,42 +1182,48 @@ const facultyView = {
                   </div>
                 </div>
 
-                <div class="table-container">
-                  <table class="custom-table">
-                    <thead>
-                      <tr><th>Batch</th><th>Deadline</th><th>Submissions Open</th><th>Grades Released</th></tr>
-                    </thead>
-                    <tbody>
-                      ${batches.map(b => {
-                        const sch = parsedSchedules.find(s => s.scopeValue === b);
-                        const deadlineVal = sch?.deadline || '';
-                        const subOpen = sch ? (sch.submissionsOpen ?? true) : true;
-                        const gradesRel = sch ? (sch.gradesReleased ?? false) : false;
+                ${batches.length === 0 ? `
+                  <div style="padding:20px; text-align:center; color:var(--text-secondary); font-size:13px; background:var(--bg-secondary); border-radius:var(--radius-md);">
+                    No students enrolled — enroll students first to configure batch schedules.
+                  </div>
+                ` : `
+                  <div class="table-container">
+                    <table class="custom-table">
+                      <thead>
+                        <tr><th>Batch</th><th>Deadline</th><th>Submissions Open</th><th>Grades Released</th></tr>
+                      </thead>
+                      <tbody>
+                        ${batches.map(b => {
+                          const sch = parsedSchedules.find(s => s.scopeValue === b);
+                          const deadlineVal = sch?.deadline || '';
+                          const subOpen = sch ? (sch.submissionsOpen ?? true) : true;
+                          const gradesRel = sch ? (sch.gradesReleased ?? false) : false;
 
-                        return `
-                          <tr>
-                            <td class="mono-val" style="font-weight:700;">Batch ${b}</td>
-                            <td>
-                              <input type="datetime-local" id="deadline-${a.id}-${b}" class="form-input code-font btn-sm" value="${deadlineVal}" style="padding:4px 8px; width:220px;">
-                            </td>
-                            <td>
-                              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-                                <input type="checkbox" id="submissions-open-${a.id}-${b}" ${subOpen ? 'checked' : ''} style="accent-color:var(--success); width:16px; height:16px;">
-                                <span style="font-size:12px; font-weight:600;">${subOpen ? '🟢 Open' : '🔴 Closed'}</span>
-                              </label>
-                            </td>
-                            <td>
-                              <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-                                <input type="checkbox" id="grades-released-${a.id}-${b}" ${gradesRel ? 'checked' : ''} style="accent-color:var(--accent-blue); width:16px; height:16px;">
-                                <span style="font-size:12px; font-weight:600;">${gradesRel ? '🟢 Released' : '⚪ Hidden'}</span>
-                              </label>
-                            </td>
-                          </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
-                </div>
+                          return `
+                            <tr>
+                              <td class="mono-val" style="font-weight:700;">Batch ${b}</td>
+                              <td>
+                                <input type="datetime-local" id="deadline-${a.id}-${b}" class="form-input code-font btn-sm" value="${deadlineVal}" style="padding:4px 8px; width:220px;">
+                              </td>
+                              <td>
+                                <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                  <input type="checkbox" id="submissions-open-${a.id}-${b}" ${subOpen ? 'checked' : ''} style="accent-color:var(--success); width:16px; height:16px;">
+                                  <span style="font-size:12px; font-weight:600;">${subOpen ? '🟢 Open' : '🔴 Closed'}</span>
+                                </label>
+                              </td>
+                              <td>
+                                <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                  <input type="checkbox" id="grades-released-${a.id}-${b}" ${gradesRel ? 'checked' : ''} style="accent-color:var(--accent-blue); width:16px; height:16px;">
+                                  <span style="font-size:12px; font-weight:600;">${gradesRel ? '🟢 Released' : '⚪ Hidden'}</span>
+                                </label>
+                              </td>
+                            </tr>
+                          `;
+                        }).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                `}
               </div>
             `;
           }).join('')}
@@ -1227,7 +1236,10 @@ const facultyView = {
     const asg = app.data.assignments.find(a => a.id === asgId);
     if (!asg) return;
 
-    const batches = ['A1','A2','A3','A4','B1','B2','B3','B4'];
+    const sub = (app.data.subjects || []).find(s => s.id === (asg.subjectId || asg.subject_id)) || (app.data.subjects || [])[0];
+    const deptId = sub ? (sub.departmentId || sub.department_id) : '';
+    const students = deptId ? app.getStudentsForDept(deptId) : [];
+    const batches = [...new Set(students.map(s => s.batch).filter(Boolean))].sort();
     const schedules = batches.map(b => ({
       scopeType: 'batch',
       scopeValue: b,
