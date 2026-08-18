@@ -1363,7 +1363,7 @@ const facultyView = {
     // Orphaned keys detection
     const currentVarSet = new Set(variableNames);
     const existingAsgVars = (app.data.studentVariables || []).filter(v =>
-      v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId
+      v.assignmentId === activeAsg.id || v.assignment_id === activeAsg.id || v.assignmentId === activeAsg.code || v.assignment_id === activeAsg.code || v.assignmentId === activeAsg.originalId || v.assignment_id === activeAsg.originalId
     );
     const orphanedKeys = Array.from(new Set(existingAsgVars.map(v => v.key).filter(k => k && !currentVarSet.has(k))));
 
@@ -1376,8 +1376,8 @@ const facultyView = {
     enrolledStudents.forEach(s => {
       const isFullyAssigned = variableNames.length > 0 && variableNames.every(vName => {
         const rec = (app.data.studentVariables || []).find(v =>
-          v.studentId === s.id &&
-          (v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId) &&
+          (v.studentId === s.id || v.student_id === s.id) &&
+          (v.assignmentId === activeAsg.id || v.assignment_id === activeAsg.id || v.assignmentId === activeAsg.code || v.assignment_id === activeAsg.code || v.assignmentId === activeAsg.originalId || v.assignment_id === activeAsg.originalId) &&
           v.key === vName
         );
         return rec && rec.value !== undefined && rec.value !== null && String(rec.value).trim() !== '';
@@ -1459,8 +1459,8 @@ const facultyView = {
                     <td>${st.name || st.fullName || 'Student'}</td>
                     ${variableNames.map(vName => {
                       const rec = (app.data.studentVariables || []).find(v =>
-                        v.studentId === st.id &&
-                        (v.assignmentId === activeAsg.id || v.assignmentId === activeAsg.code || v.assignmentId === activeAsg.originalId) &&
+                        (v.studentId === st.id || v.student_id === st.id) &&
+                        (v.assignmentId === activeAsg.id || v.assignment_id === activeAsg.id || v.assignmentId === activeAsg.code || v.assignment_id === activeAsg.code || v.assignmentId === activeAsg.originalId || v.assignment_id === activeAsg.originalId) &&
                         v.key === vName
                       );
                       const val = rec ? rec.value : null;
@@ -1502,8 +1502,8 @@ const facultyView = {
       const uinCell = s.uin || s.id || '';
       const varCells = variableNames.map(vName => {
         const rec = (app.data.studentVariables || []).find(v =>
-          v.studentId === s.id &&
-          (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId) &&
+          (v.studentId === s.id || v.student_id === s.id) &&
+          (v.assignmentId === asg.id || v.assignment_id === asg.id || v.assignmentId === asg.code || v.assignment_id === asg.code || v.assignmentId === asg.originalId || v.assignment_id === asg.originalId) &&
           v.key === vName
         );
         return rec && rec.value !== undefined && rec.value !== null ? rec.value : '';
@@ -1732,8 +1732,8 @@ const facultyView = {
         enrolledStudents.forEach(s => {
           const isFullyAssigned = variableNames.length > 0 && variableNames.every(vName => {
             const rec = (app.data.studentVariables || []).find(v =>
-              v.studentId === s.id &&
-              (v.assignmentId === asg.id || v.assignmentId === asg.code || v.assignmentId === asg.originalId) &&
+              (v.studentId === s.id || v.student_id === s.id) &&
+              (v.assignmentId === asg.id || v.assignment_id === asg.id || v.assignmentId === asg.code || v.assignment_id === asg.code || v.assignmentId === asg.originalId || v.assignment_id === asg.originalId) &&
               v.key === vName
             );
             return rec && rec.value !== undefined && rec.value !== null && String(rec.value).trim() !== '';
