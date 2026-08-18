@@ -102,18 +102,7 @@ const facultyView = {
     }
 
     const facultyEmail = app.currentUser.email ? app.currentUser.email.trim().toLowerCase() : '';
-
-    const assignedSfs = (app.data.subjectFaculty || []).filter(sf =>
-      sf.faculty_id === facultyEmail || sf.facultyId === facultyEmail
-    );
-
-    let assignedSubjects = (app.data.subjects || []).filter(s =>
-      assignedSfs.some(sf => sf.subject_id === s.id || sf.subjectId === s.id)
-    );
-
-    if (assignedSubjects.length === 0 && app.currentRole === 'admin') {
-      assignedSubjects = app.data.subjects || [];
-    }
+    const assignedSubjects = app.getFacultySubjects(facultyEmail);
 
     const pendingSubmissions = app.data.submissions.filter(s => (s.verificationStatus || 'pending').toLowerCase() === 'pending');
 
@@ -495,17 +484,7 @@ const facultyView = {
 
   /* PART 9 FIX: Filter students by subject's branch/class */
   renderSubjectStudentsTab(sub) {
-    const enrolled = app.data.students.filter(s => {
-      if (!sub) return true;
-      const b = (s.branch || '').toLowerCase();
-      const deptId = sub.departmentId || '';
-      if (deptId === 'dept-aids') return b.includes('artificial intelligence');
-      if (deptId === 'dept-civil') return b.includes('civil');
-      if (deptId === 'dept-comp') return b.includes('computer engineering');
-      if (deptId === 'dept-ecs') return b.includes('electronics');
-      if (deptId === 'dept-mech') return b.includes('mechanical');
-      return true;
-    });
+    const enrolled = app.getStudentsForSubject(sub);
 
     return `
       <div class="card">
@@ -1144,8 +1123,7 @@ const facultyView = {
   renderScheduleManager(container, sub) {
     const subAsgs = (app.data.assignments || []).filter(a => !sub || a.subjectId === sub.id || a.subject_id === sub.id);
     const targetSub = sub || (subAsgs[0] ? (app.data.subjects || []).find(s => s.id === (subAsgs[0].subjectId || subAsgs[0].subject_id)) : null) || (app.data.subjects || [])[0];
-    const deptId = targetSub ? (targetSub.departmentId || targetSub.department_id) : '';
-    const students = deptId ? app.getStudentsForDept(deptId) : [];
+    const students = targetSub ? app.getStudentsForSubject(targetSub) : [];
     const batches = [...new Set(students.map(s => s.batch).filter(Boolean))].sort();
 
     container.innerHTML = `
@@ -1256,6 +1234,7 @@ const facultyView = {
       title: asg.title,
       display_code: asg.display_code || null,
       subject_id: asg.subjectId || asg.subject_id,
+      academic_year: asg.academic_year || app.getActiveAcademicYear(),
       lifecycle_status: asg.lifecycle_status || 'draft',
       questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(schedules)
@@ -1382,10 +1361,9 @@ const facultyView = {
     );
     const orphanedKeys = Array.from(new Set(existingAsgVars.map(v => v.key).filter(k => k && !currentVarSet.has(k))));
 
-    // Resolve subject & enrolled students via app.getStudentsForDept
+    // Resolve subject & enrolled students via app.getStudentsForSubject
     const currentSubject = subObj || (app.data.subjects || []).find(s => s.id === (activeAsg.subjectId || activeAsg.subject_id)) || (app.data.subjects || [])[0];
-    const deptId = currentSubject ? (currentSubject.departmentId || currentSubject.department_id || '') : '';
-    const enrolledStudents = app.getStudentsForDept(deptId);
+    const enrolledStudents = app.getStudentsForSubject(currentSubject);
 
     // Compute coverage: students fully assigned (has non-empty value for ALL scoped variables)
     let fullyAssignedCount = 0;
@@ -2183,6 +2161,7 @@ const facultyView = {
       title: asgRecord.title,
       working_title: asgRecord.working_title,
       subject_id: subId,
+      academic_year: academicYear || app.getActiveAcademicYear(),
       series_prefix: seriesPrefix,
       series_type: seriesType,
       lifecycle_status: 'draft',
@@ -2327,6 +2306,7 @@ const facultyView = {
       code: asgCode,
       title: asg.title,
       subject_id: asg.subjectId || asg.subject_id,
+      academic_year: asg.academic_year || app.getActiveAcademicYear(),
       lifecycle_status: asg.lifecycle_status || 'draft',
       questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(asg.schedules || [])
@@ -2454,6 +2434,7 @@ const facultyView = {
       title: asg.title || asg.working_title,
       working_title: asg.working_title,
       subject_id: asg.subjectId || asg.subject_id,
+      academic_year: asg.academic_year || app.getActiveAcademicYear(),
       lifecycle_status: asg.lifecycle_status || 'draft',
       rubric_preset_id: asg.rubric_preset_id || asg.rubricPresetId || 'rub-inst-001',
       questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
@@ -2541,6 +2522,7 @@ const facultyView = {
       code: asgCode,
       title: asg.title,
       subject_id: asg.subjectId || asg.subject_id,
+      academic_year: asg.academic_year || app.getActiveAcademicYear(),
       lifecycle_status: asg.lifecycle_status || 'draft',
       questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: JSON.stringify(asg.schedules || [])
@@ -2661,6 +2643,7 @@ const facultyView = {
         working_title: asg.working_title,
         display_code: displayCode,
         subject_id: subjectId,
+        academic_year: academicYear,
         series_prefix: seriesPrefix,
         series_type: seriesType,
         lifecycle_status: 'published',
@@ -2702,6 +2685,7 @@ const facultyView = {
       title: asg.title,
       display_code: asg.display_code,
       subject_id: asg.subjectId || asg.subject_id,
+      academic_year: asg.academic_year || app.getActiveAcademicYear(),
       lifecycle_status: 'retracted',
       questions: typeof asg.questions === 'string' ? asg.questions : JSON.stringify(asg.questions || []),
       schedules: typeof asg.schedules === 'string' ? asg.schedules : JSON.stringify(asg.schedules || [])
@@ -2755,6 +2739,8 @@ const facultyView = {
 
     const newDraft = {
       ...JSON.parse(JSON.stringify(asg)),
+      subject_id: subId,
+      academic_year: app.getActiveAcademicYear(),
       id: newAsgId,
       lifecycle_status: 'draft',
       state: 'Draft',
@@ -3012,6 +2998,7 @@ const facultyView = {
       title: asg.title || asg.working_title,
       working_title: asg.working_title || asg.title,
       subject_id: asg.subjectId || asg.subject_id,
+      academic_year: asg.academic_year || app.getActiveAcademicYear(),
       lifecycle_status: asg.lifecycle_status || 'draft',
       display_code: asg.display_code || null,
       bt_level: asg.btLevel || asg.bt_level || '',

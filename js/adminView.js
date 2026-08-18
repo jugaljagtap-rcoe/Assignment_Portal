@@ -613,7 +613,7 @@ const adminView = {
       division: s.division,
       batch: s.batch,
       year_of_study: s.yearOfStudy,
-      academic_year: '2026-27'
+      academic_year: app.getActiveAcademicYear()
     }, `Student ${s.name}`);
     writeAudit('updated', 'student', s.id, { transfer: true, branch: s.branch, division: s.division });
     app.closeModal();
@@ -708,7 +708,7 @@ const adminView = {
         division: st.division,
         batch: st.batch,
         year_of_study: year,
-        academic_year: '2026-27'
+        academic_year: app.getActiveAcademicYear()
       }, `Student ${st.name}`);
     }
 
@@ -882,7 +882,7 @@ const adminView = {
         id: stObj.id, uin: stObj.uin, name: stObj.name,
         email: stObj.email, branch: stObj.branch,
         division: stObj.division, batch: stObj.batch,
-        year_of_study: stObj.yearOfStudy, academic_year: '2026-27'
+        year_of_study: stObj.yearOfStudy, academic_year: app.getActiveAcademicYear()
       }, `Student ${stObj.name}`);
     }
     app.closeModal();
@@ -1049,7 +1049,7 @@ const adminView = {
           subjectId: sub.id,
           faculty_id: email,
           facultyId: email,
-          academic_year: '2026-27'
+          academic_year: app.getActiveAcademicYear()
         };
         app.data.subjectFaculty.push(newSf);
         await app.supabaseUpsert('subject_faculty', {
@@ -1133,7 +1133,7 @@ const adminView = {
       id: deterministicSfId,
       subject_id: subjectId,
       faculty_id: facultyEmail,
-      academic_year: '2026-27',
+      academic_year: app.getActiveAcademicYear(),
       assigned_by: app.currentUser ? app.currentUser.email : 'system',
       assigned_at: new Date().toISOString()
     };
@@ -1376,7 +1376,7 @@ const adminView = {
       division: stRecord.division,
       batch: stRecord.batch,
       year_of_study: stRecord.yearOfStudy,
-      academic_year: '2026-27'
+      academic_year: app.getActiveAcademicYear()
     }, `Student ${stRecord.name}`);
     writeAudit('created', 'student', stRecord.id, stRecord);
     app.closeModal();
@@ -1447,7 +1447,7 @@ const adminView = {
       division: s.division,
       batch: s.batch,
       year_of_study: s.yearOfStudy,
-      academic_year: '2026-27'
+      academic_year: app.getActiveAcademicYear()
     }, `Student ${s.name}`);
     writeAudit('updated', 'student', id, s);
     app.closeModal();

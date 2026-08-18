@@ -54,8 +54,102 @@ class AppEngine {
     const savedAsgId = localStorage.getItem('rizvi_fe_active_asg_id');
     const firstAsgId = this.data.assignments.length > 0 ? this.data.assignments[0].id : null;
     this.activeAssignmentId = savedAsgId || firstAsgId || null;
+    this.activeSubjectId = null;
     this.lastSyncedAt = null;
     this.reconcileUserSession();
+  }
+
+  getStudentsForAY(ay = this.getActiveAcademicYear()) {
+    return (this.data.students || []).filter(s => !s.academic_year || s.academic_year === ay);
+  }
+
+  getSubjectsForStudent(student) {
+    if (!student) return [];
+    const activeAY = this.getActiveAcademicYear();
+    const activeSFSubjectIds = new Set(
+      (this.data.subjectFaculty || [])
+        .filter(sf => sf.academic_year === activeAY || !sf.academic_year)
+        .map(sf => sf.subject_id)
+    );
+    if (student.yearOfStudy === 'FE') {
+      return (this.data.subjects || []).filter(s =>
+        s.departmentId === 'dept-fe' &&
+        ['Semester I', 'Semester II'].includes(s.semester) &&
+        activeSFSubjectIds.has(s.id)
+      );
+    }
+    const branchMap = {
+      'Artificial Intelligence & Data Science': 'dept-aids',
+      'Civil Engineering': 'dept-civil',
+      'Computer Engineering': 'dept-comp',
+      'Electronics & Computer Science': 'dept-ecs',
+      'Mechanical Engineering': 'dept-mech'
+    };
+    const deptId = branchMap[student.branch];
+    if (!deptId) return [];
+    const semMap = {
+      'SE': ['Semester III', 'Semester IV'],
+      'TE': ['Semester V', 'Semester VI'],
+      'BE': ['Semester VII', 'Semester VIII']
+    };
+    const allowedSemesters = semMap[student.yearOfStudy] || [];
+    return (this.data.subjects || []).filter(s =>
+      s.departmentId === deptId &&
+      allowedSemesters.includes(s.semester) &&
+      activeSFSubjectIds.has(s.id)
+    );
+  }
+
+  getAssignmentsForStudent(student) {
+    const subjects = this.getSubjectsForStudent(student);
+    const subjectIds = new Set(subjects.map(s => s.id));
+    let assignments = (this.data.assignments || []).filter(a =>
+      subjectIds.has(a.subjectId || a.subject_id)
+    );
+    if (this.currentRole !== 'admin' && !this.currentUser?.isDualRole) {
+      assignments = assignments.filter(a => a.lifecycle_status !== 'draft');
+    }
+    return assignments;
+  }
+
+  getStudentsForSubject(subject) {
+    if (!subject) return [];
+    const activeAY = this.getActiveAcademicYear();
+    const semester = subject.semester || '';
+    let yearOfStudy = '';
+    if (['Semester I', 'Semester II'].includes(semester)) yearOfStudy = 'FE';
+    else if (['Semester III', 'Semester IV'].includes(semester)) yearOfStudy = 'SE';
+    else if (['Semester V', 'Semester VI'].includes(semester)) yearOfStudy = 'TE';
+    else if (['Semester VII', 'Semester VIII'].includes(semester)) yearOfStudy = 'BE';
+
+    const deptId = subject.departmentId || subject.department_id;
+    const students = this.getStudentsForAY(activeAY);
+    if (deptId === 'dept-fe') {
+      return students.filter(s => s.yearOfStudy === 'FE');
+    }
+    return students.filter(s => {
+      const b = (s.branch || '').toLowerCase();
+      const y = (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase();
+      if (y !== yearOfStudy) return false;
+      if (deptId === 'dept-aids') return b.includes('artificial intelligence');
+      if (deptId === 'dept-civil') return b.includes('civil');
+      if (deptId === 'dept-comp') return b.includes('computer engineering');
+      if (deptId === 'dept-ecs') return b.includes('electronics');
+      if (deptId === 'dept-mech') return b.includes('mechanical');
+      return false;
+    });
+  }
+
+  getFacultySubjects(facultyEmail) {
+    if (this.currentRole === 'admin') return this.data.subjects || [];
+    const activeAY = this.getActiveAcademicYear();
+    const email = (facultyEmail || '').trim().toLowerCase();
+    const sfRecords = (this.data.subjectFaculty || []).filter(sf =>
+      (sf.faculty_id || '').trim().toLowerCase() === email &&
+      (!sf.academic_year || sf.academic_year === activeAY)
+    );
+    const sfSubjectIds = new Set(sfRecords.map(sf => sf.subject_id));
+    return (this.data.subjects || []).filter(s => sfSubjectIds.has(s.id));
   }
 
   getStudentsForDept(deptId) {
@@ -388,6 +482,7 @@ class AppEngine {
           title: asg.title || asg.working_title,
           working_title: asg.working_title || asg.title,
           subject_id: asg.subjectId || asg.subject_id,
+          academic_year: asg.academic_year || this.getActiveAcademicYear(),
           lifecycle_status: asg.lifecycle_status || 'draft',
           display_code: asg.display_code || null,
           bt_level: asg.btLevel || asg.bt_level || '',
@@ -576,11 +671,11 @@ class AppEngine {
      ========================================================================== */
   canFacultyEditSubject(subjectId) {
     if (this.currentRole === 'admin') return true;
-    const activeYear = '2026-27';
+    const activeYear = this.getActiveAcademicYear();
     return (this.data.subjectFaculty || []).some(sf =>
       sf.subject_id === subjectId &&
       sf.faculty_id === (this.currentUser?.email || '').trim().toLowerCase() &&
-      (sf.academic_year === activeYear || sf.academicYear === activeYear)
+      (!sf.academic_year || sf.academic_year === activeYear || sf.academicYear === activeYear)
     );
   }
 
@@ -1318,8 +1413,8 @@ class AppEngine {
       student = (this.data.students || []).find(s => s.id === studentId);
     }
     if (!student) {
-      // Faculty preview mode or fallback: use first enrolled student for subject/branch
-      const enrolled = this.getStudentsForDept(deptId);
+      // Faculty preview mode or fallback: use first enrolled student for subject
+      const enrolled = this.getStudentsForSubject(subject);
       student = enrolled.length > 0 ? enrolled[0] : null;
     }
 

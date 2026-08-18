@@ -13,7 +13,8 @@ const analyticsView = {
     }
 
     const isAdminViewing = app.currentRole === 'admin';
-    const totalStudents = app.data.students.length;
+    const studentsForAY = app.getStudentsForAY(app.getActiveAcademicYear());
+    const totalStudents = studentsForAY.length;
 
     // Use rolled-up assignmentSubmissions where possible for student-based completion
     const asgSubs = app.data.assignmentSubmissions || [];
@@ -116,7 +117,7 @@ const analyticsView = {
                 </tr>
               </thead>
               <tbody>
-                ${app.data.students.map(st => {
+                ${studentsForAY.map(st => {
                   const studentSubs = (app.data.assignmentSubmissions || []).filter(as => as.studentId === st.id);
                   const completedCount = studentSubs.filter(as => as.status === 'submitted' || as.status === 'late').length;
                   let totalMarks = 0;
@@ -255,7 +256,7 @@ const analyticsView = {
                 ${subjects.map(s => {
                   const dept = (app.data.departments || []).find(d => d.id === s.departmentId);
                   const asgs = (app.data.assignments || []).filter(a => a.subjectId === s.id);
-                  const enrolled = branchFilter ? app.data.students.filter(st => st.branch === branchFilter) : app.data.students;
+                  const enrolled = branchFilter ? app.getStudentsForAY(app.getActiveAcademicYear()).filter(st => st.branch === branchFilter) : app.getStudentsForAY(app.getActiveAcademicYear());
                   const completedSubs = (app.data.assignmentSubmissions || []).filter(as => asgs.some(a => a.id === as.assignmentId) && (as.status === 'submitted' || as.status === 'late'));
                   const rate = enrolled.length > 0 ? Math.round((completedSubs.length / (enrolled.length * Math.max(1, asgs.length))) * 100) : 0;
                   return `
@@ -317,7 +318,7 @@ const analyticsView = {
       }
 
       case 'reportC': {
-        const enrolled = branchFilter ? app.data.students.filter(st => st.branch === branchFilter) : app.data.students;
+        const enrolled = branchFilter ? app.getStudentsForAY(app.getActiveAcademicYear()).filter(st => st.branch === branchFilter) : app.getStudentsForAY(app.getActiveAcademicYear());
         return `
           <h3 class="card-title" style="margin-bottom:12px;">Report C: Student Verification Roster</h3>
           <div class="table-container">
@@ -425,7 +426,8 @@ const analyticsView = {
   },
 
   exportMasterClassGradebookCSV() {
-    if (!app.data.students || app.data.students.length === 0) {
+    const studentsForAY = app.getStudentsForAY(app.getActiveAcademicYear());
+    if (!studentsForAY || studentsForAY.length === 0) {
       app.showToast('No student data available to export', 'warning');
       return;
     }
@@ -433,7 +435,7 @@ const analyticsView = {
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += "Student UIN,Student Name,Email,Branch,Division,Batch,Completed Assignments,Total Marks Earned\n";
 
-    app.data.students.forEach(st => {
+    studentsForAY.forEach(st => {
       const studentSubs = (app.data.assignmentSubmissions || []).filter(as => as.studentId === st.id);
       const completedCount = studentSubs.filter(as => as.status === 'submitted' || as.status === 'late').length;
       let totalMarks = 0;
@@ -449,7 +451,7 @@ const analyticsView = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    app.showToast(`Exported Master Class Gradebook for ${app.data.students.length} students`, 'success');
+    app.showToast(`Exported Master Class Gradebook for ${studentsForAY.length} students`, 'success');
   },
 
   exportCOAttainmentCSV() {

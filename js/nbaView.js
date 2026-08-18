@@ -31,7 +31,7 @@ const nbaView = {
         <button class="segmented-btn ${activeTab === 'department' ? 'active' : ''}" onclick="window.location.hash='#nba-dept-${this.activeDeptId || 'dept-mech'}'">
           🏢 Department Analysis
         </button>
-        <button class="segmented-btn ${activeTab === 'student' ? 'active' : ''}" onclick="window.location.hash='#nba-student-${this.activeStudentId || (app.data.students[0] ? app.data.students[0].id : '')}'">
+        <button class="segmented-btn ${activeTab === 'student' ? 'active' : ''}" onclick="window.location.hash='#nba-student-${this.activeStudentId || (app.getStudentsForAY()[0] ? app.getStudentsForAY()[0].id : '')}'">
           🎓 Student Attainment Profile
         </button>
         <button class="segmented-btn ${activeTab === 'export' ? 'active' : ''}" onclick="window.location.hash='#nba-export'">
@@ -43,7 +43,8 @@ const nbaView = {
   },
 
   renderInstituteView(container) {
-    const totalStudents = app.data.students.length;
+    const studentsForAY = app.getStudentsForAY();
+    const totalStudents = studentsForAY.length;
     const totalCos = (app.data.courseOutcomes || []).length;
     const classTarget = app.data.attainmentSettings ? app.data.attainmentSettings.classTargetPct : 70;
     const studentThreshold = app.data.attainmentSettings ? app.data.attainmentSettings.studentThresholdPct : 60;
@@ -63,7 +64,7 @@ const nbaView = {
       const relevantPids = Object.keys(paramMap).filter(pid => paramMap[pid].coId === co.code);
       let passingStudents = 0;
 
-      app.data.students.forEach(st => {
+      studentsForAY.forEach(st => {
         let earnedRaw = 0;
         let possibleRaw = 0;
         relevantPids.forEach(pid => {
@@ -310,12 +311,13 @@ const nbaView = {
   },
 
   renderStudentView(container, studentId) {
-    if (!studentId && app.data.students.length > 0) {
-      studentId = app.data.students[0].id;
+    const studentsForAY = app.getStudentsForAY();
+    if (!studentId && studentsForAY.length > 0) {
+      studentId = studentsForAY[0].id;
     }
     this.activeStudentId = studentId;
 
-    const student = app.data.students.find(s => s.id === studentId) || app.data.students[0] || null;
+    const student = studentsForAY.find(s => s.id === studentId) || studentsForAY[0] || null;
 
     container.innerHTML = `
       <div class="page-header-container">
@@ -332,7 +334,7 @@ const nbaView = {
         <div class="filter-group">
           <label style="color:var(--accent-blue);">Select Student to Inspect Attainment</label>
           <select class="form-select" style="background:#FFF;" onchange="window.location.hash='#nba-student-' + this.value">
-            ${app.data.students.map(s => `
+            ${studentsForAY.map(s => `
               <option value="${s.id}" ${student && s.id === student.id ? 'selected' : ''}>
                 ${s.name} (${s.uin} — ${s.branch})
               </option>
@@ -362,7 +364,7 @@ const nbaView = {
           <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
             ${(app.data.courseOutcomes || []).map(co => {
               const paramMap = {};
-              (app.data.assignments || []).forEach(asg => {
+              (app.getAssignmentsForStudent(student) || []).forEach(asg => {
                 (asg.questions || []).forEach(q => {
                   (q.parameters || []).forEach(p => {
                     paramMap[p.id] = { coId: q.coId || 'CO1', valueMarks: p.valueMarks || 4 };
