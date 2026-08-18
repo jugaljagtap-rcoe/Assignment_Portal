@@ -1657,7 +1657,7 @@ const facultyView = {
         }
 
         const rawId = `sv-${student.id}-${asgId}-${scopedKey}`;
-        const deterministicId = rawId.toLowerCase().replace(/[^a-z0-9\-]/g, '-');
+        const deterministicId = rawId.replace(/[^a-zA-Z0-9\-\_]/g, '-');
 
         const record = {
           id: deterministicId,
