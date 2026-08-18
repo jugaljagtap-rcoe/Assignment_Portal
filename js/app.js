@@ -60,7 +60,7 @@ class AppEngine {
   }
 
   getStudentsForAY(ay = this.getActiveAcademicYear()) {
-    return (this.data.students || []).filter(s => !s.academic_year || s.academic_year === ay);
+    return (this.data.students || []).filter(s => s.academic_year === ay);
   }
 
   getSubjectsForStudent(student) {
@@ -68,7 +68,7 @@ class AppEngine {
     const activeAY = this.getActiveAcademicYear();
     const activeSFSubjectIds = new Set(
       (this.data.subjectFaculty || [])
-        .filter(sf => sf.academic_year === activeAY || !sf.academic_year)
+        .filter(sf => sf.academic_year === activeAY)
         .map(sf => sf.subject_id)
     );
     if (student.yearOfStudy === 'FE') {
@@ -101,10 +101,11 @@ class AppEngine {
   }
 
   getAssignmentsForStudent(student) {
+    const activeAY = this.getActiveAcademicYear();
     const subjects = this.getSubjectsForStudent(student);
     const subjectIds = new Set(subjects.map(s => s.id));
     let assignments = (this.data.assignments || []).filter(a =>
-      subjectIds.has(a.subjectId || a.subject_id)
+      subjectIds.has(a.subjectId || a.subject_id) && (!a.academic_year || a.academic_year === activeAY)
     );
     if (this.currentRole !== 'admin' && !this.currentUser?.isDualRole) {
       assignments = assignments.filter(a => a.lifecycle_status !== 'draft');
@@ -146,7 +147,7 @@ class AppEngine {
     const email = (facultyEmail || '').trim().toLowerCase();
     const sfRecords = (this.data.subjectFaculty || []).filter(sf =>
       (sf.faculty_id || '').trim().toLowerCase() === email &&
-      (!sf.academic_year || sf.academic_year === activeAY)
+      sf.academic_year === activeAY
     );
     const sfSubjectIds = new Set(sfRecords.map(sf => sf.subject_id));
     return (this.data.subjects || []).filter(s => sfSubjectIds.has(s.id));

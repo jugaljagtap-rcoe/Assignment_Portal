@@ -86,16 +86,15 @@ const studentView = {
       }
     }
 
-    // Level 1 — Subject Cards Grid
     const subjects = app.getSubjectsForStudent(student);
-    const studentAsgs = app.getAssignmentsForStudent(student);
+    const publishedAsgs = app.getAssignmentsForStudent(student);
     const studentsForAY = app.getStudentsForAY();
 
     container.innerHTML = `
       <div class="page-header-container" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
-          <h1 class="page-title">Welcome back, ${student ? student.name : 'Student'}!</h1>
-          <p class="page-subtitle">UIN: <strong class="mono-val">${student ? student.uin : '--'}</strong> · Branch: <strong>${student ? student.branch : 'Engineering'}</strong></p>
+          <h1 class="page-title">My Courses & Labs</h1>
+          <p class="page-subtitle">${student ? student.name : 'Student'} · UIN: <strong class="mono-val">${student ? student.uin : '--'}</strong> · Branch: <strong>${student ? student.branch : 'Engineering'}</strong></p>
         </div>
         
         <div style="display:flex; gap:12px; align-items:center;">
@@ -114,38 +113,32 @@ const studentView = {
         </div>
       </div>
 
-      <div class="card-header" style="margin-bottom:16px;">
-        <h2 class="card-title">My Courses & Lab Modules</h2>
-        <p class="card-subtitle">Select a subject to view published experiment assignments, progress track, and submit work</p>
-      </div>
-
       ${subjects.length === 0 ? `
         <div class="card" style="padding:40px; text-align:center;">
           <div class="empty-state">
             <div class="empty-state-emoji">📚</div>
-            <h3 class="empty-state-title">No Enrolled Courses Found</h3>
-            <p class="empty-state-subtitle">No active subject courses mapped for your academic year (${student?.yearOfStudy || 'FE'}) and branch.</p>
+            <h3 class="empty-state-title">No courses assigned yet</h3>
+            <p class="empty-state-subtitle">Contact your administrator.</p>
           </div>
         </div>
       ` : `
-        <div class="dept-blocks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+        <div class="dept-blocks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
           ${subjects.map(sub => {
-            const subAsgs = studentAsgs.filter(a => (a.subjectId || a.subject_id) === sub.id);
-            const dept = (app.data.departments || []).find(d => d.id === (sub.departmentId || sub.department_id));
+            const subjectAsgs = publishedAsgs.filter(a => a.subject_id === sub.id || a.subjectId === sub.id);
+            const dept = (HARDCODED_DEPARTMENTS || []).find(d => d.id === (sub.departmentId || sub.department_id));
             
-            let totalSubAsgs = subAsgs.length;
             let submittedCount = 0;
-            let pendingCount = 0;
             let marksEarned = 0;
 
-            subAsgs.forEach(a => {
+            subjectAsgs.forEach(a => {
               const aSubRecord = (app.data.assignmentSubmissions || []).find(as => as.studentId === student?.id && (as.assignmentId === a.id || as.assignment_id === a.id));
               const stStatus = aSubRecord ? aSubRecord.status : 'not_started';
               if (stStatus === 'submitted' || stStatus === 'late') submittedCount++;
-              else pendingCount++;
 
               if (aSubRecord) marksEarned += (parseFloat(aSubRecord.total_marks_awarded) || 0);
             });
+
+            const pendingCount = subjectAsgs.length - submittedCount;
 
             return `
               <div class="card subject-card-item" style="cursor:pointer; transition:transform 0.15s ease, box-shadow 0.15s ease; border-top: 4px solid var(--accent-blue);" onclick="app.activeSubjectId = '${sub.id}'; studentView.renderSubjectWorkspace(document.getElementById('main-content'), (app.data.subjects || []).find(s => s.id === '${sub.id}'));">
@@ -156,9 +149,9 @@ const studentView = {
                 <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin-bottom:4px; line-height:1.3;">
                   ${sub.fullName || sub.name}
                 </h3>
-                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">${sub.semester || 'Semester'}</p>
+                <p style="font-size:12px; color:var(--text-secondary); margin-bottom:14px;">Semester: ${sub.semester || 'Semester I'}</p>
 
-                ${totalSubAsgs === 0 ? `
+                ${subjectAsgs.length === 0 ? `
                   <div style="padding:10px; background:var(--warning-subtle); color:var(--warning); border-radius:var(--radius-sm); font-size:12px; font-weight:600; text-align:center;">
                     ⚠️ Nothing to submit yet
                   </div>
@@ -166,7 +159,7 @@ const studentView = {
                   <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; background:var(--bg-subtle); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border-default);">
                     <div>
                       <div style="font-size:10px; color:var(--text-tertiary); font-weight:700; text-transform:uppercase;">Total Assignments</div>
-                      <div style="font-size:15px; font-weight:800; color:var(--text-primary);" class="mono-val">${totalSubAsgs}</div>
+                      <div style="font-size:15px; font-weight:800; color:var(--text-primary);" class="mono-val">${subjectAsgs.length}</div>
                     </div>
                     <div>
                       <div style="font-size:10px; color:var(--text-tertiary); font-weight:700; text-transform:uppercase;">Submitted</div>
@@ -194,22 +187,12 @@ const studentView = {
     if (!sub) return;
     app.activeSubjectId = sub.id;
     const student = this.getResolvedStudent();
-    const subAsgs = app.getAssignmentsForStudent(student).filter(a => (a.subjectId || a.subject_id) === sub.id);
+    const allAsgs = app.getAssignmentsForStudent(student).filter(a => a.subject_id === sub.id || a.subjectId === sub.id);
 
-    const seriesGroupMap = {
-      'L': { title: 'Lab Practicals (L Series)', list: [] },
-      'A': { title: 'Assignments (A Series)', list: [] },
-      'T': { title: 'Tests & Quizzes (T Series)', list: [] },
-      'P': { title: 'Projects (P Series)', list: [] }
-    };
+    const TYPE_LABELS = { L: 'Lab Practicals', A: 'Assignments', T: 'Tests & Quizzes', P: 'Projects' };
+    const order = ['L', 'A', 'T', 'P'];
 
-    subAsgs.forEach(a => {
-      const type = (a.series_type || a.seriesType || 'A').toUpperCase();
-      if (seriesGroupMap[type]) seriesGroupMap[type].list.push(a);
-      else seriesGroupMap['A'].list.push(a);
-    });
-
-    const activeGroups = Object.keys(seriesGroupMap).filter(k => seriesGroupMap[k].list.length > 0);
+    const dept = (HARDCODED_DEPARTMENTS || []).find(d => d.id === (sub.departmentId || sub.department_id));
 
     container.innerHTML = `
       <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
@@ -223,6 +206,7 @@ const studentView = {
           <div>
             <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
               <span class="tag tag-co" style="font-weight:700;">${sub.code}</span>
+              <span class="tag tag-bt">${dept ? dept.shortName : 'FE'}</span>
               <span class="tag tag-bt">${sub.semester || 'Semester'}</span>
             </div>
             <h1 class="page-title" style="font-size:20px;">${sub.fullName || sub.name}</h1>
@@ -233,86 +217,82 @@ const studentView = {
         </div>
       </div>
 
-      ${activeGroups.length === 0 ? `
+      ${allAsgs.length === 0 ? `
         <div class="card" style="padding:40px; text-align:center;">
           <div class="empty-state">
             <div class="empty-state-emoji">📝</div>
-            <h3 class="empty-state-title">No assignments published yet</h3>
-            <p class="empty-state-subtitle">Your faculty member has not published any assignments or lab practicals for ${sub.code} yet.</p>
+            <h3 class="empty-state-title">No assignments published yet — check back later</h3>
           </div>
         </div>
       ` : `
         <div style="display:flex; flex-direction:column; gap:16px;">
-          ${activeGroups.map(groupKey => {
-            const group = seriesGroupMap[groupKey];
+          ${order.map(type => {
+            const group = allAsgs.filter(a => (a.series_type || a.seriesType || 'A').toUpperCase() === type);
+            if (group.length === 0) return '';
+            const typeLabel = TYPE_LABELS[type] || 'Assignments';
+
             return `
               <div class="card subject-group-card">
-                <h3 class="card-title" style="margin-bottom:12px; font-size:15px; font-weight:700;">${group.title}</h3>
-                <div class="table-container">
-                  <table class="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Code / Title</th>
-                        <th>Deadline</th>
-                        <th>Progress</th>
-                        <th>Status</th>
-                        <th>Marks Earned</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${group.list.map(asg => {
-                        const sch = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1');
-                        const aSubRecord = (app.data.assignmentSubmissions || []).find(as => as.studentId === student?.id && (as.assignmentId === asg.id || as.assignment_id === asg.id));
-                        const stStatus = aSubRecord ? aSubRecord.status : 'not_started';
-                        
-                        let statusLabel = 'NOT STARTED';
-                        let pillClass = 'pill-draft';
-                        if (stStatus === 'submitted') { statusLabel = 'SUBMITTED'; pillClass = 'pill-published'; }
-                        else if (stStatus === 'late') { statusLabel = 'LATE'; pillClass = 'pill-flagged'; }
-                        else if (stStatus === 'partial') { statusLabel = 'PARTIAL'; pillClass = 'pill-pending'; }
+                <div class="subject-group-header" onclick="facultyView.toggleSubjectGroup(this)" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+                  <h3 class="card-title" style="margin:0; font-size:15px; font-weight:700;">${typeLabel} (${group.length})</h3>
+                  <span class="subject-group-toggle-icon" style="font-size:14px; font-weight:700;">▼</span>
+                </div>
+                <div class="subject-group-body" style="display:block; margin-top:12px;">
+                  <div class="dept-blocks-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
+                    ${group.map(asg => {
+                      const sch = app.getAssignmentSchedule(asg.id, student ? student.batch : 'A1');
+                      const aSubRecord = (app.data.assignmentSubmissions || []).find(as => as.studentId === student?.id && (as.assignmentId === asg.id || as.assignment_id === asg.id));
+                      const stStatus = aSubRecord ? aSubRecord.status : 'not_started';
+                      
+                      let statusPill = `<span class="col-pill pill-draft">Not Started</span>`;
+                      if (stStatus === 'submitted') statusPill = `<span class="col-pill pill-published">✓ Submitted</span>`;
+                      else if (stStatus === 'late') statusPill = `<span class="col-pill pill-flagged">🕐 Late</span>`;
+                      else if (stStatus === 'partial') statusPill = `<span class="col-pill pill-pending">🟡 In Progress</span>`;
 
-                        const paramsDone = aSubRecord ? (aSubRecord.parameters_completed || 0) : 0;
-                        const paramsTotal = aSubRecord ? (aSubRecord.parameters_total || 1) : 1;
-                        const pctDone = Math.round((paramsDone / Math.max(1, paramsTotal)) * 100);
-                        const marks = aSubRecord ? (parseFloat(aSubRecord.total_marks_awarded) || 0).toFixed(1) : '0.0';
+                      const paramsDone = aSubRecord ? (aSubRecord.parameters_completed || 0) : 0;
+                      const paramsTotal = aSubRecord ? (aSubRecord.parameters_total || 1) : 1;
+                      const pctDone = Math.round((paramsDone / Math.max(1, paramsTotal)) * 100);
+                      const marksEarned = aSubRecord ? (parseFloat(aSubRecord.total_marks_awarded) || 0).toFixed(1) : '0';
 
-                        let btnText = 'Start';
-                        if (stStatus === 'submitted' || stStatus === 'late') btnText = 'View Results';
-                        else if (stStatus === 'partial') btnText = 'Continue';
+                      let btnHtml = '';
+                      if (stStatus === 'submitted' || stStatus === 'late') {
+                        btnHtml = `<button class="btn btn-secondary btn-sm" style="width:100%;" onclick="app.activeAssignmentId = '${asg.id}'; app.switchNav('grades');">📄 View Results</button>`;
+                      } else if (stStatus === 'partial') {
+                        btnHtml = `<button class="btn btn-primary btn-sm" style="width:100%;" onclick="app.activeAssignmentId = '${asg.id}'; app.switchNav('solver');">✏️ Continue</button>`;
+                      } else {
+                        btnHtml = `<button class="btn btn-primary btn-sm" style="width:100%;" onclick="app.activeAssignmentId = '${asg.id}'; app.switchNav('solver');">✏️ Start</button>`;
+                      }
 
-                        return `
-                          <tr>
-                            <td>
-                              <div style="font-weight:700; color:var(--accent-blue);" class="mono-val">${asg.display_code || asg.code || asg.id}</div>
-                              <div style="font-size:12px; color:var(--text-secondary); font-weight:600;">${asg.title || asg.working_title}</div>
-                            </td>
-                            <td style="font-size:12px; font-weight:600;">${sch ? new Date(sch.deadline).toLocaleString() : '—'}</td>
-                            <td style="width:140px;">
+                      return `
+                        <div class="card" style="padding:14px; background:var(--bg-subtle); border:1px solid var(--border-default); display:flex; flex-direction:column; justify-space-between; gap:10px;">
+                          <div>
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                              <div style="font-weight:700; color:var(--accent-blue);" class="mono-val">${asg.display_code || asg.working_title || asg.title || asg.id}</div>
+                              ${statusPill}
+                            </div>
+                            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
+                              Deadline: <strong>${sch ? new Date(sch.deadline).toLocaleString() : '—'}</strong>
+                            </div>
+                            <div style="margin-bottom:8px;">
                               <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px; font-weight:600;">
-                                <span>${paramsDone}/${paramsTotal}</span>
+                                <span>Progress (${paramsDone}/${paramsTotal})</span>
                                 <span>${pctDone}%</span>
                               </div>
-                              <div style="height:6px; background:var(--bg-subtle); border-radius:3px; overflow:hidden;">
+                              <div style="height:6px; background:var(--bg-subtle); border:1px solid var(--border-default); border-radius:3px; overflow:hidden;">
                                 <div style="width:${pctDone}%; height:100%; background:${stStatus === 'submitted' ? 'var(--success)' : 'var(--accent-blue)'}; transition:width 0.2s ease;"></div>
                               </div>
-                            </td>
-                            <td>
-                              <span class="col-pill ${pillClass}">
-                                ${statusLabel}
-                              </span>
-                            </td>
-                            <td class="mono-val" style="font-weight:700;">${marks}</td>
-                            <td>
-                              <button class="btn ${stStatus === 'not_started' ? 'btn-primary' : 'btn-secondary'} btn-sm" onclick="app.activeAssignmentId = '${asg.id}'; app.switchNav('solver');">
-                                ${btnText} →
-                              </button>
-                            </td>
-                          </tr>
-                        `;
-                      }).join('')}
-                    </tbody>
-                  </table>
+                            </div>
+                            <div style="font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:10px;">
+                              Marks Earned: <strong class="mono-val" style="color:var(--accent-blue);">${marksEarned}</strong>
+                            </div>
+                          </div>
+                          <div>
+                            ${btnHtml}
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
                 </div>
               </div>
             `;

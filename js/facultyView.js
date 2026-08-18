@@ -885,7 +885,12 @@ const facultyView = {
           <h1 class="page-title">Assignment Builder</h1>
           <p class="page-subtitle">Manage assignments and experiments for <strong>${sub ? sub.code : 'all subjects'}</strong></p>
         </div>
-        ${sub ? `<button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal('${sub.id}')">+ Create New Assignment</button>` : ''}
+        ${sub ? `
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" onclick="facultyView.openCreateAssignmentModal('${sub.id}')">+ Create New Assignment</button>
+            <button class="btn btn-secondary" onclick="facultyView.openClonePreviousAYModal('${sub.id}')">📋 Clone from Previous AY</button>
+          </div>
+        ` : ''}
       </div>
 
       ${migratedAsgs.length > 0 ? `
@@ -3026,5 +3031,92 @@ const facultyView = {
       body.style.display = 'none';
       if (icon) icon.textContent = '▶';
     }
+  },
+
+  openClonePreviousAYModal(subId) {
+    const activeAY = app.getActiveAcademicYear();
+    const previousAsgs = (app.data.assignments || []).filter(a =>
+      (a.subject_id === subId || a.subjectId === subId) &&
+      a.academic_year &&
+      a.academic_year !== activeAY
+    );
+
+    if (previousAsgs.length === 0) {
+      app.showToast('No assignments from previous years found', 'warning');
+      return;
+    }
+
+    app.showModal(`Clone Assignments from Previous AY`, `
+      <form onsubmit="facultyView.handleCloneFormSubmit(event, '${subId}')" style="min-width:480px;">
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+          Select previous academic year assignments to clone into <strong>AY ${activeAY}</strong> as drafts.
+        </p>
+        <div style="max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          ${previousAsgs.map(a => `
+            <label style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid var(--border-default); border-radius:var(--radius-sm); cursor:pointer; background:var(--bg-subtle);">
+              <input type="checkbox" name="clone_asg_id" value="${a.id}" checked>
+              <span style="font-size:13px; font-weight:600;">
+                ${a.display_code || a.working_title || a.title} — <strong style="color:var(--accent-blue);">AY ${a.academic_year}</strong>
+              </span>
+            </label>
+          `).join('')}
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Clone Selected as Drafts in ${activeAY}</button>
+        </div>
+      </form>
+    `);
+  },
+
+  handleCloneFormSubmit(e, subId) {
+    e.preventDefault();
+    const checkboxes = document.querySelectorAll('input[name="clone_asg_id"]:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    if (selectedIds.length === 0) {
+      app.showToast('Please select at least one assignment to clone', 'warning');
+      return;
+    }
+    this.clonePreviousAYAssignments(subId, selectedIds);
+  },
+
+  async clonePreviousAYAssignments(subId, selectedAsgIds) {
+    const activeAY = app.getActiveAcademicYear();
+    for (const selectedAsgId of selectedAsgIds) {
+      const original = (app.data.assignments || []).find(a => a.id === selectedAsgId);
+      if (!original) continue;
+      const newRecord = JSON.parse(JSON.stringify(original));
+      newRecord.id = 'asg-' + subId + '-clone-' + Date.now();
+      newRecord.academic_year = activeAY;
+      newRecord.lifecycle_status = 'draft';
+      newRecord.state = 'Draft';
+      newRecord.display_code = null;
+      newRecord.working_title = (original.working_title || original.title) + ' (Cloned from ' + original.academic_year + ')';
+      newRecord.title = newRecord.working_title;
+      newRecord.schedules = [];
+      newRecord.schedules = JSON.stringify([]);
+      // Keep questions, rubric_preset_id, bt_level, series_type, series_prefix identical
+      app.data.assignments.push(newRecord);
+      await app.supabaseUpsert('assignments', {
+        id: newRecord.id,
+        title: newRecord.title,
+        working_title: newRecord.working_title,
+        subject_id: subId,
+        academic_year: activeAY,
+        lifecycle_status: 'draft',
+        display_code: null,
+        bt_level: newRecord.bt_level || newRecord.btLevel || '',
+        rubric_preset_id: newRecord.rubric_preset_id || 'rub-inst-001',
+        series_type: newRecord.series_type || 'L',
+        series_prefix: newRecord.series_prefix || '',
+        questions: typeof newRecord.questions === 'string' ? newRecord.questions : JSON.stringify(newRecord.questions || []),
+        schedules: '[]'
+      }, 'Cloned assignment ' + newRecord.working_title);
+      writeAudit('created', 'assignment', newRecord.id, {cloned_from: original.id, source_ay: original.academic_year});
+    }
+    app.saveState();
+    app.closeModal();
+    app.showToast('Cloned ' + selectedAsgIds.length + ' assignment(s) as drafts for AY ' + activeAY, 'success');
+    app.renderCurrentView();
   }
 };

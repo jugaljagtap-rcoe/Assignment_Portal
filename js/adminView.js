@@ -4,6 +4,7 @@
 
 const adminView = {
   activeDeptTab: 'overview',
+  activeRosterAY: null,
 
   render(container, activeNav) {
     const hash = window.location.hash || '#admin-home';
@@ -349,7 +350,19 @@ const adminView = {
   },
 
   renderDeptStudentsTab(dept) {
-    const deptStudents = app.getStudentsForDept(dept.id);
+    const activeAY = app.getActiveAcademicYear();
+    const ayStudents = app.getStudentsForAY(activeAY);
+    const deptStudents = ayStudents.filter(s => {
+      const b = (s.branch || '').toLowerCase();
+      const y = (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase();
+      if (dept.id === 'dept-fe') return y === 'FE';
+      if (dept.id === 'dept-aids') return b.includes('artificial intelligence');
+      if (dept.id === 'dept-civil') return b.includes('civil');
+      if (dept.id === 'dept-comp') return b.includes('computer engineering');
+      if (dept.id === 'dept-ecs') return b.includes('electronics');
+      if (dept.id === 'dept-mech') return b.includes('mechanical');
+      return false;
+    });
 
     return `
       <div class="card">
@@ -366,8 +379,9 @@ const adminView = {
           </div>
         </div>
 
-        <div style="margin-bottom:12px;">
+        <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <input type="text" id="dept-student-search" class="form-input" placeholder="Search by UIN, Name or Email..." oninput="adminView.filterDeptStudents(this.value, '${dept.id}')" style="max-width:360px;">
+          <span class="tag tag-co" style="font-size:12px; font-weight:600;">Showing AY ${activeAY}</span>
         </div>
 
         <div class="table-container" style="max-height:500px; overflow-y:auto;">
@@ -395,7 +409,19 @@ const adminView = {
     const q = (query || '').toLowerCase().trim();
     const dept = HARDCODED_DEPARTMENTS.find(d => d.id === deptId) || { id: deptId };
 
-    const deptStudents = app.getStudentsForDept(dept.id);
+    const activeAY = app.getActiveAcademicYear();
+    const ayStudents = app.getStudentsForAY(activeAY);
+    const deptStudents = ayStudents.filter(s => {
+      const b = (s.branch || '').toLowerCase();
+      const y = (s.yearOfStudy || s.year_of_study || 'FE').toUpperCase();
+      if (dept.id === 'dept-fe') return y === 'FE';
+      if (dept.id === 'dept-aids') return b.includes('artificial intelligence');
+      if (dept.id === 'dept-civil') return b.includes('civil');
+      if (dept.id === 'dept-comp') return b.includes('computer engineering');
+      if (dept.id === 'dept-ecs') return b.includes('electronics');
+      if (dept.id === 'dept-mech') return b.includes('mechanical');
+      return false;
+    });
 
     const filtered = deptStudents.filter(s => {
       return (s.name || '').toLowerCase().includes(q) ||
@@ -1173,6 +1199,15 @@ const adminView = {
      STUDENTS MASTER ROSTER & MODALS
      ========================================================================== */
   renderStudentsMaster(container) {
+    if (!this.activeRosterAY) {
+      this.activeRosterAY = app.getActiveAcademicYear();
+    }
+
+    const baseStudents = app.getStudentsForAY(this.activeRosterAY);
+    const ayOptions = (app.data.academicYears || ['2026-27', '2025-26']).map(ay =>
+      `<option value="${ay}" ${ay === this.activeRosterAY ? 'selected' : ''}>Academic Year ${ay}</option>`
+    ).join('');
+
     container.innerHTML = `
       <div class="breadcrumb-container" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
         <a href="#admin-home" style="color:var(--accent-blue); font-weight:600; text-decoration:none;">Admin Home</a>
@@ -1189,6 +1224,18 @@ const adminView = {
       </div>
 
       <div class="card" style="margin-bottom:20px;">
+        <div style="margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <div class="filter-group" style="max-width:280px;">
+            <label style="font-weight:700;">Academic Year Filter</label>
+            <select id="student-ay-filter" class="form-select" onchange="adminView.activeRosterAY = this.value; adminView.filterStudentRoster();">
+              ${ayOptions}
+            </select>
+          </div>
+          <span id="student-roster-count-badge" class="tag tag-co" style="font-size:12px; font-weight:700; padding:6px 12px;">
+            Showing AY ${this.activeRosterAY} — ${baseStudents.length} students
+          </span>
+        </div>
+
         <div style="display:grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap:12px; align-items:flex-end;">
           <div class="filter-group">
             <label>Search Roster</label>
@@ -1228,7 +1275,7 @@ const adminView = {
               </tr>
             </thead>
             <tbody id="student-table-body">
-              ${this.buildStudentRows(app.data.students)}
+              ${this.buildStudentRows(baseStudents)}
             </tbody>
           </table>
         </div>
@@ -1271,16 +1318,31 @@ const adminView = {
   },
 
   filterStudentRoster() {
+    const aySelect = document.getElementById('student-ay-filter');
+    if (aySelect) {
+      this.activeRosterAY = aySelect.value;
+    } else if (!this.activeRosterAY) {
+      this.activeRosterAY = app.getActiveAcademicYear();
+    }
+
+    const baseStudents = app.getStudentsForAY(this.activeRosterAY);
     const q = (document.getElementById('student-search-input')?.value || '').toLowerCase();
     const bFilter = document.getElementById('student-branch-filter')?.value || '';
     const dFilter = document.getElementById('student-div-filter')?.value || '';
 
-    const filtered = app.data.students.filter(s => {
+    const filtered = baseStudents.filter(s => {
       const matchQ = (s.name || '').toLowerCase().includes(q) || (s.uin || '').includes(q);
       const matchB = !bFilter || s.branch === bFilter;
       const matchD = !dFilter || s.division === dFilter;
       return matchQ && matchB && matchD;
     });
+
+    const badge = document.getElementById('student-roster-count-badge');
+    if (badge) badge.textContent = `Showing AY ${this.activeRosterAY} — ${filtered.length} students`;
+
+    const body = document.getElementById('student-table-body');
+    if (body) body.innerHTML = this.buildStudentRows(filtered);
+  },
 
     const body = document.getElementById('student-table-body');
     if (body) body.innerHTML = this.buildStudentRows(filtered);

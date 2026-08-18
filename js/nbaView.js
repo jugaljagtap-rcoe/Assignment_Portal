@@ -43,7 +43,7 @@ const nbaView = {
   },
 
   renderInstituteView(container) {
-    const studentsForAY = app.getStudentsForAY();
+    const studentsForAY = app.getStudentsForAY(app.getActiveAcademicYear());
     const totalStudents = studentsForAY.length;
     const totalCos = (app.data.courseOutcomes || []).length;
     const classTarget = app.data.attainmentSettings ? app.data.attainmentSettings.classTargetPct : 70;
@@ -311,7 +311,7 @@ const nbaView = {
   },
 
   renderStudentView(container, studentId) {
-    const studentsForAY = app.getStudentsForAY();
+    const studentsForAY = app.getStudentsForAY(app.getActiveAcademicYear());
     if (!studentId && studentsForAY.length > 0) {
       studentId = studentsForAY[0].id;
     }

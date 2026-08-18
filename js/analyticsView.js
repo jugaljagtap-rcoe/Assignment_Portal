@@ -481,7 +481,7 @@ const analyticsView = {
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += "Institutional Academic & Accreditation Summary Report\n";
     csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
-    csvContent += `Total Students Enrolled,${app.data.students.length}\n`;
+    csvContent += `Total Students Enrolled,${app.getStudentsForAY(app.getActiveAcademicYear()).length}\n`;
     csvContent += `Total Faculty Members,${(app.data.faculty || []).length}\n`;
     csvContent += `Total Subjects Defined,${(app.data.subjects || []).length}\n`;
     csvContent += `Total Assignments Published,${(app.data.assignments || []).length}\n`;
