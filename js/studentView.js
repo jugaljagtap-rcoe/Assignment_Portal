@@ -348,6 +348,10 @@ const studentView = {
             <p style="color:var(--text-secondary); margin-bottom:16px;">
               ${!student ? 'No student profile selected.' : 'There are currently no published lab assignments for your class/branch to solve.'}
             </p>
+          </div>
+        `;
+        return;
+      }
 
       if (this.getAsgQuestions(asg).length === 0) {
         container.innerHTML = `
