@@ -1669,6 +1669,14 @@ const facultyView = {
           value: String(finalVal)
         };
 
+        const dbPayload = {
+          id: deterministicId,
+          student_id: student.id,
+          assignment_id: asgId,
+          key: scopedKey,
+          value: String(finalVal)
+        };
+
         // Memory upsert
         const existingIdx = (app.data.studentVariables || []).findIndex(v => v.id === deterministicId);
         if (existingIdx >= 0) {
@@ -1679,7 +1687,7 @@ const facultyView = {
         }
 
         // Supabase upsert
-        await app.supabaseUpsert('student_variables', record, `Variable ${scopedKey} for ${rawUin}`);
+        await app.supabaseUpsert('student_variables', dbPayload, `Variable ${scopedKey} for ${rawUin}`);
         recordCount++;
         studentVarSavedCount++;
       }
