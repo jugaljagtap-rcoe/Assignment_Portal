@@ -1344,10 +1344,6 @@ const adminView = {
     if (body) body.innerHTML = this.buildStudentRows(filtered);
   },
 
-    const body = document.getElementById('student-table-body');
-    if (body) body.innerHTML = this.buildStudentRows(filtered);
-  },
-
   openStudentProfileModal(studentId) {
     const s = app.data.students.find(st => st.id === studentId);
     if (!s) return;
