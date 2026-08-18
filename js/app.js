@@ -250,6 +250,23 @@ class AppEngine {
     this.renderCurrentView();
   }
 
+  async fetchAllRows(table, queryFn = null) {
+    if (!supabaseClient) return [];
+    const PAGE_SIZE = 1000;
+    let offset = 0;
+    let allRows = [];
+    while (true) {
+      let query = supabaseClient.from(table).select('*').range(offset, offset + PAGE_SIZE - 1);
+      if (queryFn) query = queryFn(query);
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) break;
+      allRows = allRows.concat(data);
+      if (data.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+    return allRows;
+  }
+
   /* ==========================================================================
      PART 2 — DATA LOADING ARCHITECTURE (Promise.all Parallel Sync)
      ========================================================================== */
@@ -262,7 +279,7 @@ class AppEngine {
     try {
       const [
         studentsRes, facultyRes, subjectFacultyRes, subjectsRes, assignmentsRes,
-        submissionsRes, assignmentSubmissionsRes, studentVarsRes, studentAnswersRes,
+        assignmentSubmissionsRes,
         courseOutcomesRes, modulesRes, auditLogRes, templatesRes, coPoRes,
         programOutcomesRes, assignmentSequencesRes, rubricPresetsRes, portalSettingsRes
       ] = await Promise.all([
@@ -271,10 +288,7 @@ class AppEngine {
         supabaseClient.from('subject_faculty').select('*'),
         supabaseClient.from('subjects').select('*'),
         supabaseClient.from('assignments').select('*'),
-        supabaseClient.from('submissions').select('*').limit(10000),
         supabaseClient.from('assignment_submissions').select('*').limit(10000),
-        supabaseClient.from('student_variables').select('*').limit(10000),
-        supabaseClient.from('student_answers').select('*').limit(10000),
         supabaseClient.from('course_outcomes').select('*'),
         supabaseClient.from('modules').select('*'),
         supabaseClient.from('audit_log').select('*').order('changed_at', { ascending: false }).limit(500),
@@ -284,6 +298,12 @@ class AppEngine {
         supabaseClient.from('assignment_sequences').select('*'),
         supabaseClient.from('rubric_presets').select('*'),
         supabaseClient.from('portal_settings').select('*')
+      ]);
+
+      const [submissionsData, studentVarsData, studentAnswersData] = await Promise.all([
+        this.fetchAllRows('submissions'),
+        this.fetchAllRows('student_variables'),
+        this.fetchAllRows('student_answers')
       ]);
 
       if (portalSettingsRes && portalSettingsRes.data) {
@@ -323,16 +343,16 @@ class AppEngine {
           subject_id: a.subject_id || a.subjectId || ''
         }));
       }
-      if (submissionsRes.data) this.data.submissions = submissionsRes.data;
+      if (submissionsData && submissionsData.length > 0) this.data.submissions = submissionsData;
       if (assignmentSubmissionsRes.data) this.data.assignmentSubmissions = assignmentSubmissionsRes.data;
-      if (studentVarsRes.data) {
-        this.data.studentVariables = studentVarsRes.data.map(v => ({
+      if (studentVarsData && studentVarsData.length > 0) {
+        this.data.studentVariables = studentVarsData.map(v => ({
           ...v,
           studentId: v.student_id || v.studentId || '',
           assignmentId: v.assignment_id || v.assignmentId || ''
         }));
       }
-      if (studentAnswersRes.data) this.data.studentAnswers = studentAnswersRes.data;
+      if (studentAnswersData && studentAnswersData.length > 0) this.data.studentAnswers = studentAnswersData;
       if (courseOutcomesRes.data) {
         this.data.courseOutcomes = courseOutcomesRes.data.map(co => ({
           ...co,
