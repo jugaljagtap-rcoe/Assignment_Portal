@@ -371,7 +371,42 @@ const studentView = {
         }
       });
 
+      const questions = this.getAsgQuestions(asg);
+      const studentSubmissions = (app.data.submissions || []).filter(s => s.studentId === student.id && s.assignmentId === asg.id);
+      
+      const answeredParamIds = new Set(studentSubmissions.map(s => s.parameterId));
+      let totalParamsCount = 0;
+      
+      const qIndicators = questions.map((q, idx) => {
+        const qParams = q.parameters || [];
+        totalParamsCount += qParams.length;
+        const qHasSubmission = qParams.some(p => answeredParamIds.has(p.id));
+        const dotStyle = qHasSubmission
+          ? 'display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--text-secondary); vertical-align: middle; margin-left: 4px;'
+          : 'display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--text-tertiary); background: transparent; vertical-align: middle; margin-left: 4px; box-sizing: border-box;';
+        return `<span>Q${idx + 1} <span style="${dotStyle}"></span></span>`;
+      });
+
+      const displayCode = asg.display_code || asg.working_title || asg.title;
+
+      const progressStripHtml = `
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 10px 16px; font-size: 13px; font-weight: 600; font-family: var(--font-mono); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span>${displayCode}</span>
+            <span style="color: var(--text-tertiary);">·</span>
+            <div style="display: flex; gap: 12px; align-items: center;">
+              ${qIndicators.join('')}
+            </div>
+          </div>
+          <div>
+            <span>${answeredParamIds.size} / ${totalParamsCount} parameters answered</span>
+          </div>
+        </div>
+      `;
+
       container.innerHTML = `
+        ${progressStripHtml}
+
         <div class="page-header-container print-hide">
           <div>
             <h1 class="page-title">Solve Assignment</h1>
@@ -422,7 +457,7 @@ const studentView = {
         </div>
 
         <div style="display:flex; flex-direction:column; gap:20px;">
-          ${this.getAsgQuestions(asg).map((q, qIndex) => {
+          ${questions.map((q, qIndex) => {
             const qPrefix = `Q${qIndex + 1}_`;
             const qStudentVars = {};
             Object.keys(studentVars).forEach(k => {
@@ -430,16 +465,28 @@ const studentView = {
                 qStudentVars[k.slice(qPrefix.length)] = studentVars[k];
               }
             });
+
+            const qParams = q.parameters || [];
+            const qAnsweredCount = qParams.filter(p => answeredParamIds.has(p.id)).length;
+            const qTotalCount = qParams.length;
+            const qProgressPct = qTotalCount > 0 ? (qAnsweredCount / qTotalCount) * 100 : 0;
+
             return `
               <div class="card" style="padding:20px;">
                 <strong style="font-size:15px; color:var(--accent-blue);">${q.sectionLabel || `Question ${qIndex+1}`}</strong>
                 <div style="font-size:14px; margin-top:8px; line-height:1.6;">${app.formatQuestionText(q.text, qStudentVars)}</div>
                 ${q.imageUrl ? `<img src="${app.getEmbeddableImageUrl(q.imageUrl)}" class="question-diagram" alt="Question Diagram">` : ''}
 
-                <div style="margin-top:16px; border-top:1px solid var(--border-default); padding-top:16px;">
-                  <label style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary);">Evaluation Parameters</label>
-                  <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
-                    ${(q.parameters || []).map(p => this.renderParameterInputField(asg.id, student.id, q, p)).join('')}
+                <div style="background: var(--bg-subtle); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 14px 16px; margin-top: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">✏️ Your Answers</span>
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-tertiary); font-family: var(--font-mono);">${qAnsweredCount} / ${qTotalCount} parameters answered</span>
+                  </div>
+                  <div style="height: 4px; background: var(--bg-hover); border-radius: var(--radius-pill); margin: 6px 0 12px 0;">
+                    <div style="height: 100%; background: var(--accent-blue); border-radius: var(--radius-pill); width: ${qProgressPct}%; transition: width 0.3s ease;"></div>
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${qParams.map(p => this.renderParameterInputField(asg.id, student.id, q, p)).join('')}
                   </div>
                 </div>
               </div>
@@ -455,74 +502,68 @@ const studentView = {
 
   renderParameterInputField(asgId, studentId, question, param) {
     const paramId = param.id;
-    const asg = (app.data.assignments || []).find(a => a.id === asgId);
-    const rubric = app.getRubricPreset(asg?.rubric_preset_id || asg?.rubricPresetId);
-
-    // Multipliers
-    const gMult = rubric?.given_multiplier ?? 1;
-    const iMult = rubric?.intermediate_multiplier ?? 2;
-    const fMult = rubric?.final_multiplier ?? 3;
-
-    // Calculate parameter share of question max_marks
-    const qParams = question.parameters || [];
-    const sumMults = qParams.reduce((sum, p) => {
-      const type = p.parameter_type || p.parameterType || 'intermediate';
-      const m = type === 'given' ? gMult : type === 'final' ? fMult : iMult;
-      return sum + m;
-    }, 0) || 1;
-
-    const pType = param.parameter_type || param.parameterType || 'intermediate';
-    const pMult = pType === 'given' ? gMult : pType === 'final' ? fMult : iMult;
-    const qMaxMarks = parseFloat(question.max_marks || question.maxMarks) || 10;
-    const paramShareMarks = (pMult / sumMults) * qMaxMarks;
-
     const priorAttempts = app.data.submissions.filter(s => s.studentId === studentId && s.parameterId === paramId);
     const attemptCount = priorAttempts.length;
     const isCapped = attemptCount >= 3;
     const latestAttempt = priorAttempts.length > 0 ? priorAttempts[priorAttempts.length - 1] : null;
 
-    let bestRawMarks = 0;
-    let bestFinalMarks = 0;
-    priorAttempts.forEach(s => {
-      bestRawMarks = Math.max(bestRawMarks, s.rawMarks || s.raw_marks || s.marksAwarded || 0);
-      bestFinalMarks = Math.max(bestFinalMarks, s.marksAwarded || s.finalMarks || 0);
-    });
+    let borderLeftColor = 'var(--border-strong)';
+    if (isCapped) {
+      borderLeftColor = 'var(--text-tertiary)';
+    } else if (attemptCount > 0) {
+      borderLeftColor = 'var(--text-secondary)';
+    }
 
-    const gt = app.data.studentAnswers.find(a => a.studentId === studentId && a.parameterId === paramId);
-    const narrativeTags = latestAttempt ? app.computeAttemptNarrativeTag(latestAttempt, gt, param) : [];
+    const maxAttempts = 3;
+    let dotsHtml = '';
+    for (let i = 1; i <= maxAttempts; i++) {
+      if (i <= attemptCount) {
+        dotsHtml += `<span style="color: var(--text-secondary); font-size: 14px;">● </span>`;
+      } else {
+        dotsHtml += `<span style="color: var(--text-tertiary); font-size: 14px;">○ </span>`;
+      }
+    }
+
+    const nextAttemptNum = Math.min(3, attemptCount + 1);
+
+    const valVal = latestAttempt ? latestAttempt.submittedValue : '';
+    const unitVal = latestAttempt ? latestAttempt.submittedUnit : '';
+    const isInitialEmpty = !valVal;
 
     return `
-      <div style="background:var(--bg-subtle); padding:12px 16px; border-radius:var(--radius-md); border:1px solid var(--border-default);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-default); border-left: 3px solid ${borderLeftColor}; border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 8px; transition: border-left-color 0.2s ease;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${param.label}</span>
           <div>
-            <strong style="font-size:13px; color:var(--text-primary);">${param.label}</strong>
-            <span class="tag tag-co" style="font-size:10px; margin-left:6px; text-transform:uppercase;">${pType} (${pMult}x)</span>
-            <span style="font-size:11px; color:var(--text-secondary); margin-left:8px;">(Param Share: <strong class="mono-val">${paramShareMarks.toFixed(2)}</strong> / Q Max ${qMaxMarks})</span>
+            ${dotsHtml}
+            <span style="font-size: 11px; color: var(--text-tertiary);">${attemptCount}/3</span>
           </div>
-          <span class="mono-val" style="font-size:12px; font-weight:700; color:var(--accent-blue);">Attempt ${attemptCount}/3</span>
         </div>
 
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-          <input type="number" step="any" id="input-val-${paramId}" class="form-input code-font" placeholder="Value" 
-            value="${latestAttempt ? latestAttempt.submittedValue : ''}" ${isCapped ? 'disabled' : ''} style="width:140px; background:#FFF;">
+        ${isCapped ? `
+          <div style="font-size: 13px; font-weight: 600; color: var(--text-tertiary); margin-top: 10px;">
+            🔒 Maximum attempts used — Last answer: ${latestAttempt ? latestAttempt.submittedValue : ''} ${latestAttempt ? latestAttempt.submittedUnit : ''}
+          </div>
+        ` : `
+          <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
+            <input type="number" step="any" id="input-val-${paramId}" class="form-input code-font"
+              value="${valVal}"
+              oninput="document.getElementById('btn-submit-${paramId}').disabled = !this.value; document.getElementById('btn-submit-${paramId}').style.opacity = !this.value ? '0.4' : '1';"
+              style="width: 160px; height: 36px; font-family: var(--font-mono); font-weight: 600; font-size: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-md) 0 0 var(--radius-md); padding: 0 12px; background: var(--bg-surface);" />
+            <input type="text" id="input-unit-${paramId}" class="form-input code-font"
+              value="${unitVal}"
+              style="width: 80px; height: 36px; font-family: var(--font-mono); font-weight: 600; font-size: 13px; border: 1px solid var(--border-strong); border-left: none; border-radius: 0 var(--radius-md) var(--radius-md) 0; padding: 0 10px; background: var(--bg-subtle); text-align: center;" />
+            <button id="btn-submit-${paramId}" class="btn btn-primary btn-sm"
+              ${isInitialEmpty ? 'disabled style="opacity: 0.4;"' : ''}
+              onclick="studentView.submitParameterAnswer('${asgId}', '${studentId}', '${paramId}')">
+              Submit (Attempt ${nextAttemptNum}/3)
+            </button>
+          </div>
+        `}
 
-          <input type="text" id="input-unit-${paramId}" class="form-input code-font" placeholder="Unit (${param.unitHint || ''})" 
-            value="${latestAttempt ? latestAttempt.submittedUnit : ''}" ${isCapped ? 'disabled' : ''} style="width:120px; background:#FFF;">
-
-          <button class="btn ${isCapped ? 'btn-ghost' : 'btn-primary'} btn-sm" onclick="studentView.submitParameterAnswer('${asgId}', '${studentId}', '${paramId}')" ${isCapped ? 'disabled' : ''}>
-            ${isCapped ? '🔒 Max Attempts Used' : `Submit (Attempt ${attemptCount + 1}/3)`}
-          </button>
-        </div>
-
-        ${priorAttempts.length > 0 ? `
-          <div class="param-summary-footer" style="margin-top:10px;">
-            <span>Attempts: <strong class="mono-val">${attemptCount} / 3</strong></span>
-            <span>Raw Marks: <strong class="mono-val" style="color:var(--accent-blue);">${bestRawMarks.toFixed(2)} / ${paramShareMarks.toFixed(2)}</strong></span>
-            <span>Final Marks: <strong class="mono-val" style="color:var(--success);">${bestFinalMarks.toFixed(2)} / ${paramShareMarks.toFixed(2)}</strong></span>
-            ${latestAttempt && latestAttempt.attemptDeductionPct > 0 ? `<span style="color:var(--warning); font-size:11px; font-weight:600;">⚠️ ${latestAttempt.attemptDeductionPct}% attempt deduction</span>` : ''}
-            <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-              ${narrativeTags.map(t => `<span class="tag tag-co" style="font-size:10px;">${t}</span>`).join('')}
-            </div>
+        ${(!isCapped && attemptCount > 0) ? `
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+            Answer recorded — Attempt ${attemptCount}/3 used
           </div>
         ` : ''}
       </div>
@@ -700,7 +741,23 @@ const studentView = {
         } catch(e) { console.warn('Rollup upsert notice:', e); }
       }
 
-      app.showToast(`Attempt ${nextAttemptNum}/3 submitted successfully`, 'success');
+      const student = this.getResolvedStudent();
+      const schedule = app.getAssignmentSchedule(asgId, student ? student.batch : 'A1');
+      const isLate = schedule && schedule.deadline ? new Date() > new Date(schedule.deadline) : false;
+
+      if (isLate) {
+        app.showToast('Late submission recorded — penalty may apply', 'warning');
+      }
+
+      if (nextAttemptNum < 3) {
+        app.showToast(`Answer recorded — Attempt ${nextAttemptNum}/3`, 'info');
+      } else if (nextAttemptNum === 3) {
+        app.showToast('Maximum attempts reached for this parameter', 'warning');
+      }
+
+      if (allAsgParams.length > 0 && uniqueParamsDone >= allAsgParams.length) {
+        app.showToast('All answers submitted for this assignment', 'success');
+      }
     } finally {
       this._submitting = false;
     }
