@@ -35,10 +35,12 @@ function parseJwtToken(token) {
 function writeAudit(action, entityType, entityId, snapshot) {
   if (!supabaseClient) return;
   supabaseClient.from('audit_log').insert({
+    id: crypto.randomUUID(),
     action: action,
     entity_type: entityType,
     entity_id: entityId,
     changed_by: (window.app && window.app.currentUser) ? window.app.currentUser.email : 'system',
+    changed_at: new Date().toISOString(),
     snapshot: snapshot || {}
   }).then(() => {}).catch(err => console.warn('Audit insert notice:', err));
 }
