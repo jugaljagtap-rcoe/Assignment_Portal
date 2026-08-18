@@ -1368,7 +1368,9 @@ const facultyView = {
     const orphanedKeys = Array.from(new Set(existingAsgVars.map(v => v.key).filter(k => k && !currentVarSet.has(k))));
 
     // Resolve subject & enrolled students via app.getStudentsForSubject
-    const currentSubject = subObj || (app.data.subjects || []).find(s => s.id === (activeAsg.subjectId || activeAsg.subject_id)) || (app.data.subjects || [])[0];
+    const resolvedSubjectId = activeAsg.subject_id || activeAsg.subjectId || '';
+    const currentSubject = subObj || (resolvedSubjectId ? (app.data.subjects || []).find(s => s.id === resolvedSubjectId) : null) || null;
+    if (!currentSubject) { stepContainer.innerHTML = '<div class="empty-state">Subject not found. Please reload.</div>'; return; }
     const enrolledStudents = app.getStudentsForSubject(currentSubject);
 
     // Compute coverage: students fully assigned (has non-empty value for ALL scoped variables)
