@@ -1352,6 +1352,7 @@ const facultyView = {
     if (!activeAsg) return;
 
     this.activeCSVAssignmentId = activeAsg.id;
+    const deptId = subObj ? (subObj.departmentId || subObj.department_id || '') : '';
     const variableNames = this.getAssignmentVariables(activeAsg);
 
     // Orphaned keys detection
