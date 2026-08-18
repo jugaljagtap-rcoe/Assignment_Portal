@@ -1188,7 +1188,7 @@ class AppEngine {
     varTokens.forEach((vt, i) => {
       const val = variablesMap[vt.key];
       const html = val !== undefined
-        ? `<strong class="mono-val" style="color:var(--accent-blue);">${val}</strong>`
+        ? `${val}`
         : `<code class="code-font" style="color:var(--warning);">{{${vt.key}}}</code>`;
       out = out.replace(`\x00VAR${i}\x00`, html);
     });
