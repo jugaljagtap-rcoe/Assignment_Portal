@@ -1297,7 +1297,7 @@ const facultyView = {
 
     if (variableAssignments.length === 0) {
       modeACardContainer.innerHTML = `
-        <h3 class="card-title">Mode A: Per-Student Variable CSV Pipeline</h3>
+        <h3 class="card-title">Mode A: Per-Student Variables & Solution Key</h3>
         <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;">
           Assign custom per-student values for question variables (e.g. {{A}}, {{m}}, {{P}}).
         </p>
@@ -1318,7 +1318,7 @@ const facultyView = {
     modeACardContainer.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
         <div>
-          <h3 class="card-title">Mode A: Per-Student Variable CSV Pipeline</h3>
+          <h3 class="card-title">Mode A: Per-Student Variables & Solution Key</h3>
           <p style="font-size:13px; color:var(--text-secondary); margin-top:4px;">
             Download template, upload custom variable values per student UIN, and track assignment coverage.
           </p>
@@ -1399,41 +1399,42 @@ const facultyView = {
         </div>
       ` : ''}
 
-      <!-- Step 2 & Step 3 — Template Download & CSV Upload -->
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px; padding:16px; background:var(--surface-hover); border-radius:8px; border:1px solid var(--border-color);">
-        <div>
-          <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 2 — Download CSV Template</label>
+      <!-- Step 2 & Step 3A — Template Download & CSV Upload -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div style="min-height:160px; padding:20px; background:var(--surface-hover); border-radius:8px; border:1px solid var(--border-color);">
+          <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 2 — Download Variable CSV Template</label>
           <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
             Generates a pre-formatted CSV with headers (<code>uin, ${variableNames.join(', ')}</code>), a DEFAULT fallback row, and enrolled student rows pre-filled with saved values.
           </p>
-          <button class="btn btn-secondary" onclick="facultyView.downloadVariableCSVTemplate('${activeAsg.id}', '${deptId}')">
-            📥 Download CSV Template
+          <button class="btn btn-secondary" style="background: transparent; border: 2px solid var(--accent-blue); color: var(--accent-blue); min-width: 200px;" onclick="facultyView.downloadVariableCSVTemplate('${activeAsg.id}', '${deptId}')">
+            ⬇ Download CSV Template
           </button>
         </div>
 
-        <div>
-          <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 3 — Upload Filled CSV</label>
+        <div style="min-height:160px; padding:20px; background:var(--surface-hover); border-radius:8px; border:1px solid var(--border-color);">
+          <label style="font-weight:600; font-size:13px; margin-bottom:6px; display:block;">Step 3A — Upload Variable CSV</label>
           <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">
             Upload completed CSV with student variable assignments.
           </p>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <input type="file" id="mode-a-csv-file-input" accept=".csv" class="form-control" style="max-width:240px; font-size:12px;">
-            <button class="btn btn-primary" onclick="facultyView.uploadVariableCSV('${activeAsg.id}', ${subIdArg})">
-              📤 Upload & Save Variables
+            <button class="btn btn-primary" style="min-width: 200px;" onclick="facultyView.uploadVariableCSV('${activeAsg.id}', ${subIdArg})">
+              ⬆ Upload & Save Variables
             </button>
           </div>
         </div>
       </div>
 
-      <div style="margin-bottom:24px; padding:16px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
-        <div style="font-weight:700; font-size:13px; margin-bottom:6px;">Solution Key (Ground Truth Values)</div>
+      <!-- Step 3B — Solution Key -->
+      <div style="min-height:160px; padding:20px; margin-bottom:24px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
+        <div style="font-weight:700; font-size:13px; margin-bottom:6px;">Step 3B — Solution Key (Ground Truth for Auto-Grading)</div>
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
           Download the template pre-filled with current correct values per student. Fill in missing values in Excel and re-upload to set ground truth for auto-grading.
         </p>
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-          <button class="btn btn-secondary" onclick="facultyView.downloadSolutionKeyTemplate('${activeAsg.id}', ${subIdArg})">📥 Download Solution Key Template</button>
+          <button class="btn btn-secondary" style="background: transparent; border: 2px solid var(--accent-blue); color: var(--accent-blue); min-width: 200px;" onclick="facultyView.downloadSolutionKeyTemplate('${activeAsg.id}', ${subIdArg})">⬇ Download Solution Key Template</button>
           <input type="file" id="solution-key-file-input-${activeAsg.id}" accept=".csv" style="font-size:12px; max-width:240px;">
-          <button class="btn btn-primary" onclick="facultyView.uploadSolutionKeyCSV('${activeAsg.id}', ${subIdArg})">📤 Upload Solution Key CSV</button>
+          <button class="btn btn-primary" style="min-width: 200px;" onclick="facultyView.uploadSolutionKeyCSV('${activeAsg.id}', ${subIdArg})">⬆ Upload Solution Key CSV</button>
         </div>
       </div>
 
@@ -1633,11 +1634,25 @@ const facultyView = {
   },
 
   renderCoverageTableHTML(activeAsg, variableNames, enrolledStudents, fullyAssignedCount) {
+    const totalCount = enrolledStudents ? enrolledStudents.length : 0;
+    const pct = totalCount > 0 ? (fullyAssignedCount / totalCount) * 100 : 0;
+    let badgeBg = 'var(--danger)';
+    if (pct === 100) {
+      badgeBg = 'var(--success)';
+    } else if (pct > 0) {
+      badgeBg = 'var(--warning)';
+    }
+
     return `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
         <h4 style="margin:0; font-size:14px; font-weight:700;">Step 4 — Variable Assignment Coverage</h4>
-        <div style="font-size:13px; font-weight:600; color:var(--text-primary);">
-          📊 <strong>${fullyAssignedCount} of ${enrolledStudents.length} students fully assigned.</strong>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="background: ${badgeBg}; padding: 6px 14px; border-radius: var(--radius-pill); font-weight: 700; font-size: 13px; color: #fff;">
+            ${fullyAssignedCount} / ${totalCount} (${pct.toFixed(0)}%)
+          </span>
+          <div style="font-size:13px; font-weight:600; color:var(--text-primary);">
+            📊 <strong>${fullyAssignedCount} of ${totalCount} students fully assigned.</strong>
+          </div>
         </div>
       </div>
 
@@ -1961,9 +1976,9 @@ const facultyView = {
       </div>
 
       <div class="segmented-control print-hide" style="margin-bottom:20px;">
-        <button class="segmented-btn ${this.gradingMode === 'bulk' ? 'active' : ''}" onclick="facultyView.gradingMode = 'bulk'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">📁 Mode A: Bulk CSV</button>
-        <button class="segmented-btn ${this.gradingMode === 'queue' ? 'active' : ''}" onclick="facultyView.gradingMode = 'queue'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">👤 Mode B: Student Queue</button>
-        <button class="segmented-btn ${this.gradingMode === 'roster' ? 'active' : ''}" onclick="facultyView.gradingMode = 'roster'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">📋 Mode C: Roster Override</button>
+        <button class="segmented-btn ${this.gradingMode === 'bulk' ? 'active' : ''}" style="min-width:200px; justify-content:center; ${this.gradingMode === 'bulk' ? 'border-left: 3px solid var(--accent-blue);' : ''}" onclick="facultyView.gradingMode = 'bulk'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">📁 Mode A: Bulk CSV</button>
+        <button class="segmented-btn ${this.gradingMode === 'queue' ? 'active' : ''}" style="min-width:200px; justify-content:center; ${this.gradingMode === 'queue' ? 'border-left: 3px solid var(--accent-blue);' : ''}" onclick="facultyView.gradingMode = 'queue'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">👤 Mode B: Student Queue</button>
+        <button class="segmented-btn ${this.gradingMode === 'roster' ? 'active' : ''}" style="min-width:200px; justify-content:center; ${this.gradingMode === 'roster' ? 'border-left: 3px solid var(--accent-blue);' : ''}" onclick="facultyView.gradingMode = 'roster'; facultyView.renderCSVPipeline(document.getElementById('subject-workspace-tab-content') || document.getElementById('main-content'), ${subIdArg});">📋 Mode C: Roster Override</button>
       </div>
 
       <div class="card" id="mode-a-container">
