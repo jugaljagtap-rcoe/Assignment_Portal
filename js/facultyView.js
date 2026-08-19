@@ -1425,11 +1425,211 @@ const facultyView = {
         </div>
       </div>
 
+      <div style="margin-bottom:24px; padding:16px; background:var(--bg-subtle); border-radius:var(--radius-md); border:1px solid var(--border-default);">
+        <div style="font-weight:700; font-size:13px; margin-bottom:6px;">Solution Key (Ground Truth Values)</div>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">
+          Download the template pre-filled with current correct values per student. Fill in missing values in Excel and re-upload to set ground truth for auto-grading.
+        </p>
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="facultyView.downloadSolutionKeyTemplate('${activeAsg.id}', ${subIdArg})">📥 Download Solution Key Template</button>
+          <input type="file" id="solution-key-file-input-${activeAsg.id}" accept=".csv" style="font-size:12px; max-width:240px;">
+          <button class="btn btn-primary" onclick="facultyView.uploadSolutionKeyCSV('${activeAsg.id}', ${subIdArg})">📤 Upload Solution Key CSV</button>
+        </div>
+      </div>
+
       <!-- Step 4 — Coverage Display -->
       <div id="mode-a-coverage-container">
         ${this.renderCoverageTableHTML(activeAsg, variableNames, enrolledStudents, fullyAssignedCount)}
       </div>
     `;
+  },
+
+  downloadSolutionKeyTemplate(asgId, sub) {
+    const asg = (app.data.assignments || []).find(a => a.id === asgId);
+    if (!asg) return;
+
+    const questions = this.getAsgQuestions(asg);
+
+    const subObj = typeof sub === 'object' && sub !== null
+      ? sub
+      : (app.data.subjects || []).find(s => s.id === sub) || null;
+    const resolvedSubjectId = asg.subject_id || asg.subjectId || '';
+    const currentSubject = subObj || (resolvedSubjectId ? (app.data.subjects || []).find(s => s.id === resolvedSubjectId) : null) || null;
+
+    const enrolledStudents = currentSubject ? app.getStudentsForSubject(currentSubject) : [];
+
+    const params = [];
+    questions.forEach((q, qi) => {
+      const qParams = q.parameters || [];
+      qParams.forEach(p => {
+        params.push({ parameterId: p.id, label: p.label, questionIndex: qi + 1 });
+      });
+    });
+
+    const escapeCSV = (val) => {
+      if (val === undefined || val === null) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes(';')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const headerRow = ['uin', ...params.map(p => `${p.parameterId} (Q${p.questionIndex}: ${p.label})`)].map(escapeCSV).join(',');
+    const studentRows = enrolledStudents.map(st => {
+      const uinCell = st.uin || st.id || '';
+      const paramCells = params.map(p => {
+        const ans = (app.data.studentAnswers || []).find(a =>
+          (a.studentId === st.id || a.student_id === st.id) &&
+          (a.parameterId === p.parameterId || a.parameter_id === p.parameterId)
+        );
+        return ans && ans.correctValue !== undefined && ans.correctValue !== null ? ans.correctValue : (ans && ans.correct_value !== undefined && ans.correct_value !== null ? ans.correct_value : '');
+      });
+      return [uinCell, ...paramCells].map(escapeCSV).join(',');
+    });
+
+    const csvContent = [headerRow, ...studentRows].join('\n');
+
+    const assignmentLabel = this.getAssignmentLabel(asg);
+    const safeFilename = `${assignmentLabel.replace(/[^a-zA-Z0-9_\-]/g, '_')}_solution_key.csv`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', safeFilename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
+
+  async uploadSolutionKeyCSV(asgId, sub) {
+    const fileInput = document.getElementById(`solution-key-file-input-${asgId}`);
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      app.showToast('Please select a CSV file.', 'warning');
+      return;
+    }
+
+    let text = await file.text();
+    if (text.charCodeAt(0) === 0xFEFF) {
+      text = text.slice(1);
+    }
+
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    if (lines.length < 2) {
+      app.showToast('CSV file is empty or missing header/data rows.', 'warning');
+      return;
+    }
+
+    const headerLine = lines[0];
+    const commaCount = (headerLine.match(/,/g) || []).length;
+    const semicolonCount = (headerLine.match(/;/g) || []).length;
+    const delimiter = semicolonCount > commaCount ? ';' : ',';
+
+    const parseLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim().replace(/^["']|["']$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim().replace(/^["']|["']$/g, ''));
+      return result;
+    };
+
+    const headerCols = parseLine(lines[0]);
+    if (headerCols.length < 2) {
+      app.showToast('Invalid CSV structure.', 'warning');
+      return;
+    }
+
+    const paramHeaders = headerCols.slice(1).map(col => {
+      const trimmed = col.trim();
+      const firstSpaceIdx = trimmed.indexOf(' ');
+      return firstSpaceIdx > -1 ? trimmed.substring(0, firstSpaceIdx) : trimmed;
+    });
+
+    let count = 0;
+    const processedStudentIds = new Set();
+    const skippedUins = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const rowCols = parseLine(lines[i]);
+      if (rowCols.length === 0 || !rowCols[0]) continue;
+      const rawUin = String(rowCols[0]).trim();
+      if (!rawUin || rawUin.toLowerCase() === 'uin') continue;
+
+      const st = (app.data.students || []).find(student => String(student.uin).trim() === rawUin);
+      if (!st) {
+        skippedUins.push(rawUin);
+        continue;
+      }
+
+      for (let j = 0; j < paramHeaders.length; j++) {
+        const parameterId = paramHeaders[j];
+        const cellVal = rowCols[j + 1] !== undefined ? String(rowCols[j + 1]).trim() : '';
+        if (cellVal === '') continue;
+
+        const correctValue = cellVal;
+        const rawId = `sa-${st.id}-${parameterId}`;
+        const deterministicId = rawId.replace(/[^a-zA-Z0-9\-\_]/g, '-');
+
+        const record = {
+          id: deterministicId,
+          student_id: st.id,
+          studentId: st.id,
+          assignment_id: asgId,
+          assignmentId: asgId,
+          parameter_id: parameterId,
+          parameterId: parameterId,
+          correctValue: correctValue,
+          correct_value: correctValue
+        };
+
+        if (!app.data.studentAnswers) app.data.studentAnswers = [];
+        const existingIdx = app.data.studentAnswers.findIndex(a => a.id === deterministicId);
+        if (existingIdx >= 0) {
+          app.data.studentAnswers[existingIdx] = record;
+        } else {
+          app.data.studentAnswers.push(record);
+        }
+
+        await app.supabaseUpsert('student_answers', {
+          id: deterministicId,
+          student_id: st.id,
+          assignment_id: asgId,
+          parameter_id: parameterId,
+          correct_value: correctValue
+        }, `Solution key ${rawUin} / ${parameterId}`);
+
+        count++;
+        processedStudentIds.add(st.id);
+      }
+    }
+
+    app.saveState();
+    writeAudit('updated', 'solution_key_bulk', asgId, { records_upserted: count, skipped_uins: skippedUins.length });
+
+    if (skippedUins.length > 0) {
+      app.showToast(`Skipped ${skippedUins.length} UINs not found`, 'warning');
+    }
+
+    app.showToast(`Solution key saved for ${processedStudentIds.size} students across ${paramHeaders.length} parameters.`, 'success');
   },
 
   renderCoverageTableHTML(activeAsg, variableNames, enrolledStudents, fullyAssignedCount) {
